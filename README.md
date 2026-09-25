@@ -40,20 +40,58 @@ npm start
 
 Sau đó mở Expo Go (Android/iOS) hoặc nhấn `a` / `i` trong terminal.
 
+`expo-secure-store` là native module: Expo Go có sẵn, còn development build phải build lại sau khi cài.
+
+### Kết nối backend
+
+App gọi **API gateway** (`:8080`), không gọi thẳng user-service. Đặt địa chỉ qua biến môi trường (file `mobile/.env`):
+
+```bash
+EXPO_PUBLIC_API_BASE_URL=http://192.168.1.10:8080
+```
+
+| Môi trường | Giá trị mặc định / cần đặt |
+|-----------|-----------|
+| iOS simulator, web | `http://localhost:8080` (mặc định) |
+| Android emulator | `http://10.0.2.2:8080` (mặc định) |
+| Máy thật (Expo Go) | IP LAN của máy chạy backend, bắt buộc đặt biến trên |
+
+Luồng auth (tạm tắt):
+
+Mặc định `AUTH_ENABLED=false` — app mở thẳng các tab, không bắt đăng nhập (chưa có DB). Khi backend sẵn sàng, đặt trong `mobile/.env`:
+
+```bash
+EXPO_PUBLIC_AUTH_ENABLED=true
+EXPO_PUBLIC_API_BASE_URL=http://192.168.1.10:8080
+```
+
+Khi bật lại:
+
+- `POST /auth/login` → lưu `accessToken` + `refreshToken` vào SecureStore (Keychain/Keystore; web dùng `localStorage`).
+- Request cần đăng nhập gửi `Authorization: Bearer <accessToken>`; gặp 401 thì gọi `POST /auth/refresh` một lần (dùng chung cho các request song song vì refresh token xoay vòng), refresh lỗi thì về màn đăng nhập.
+- Đăng ký `POST /api/users/register` rồi tự đăng nhập; hồ sơ lấy từ `GET /api/users/me`; đăng xuất gọi `POST /auth/logout` rồi xoá token.
+- Quên mật khẩu: backend hiện chỉ ghi mã reset ra log server (chưa gửi email), nên màn "Đặt lại mật khẩu" cần dán mã thủ công.
+
+## Giao diện
+
+Theo FE web **IELTSPath**: nền kem `#faf8f5`, chữ `#1c1917`, accent hổ phách `#f59e0b` / `#d97706`, thẻ trắng viền `#ede8df` với cạnh dưới "3D", font **Be Vietnam Pro**, màu kỹ năng Listening/Reading/Writing/Speaking/Full test. Token nằm ở `src/theme/tokens.js` (dùng chung cho Tailwind và code).
+
+Font custom tự mang weight, nên dùng `<Text weight="bold">` (`src/components/ui/text.tsx`) thay cho class `font-bold`.
+
 ## Cấu trúc
 
 ```text
-app/                 # Expo Router screens
-  (tabs)/
-    index.tsx        # Hôm nay — daily plan
-    practice.tsx     # Luyện tập ngắn
-    community.tsx    # Cộng đồng
-    profile.tsx      # Tiến độ / hồ sơ
+app/
+  _layout.tsx        # Font, providers, guard (Stack.Protected)
+  (auth)/            # login, register, forgot-password, reset-password
+  (tabs)/            # Hôm nay, Luyện đề, Cộng đồng, Tiến độ (hồ sơ + đăng xuất)
 src/
-  lib/query-client.ts
+  components/ui/     # Text, Button, TextField, Card, FormAlert, BrandLogo
+  features/auth/     # api, schemas (Zod khớp DTO backend), AuthProvider, màn auth
+  features/practice/ # danh sách kỹ năng + SkillCard
+  lib/               # env, api-client (Bearer + refresh), token-storage, query-client
   schemas/learner.ts # Zod stubs
-  types/
-components/          # UI helpers (template)
+  theme/             # design tokens
 plans/               # ClaudeKit plans
 ```
 
@@ -62,7 +100,9 @@ plans/               # ClaudeKit plans
 - [x] Expo + TS + Expo Router
 - [x] NativeWind + tab shell 4 tab
 - [x] TanStack Query provider + Zod stubs
-- [ ] Auth / API thật
+- [x] Auth thật qua gateway (đăng nhập, đăng ký, refresh, đăng xuất, quên/đặt lại mật khẩu)
+- [x] Giao diện IELTSPath theo FE web
+- [ ] API học tập (learning-support, content, assessment)
 - [ ] Push notifications
 - [ ] Audio listening 10'
 - [ ] Feed cộng đồng đầy đủ

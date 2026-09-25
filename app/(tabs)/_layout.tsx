@@ -1,69 +1,38 @@
-import { SymbolView } from 'expo-symbols';
 import { Tabs } from 'expo-router';
-import Colors from '@/constants/Colors';
-import { useColorScheme } from '@/components/useColorScheme';
-import { useClientOnlyValue } from '@/components/useClientOnlyValue';
+import { BookOpen, ChartLine, House, Users } from 'lucide-react-native';
+
+import { BrandLogo } from '@/src/components/ui/brand-logo';
+import { colors, fonts } from '@/src/theme';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme].tint,
-        headerShown: useClientOnlyValue(false, true),
+        headerTitle: () => <BrandLogo size="sm" />,
+        headerTitleAlign: 'left',
+        headerShadowVisible: false,
+        headerStyle: { backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.line },
+        tabBarActiveTintColor: colors.accentDeep,
+        tabBarInactiveTintColor: colors.muted,
+        tabBarLabelStyle: { fontFamily: fonts.semibold, fontSize: 11 },
+        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.line },
+        sceneStyle: { backgroundColor: colors.canvas },
       }}>
       <Tabs.Screen
         name="index"
-        options={{
-          title: 'Hôm nay',
-          tabBarIcon: ({ color }) => (
-            <SymbolView
-              name={{ ios: 'sun.max.fill', android: 'home', web: 'home' }}
-              tintColor={color}
-              size={26}
-            />
-          ),
-        }}
+        options={{ title: 'Hôm nay', tabBarIcon: ({ color, size }) => <House color={color} size={size} /> }}
       />
       <Tabs.Screen
         name="practice"
-        options={{
-          title: 'Luyện tập',
-          tabBarIcon: ({ color }) => (
-            <SymbolView
-              name={{ ios: 'book.fill', android: 'menu_book', web: 'menu_book' }}
-              tintColor={color}
-              size={26}
-            />
-          ),
-        }}
+        options={{ title: 'Luyện đề', tabBarIcon: ({ color, size }) => <BookOpen color={color} size={size} /> }}
       />
       <Tabs.Screen
         name="community"
-        options={{
-          title: 'Cộng đồng',
-          tabBarIcon: ({ color }) => (
-            <SymbolView
-              name={{ ios: 'person.3.fill', android: 'groups', web: 'groups' }}
-              tintColor={color}
-              size={26}
-            />
-          ),
-        }}
+        options={{ title: 'Cộng đồng', tabBarIcon: ({ color, size }) => <Users color={color} size={size} /> }}
       />
       <Tabs.Screen
         name="profile"
-        options={{
-          title: 'Tiến độ',
-          tabBarIcon: ({ color }) => (
-            <SymbolView
-              name={{ ios: 'chart.bar.fill', android: 'bar_chart', web: 'bar_chart' }}
-              tintColor={color}
-              size={26}
-            />
-          ),
-        }}
+        options={{ title: 'Tiến độ', tabBarIcon: ({ color, size }) => <ChartLine color={color} size={size} /> }}
       />
     </Tabs>
   );
