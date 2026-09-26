@@ -19,7 +19,7 @@ export function BrandLogo({ size = 'md' }: BrandLogoProps) {
           <Defs>
             <LinearGradient id="stamp" x1="0" y1="0" x2="1" y2="1">
               <Stop offset="0" stopColor={colors.accent} />
-              <Stop offset="1" stopColor={colors.accentWarm} />
+              <Stop offset="1" stopColor={colors.accentDeep} />
             </LinearGradient>
           </Defs>
           <Rect width={stamp} height={stamp} rx={stamp * 0.3} fill="url(#stamp)" />
@@ -29,7 +29,10 @@ export function BrandLogo({ size = 'md' }: BrandLogoProps) {
         </Text>
       </View>
       <Text weight="extrabold" className={size === 'sm' ? 'text-lg' : 'text-xl'} style={{ letterSpacing: -0.4 }}>
-        IELTS<Text weight="black" className="text-accent-deep">Path</Text>
+        IELTS
+        <Text weight="black" className="text-accent-deep">
+          Path
+        </Text>
       </Text>
     </View>
   );

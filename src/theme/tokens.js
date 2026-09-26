@@ -1,6 +1,6 @@
 /**
- * IELTSPath design tokens, mirrored from the web frontend landing palette.
- * Plain CommonJS so tailwind.config.js can require it.
+ * IELTSPath mobile tokens — amber/orange brand aligned with FE.
+ * Path UI stays Duolingo-like (icon-first); colors stay IELTSPath orange.
  */
 const colors = {
   canvas: '#faf8f5',
@@ -15,6 +15,8 @@ const colors = {
   accentSoft: '#fef3c7',
   accentEdge: '#b45309',
   accentWarm: '#ea580c',
+  xp: '#fbbf24',
+  xpDeep: '#d97706',
   danger: '#dc2626',
   dangerSoft: '#fef2f2',
   success: '#16a34a',

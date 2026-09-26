@@ -1,54 +1,104 @@
 import { router } from 'expo-router';
-import { Flame } from 'lucide-react-native';
-import { ScrollView, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Alert, Platform, Pressable, ScrollView, View } from 'react-native';
 
-import { Button } from '@/src/components/ui/button';
-import { Card } from '@/src/components/ui/card';
 import { Text } from '@/src/components/ui/text';
-import { useCurrentUser } from '@/src/features/auth/auth-provider';
-import { SkillCard } from '@/src/features/practice/components/skill-card';
-import { skills } from '@/src/features/practice/skills';
+import { LearningPath } from '@/src/features/practice/components/learning-path';
+import { LessonSheet } from '@/src/features/practice/components/lesson-sheet';
+import { StreakBar } from '@/src/features/practice/components/streak-bar';
+import { learnerStats, pathUnits, type PathNode } from '@/src/features/practice/path';
 import { colors } from '@/src/theme';
 
 export default function HomeScreen() {
-  const { data: user } = useCurrentUser();
-  const firstName = user?.fullName.trim().split(/\s+/).pop();
+  const [selected, setSelected] = useState<PathNode | null>(null);
+  const current = useMemo(
+    () => pathUnits.flatMap((unit) => unit.nodes).find((node) => node.status === 'current') ?? null,
+    [],
+  );
+
+  const startLesson = (nodeId: string) => {
+    const node = pathUnits.flatMap((unit) => unit.nodes).find((item) => item.id === nodeId);
+    const message = node
+      ? `Sắp luyện: ${node.title}. Phiên ngắn sẽ mở đầy đủ trong bản tới — bạn có thể xem kho đề ngay.`
+      : 'Phiên luyện sẽ mở trong bản tới.';
+    if (Platform.OS === 'web') {
+      window.alert(message);
+      return;
+    }
+    Alert.alert('Bắt đầu luyện', message, [
+      { text: 'Ở lại path', style: 'cancel' },
+      { text: 'Mở kho đề', onPress: () => router.push('/practice') },
+    ]);
+  };
 
   return (
-    <ScrollView className="flex-1 bg-canvas" contentContainerClassName="px-5 pb-10 pt-5">
-      <Text weight="bold" className="text-xs uppercase tracking-widest text-accent-deep">
-        Kế hoạch hôm nay
-      </Text>
-      <Text weight="black" className="mt-1.5 text-3xl leading-10" style={{ letterSpacing: -0.8 }}>
-        {firstName ? `Chào ${firstName}, sẵn sàng luyện chưa?` : 'Sẵn sàng luyện chưa?'}
-      </Text>
-      <Text className="mt-2 text-base leading-6 text-muted">
-        Làm đề, xem lời giải, lưu từ và theo dõi band — mỗi ngày một bước.
-      </Text>
+    <View className="flex-1 bg-canvas">
+      <ScrollView contentContainerClassName="px-5 pb-28 pt-4" showsVerticalScrollIndicator={false}>
+        <StreakBar
+          streak={learnerStats.streak}
+          xp={learnerStats.xp}
+          dailyXp={learnerStats.dailyXp}
+          dailyGoal={learnerStats.dailyGoal}
+        />
 
-      <Card className="mt-6 bg-tint">
-        <View className="flex-row items-center gap-3">
-          <View className="h-12 w-12 items-center justify-center rounded-2xl bg-accent-soft">
-            <Flame size={24} color={colors.accentWarm} />
-          </View>
-          <View className="flex-1">
-            <Text weight="extrabold" className="text-lg">
-              Chuỗi ngày học
+        {current ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Bắt đầu ${current.title}, cộng ${current.xp} XP`}
+            onPress={() => setSelected(current)}
+            className="mt-5 overflow-hidden rounded-3xl border border-b-4 active:translate-y-0.5"
+            style={{ borderColor: `${current.color}55`, borderBottomColor: current.color, backgroundColor: colors.surface }}>
+            <View className="h-1.5" style={{ backgroundColor: current.color }} />
+            <View className="flex-row items-center gap-3 px-4 py-4">
+              <View className="h-14 w-14 items-center justify-center rounded-full" style={{ backgroundColor: current.color }}>
+                <current.Icon size={26} color="#fff" />
+              </View>
+              <View className="flex-1">
+                <Text weight="bold" className="text-xs uppercase tracking-wide text-accent-deep">
+                  Bài tiếp theo
+                </Text>
+                <Text weight="black" className="mt-0.5 text-lg leading-6">
+                  {current.title}
+                </Text>
+                <Text className="mt-0.5 text-sm text-muted">{current.subtitle}</Text>
+              </View>
+              <View className="rounded-2xl px-3 py-2" style={{ backgroundColor: current.color }}>
+                <Text weight="extrabold" className="text-sm text-white">
+                  Bắt đầu
+                </Text>
+              </View>
+            </View>
+          </Pressable>
+        ) : null}
+
+        <Text weight="bold" className="mb-3 mt-7 text-sm text-muted">
+          Path học · chạm vòng tròn đang sáng
+        </Text>
+
+        <LearningPath units={pathUnits} onSelectNode={setSelected} />
+      </ScrollView>
+
+      {current ? (
+        <View className="absolute bottom-0 left-0 right-0 border-t border-line bg-surface px-5 pb-5 pt-3">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Bắt đầu ${current.title}`}
+            onPress={() => setSelected(current)}
+            className="h-14 flex-row items-center justify-center gap-2 rounded-2xl border border-accent-edge border-b-4 bg-accent active:translate-y-0.5">
+            <current.Icon size={22} color="#fff" />
+            <Text weight="extrabold" className="text-base text-white">
+              Bắt đầu · +{current.xp} XP
             </Text>
-            <Text className="text-sm text-muted">Hoàn thành một bài luyện để giữ streak.</Text>
-          </View>
+          </Pressable>
         </View>
-        <Button className="mt-4" label="Bắt đầu luyện miễn phí" onPress={() => router.push('/practice')} />
-      </Card>
+      ) : null}
 
-      <Text weight="extrabold" className="mb-3 mt-8 text-xl">
-        Luyện đề theo kỹ năng
-      </Text>
-      <View className="flex-row flex-wrap justify-between gap-y-3">
-        {skills.map((skill) => (
-          <SkillCard key={skill.key} skill={skill} className="w-[48.5%]" />
-        ))}
-      </View>
-    </ScrollView>
+      <LessonSheet
+        node={selected}
+        visible={selected != null}
+        onClose={() => setSelected(null)}
+        onStart={startLesson}
+      />
+    </View>
   );
 }

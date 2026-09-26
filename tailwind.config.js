@@ -20,6 +20,10 @@ module.exports = {
           soft: colors.accentSoft,
           edge: colors.accentEdge,
         },
+        xp: {
+          DEFAULT: colors.xp,
+          deep: colors.xpDeep,
+        },
         danger: {
           DEFAULT: colors.danger,
           soft: colors.dangerSoft,

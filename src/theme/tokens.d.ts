@@ -11,6 +11,8 @@ export declare const colors: {
   accentSoft: string;
   accentEdge: string;
   accentWarm: string;
+  xp: string;
+  xpDeep: string;
   danger: string;
   dangerSoft: string;
   success: string;

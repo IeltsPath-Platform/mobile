@@ -1,4 +1,4 @@
-import { LogOut, Mail, Phone, ShieldCheck, UserRound } from 'lucide-react-native';
+import { Flame, LogOut, Mail, Phone, ShieldCheck, Trophy, UserRound, Zap } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Platform, RefreshControl, ScrollView, View } from 'react-native';
 import type { LucideIcon } from 'lucide-react-native';
@@ -8,6 +8,7 @@ import { Card } from '@/src/components/ui/card';
 import { FormAlert } from '@/src/components/ui/form-alert';
 import { Text } from '@/src/components/ui/text';
 import { useAuth, useCurrentUser } from '@/src/features/auth/auth-provider';
+import { learnerStats, pathUnits } from '@/src/features/practice/path';
 import { colors } from '@/src/theme';
 
 const roleLabels: Record<string, string> = {
@@ -18,35 +19,14 @@ const roleLabels: Record<string, string> = {
   SALES_STAFF: 'Tư vấn viên',
 };
 
+const weekDays = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+const weekDone = [true, true, true, true, false, false, false];
+
 export default function ProfileScreen() {
   const { authEnabled, signOut } = useAuth();
   const { data: user, error, isPending, isRefetching, refetch } = useCurrentUser();
   const [signingOut, setSigningOut] = useState(false);
-
-  if (!authEnabled) {
-    return (
-      <ScrollView className="flex-1 bg-canvas" contentContainerClassName="px-5 pb-10 pt-5">
-        <Text weight="bold" className="text-xs uppercase tracking-widest text-accent-deep">
-          Bảng tiến độ
-        </Text>
-        <Text weight="black" className="mt-1.5 text-3xl leading-10" style={{ letterSpacing: -0.8 }}>
-          Tài khoản của bạn
-        </Text>
-
-        <Card className="mt-6 items-center py-8">
-          <View className="h-14 w-14 items-center justify-center rounded-2xl bg-accent-soft">
-            <UserRound size={28} color={colors.accentDeep} />
-          </View>
-          <Text weight="extrabold" className="mt-4 text-lg">
-            Đang xem với tư cách khách
-          </Text>
-          <Text className="mt-1.5 text-center text-sm leading-5 text-muted">
-            Đăng nhập tạm tắt vì chưa có DB / API. Bật lại bằng `EXPO_PUBLIC_AUTH_ENABLED=true` khi backend sẵn sàng.
-          </Text>
-        </Card>
-      </ScrollView>
-    );
-  }
+  const doneNodes = pathUnits.flatMap((unit) => unit.nodes).filter((node) => node.status === 'done').length;
 
   const doSignOut = async () => {
     setSigningOut(true);
@@ -73,18 +53,64 @@ export default function ProfileScreen() {
   return (
     <ScrollView
       className="flex-1 bg-canvas"
-      contentContainerClassName="px-5 pb-10 pt-5"
+      contentContainerClassName="px-5 pb-12 pt-5"
       refreshControl={
-        <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.accentDeep} />
+        authEnabled ? (
+          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.accentDeep} />
+        ) : undefined
       }>
       <Text weight="bold" className="text-xs uppercase tracking-widest text-accent-deep">
-        Bảng tiến độ
+        Tiến độ
       </Text>
       <Text weight="black" className="mt-1.5 text-3xl leading-10" style={{ letterSpacing: -0.8 }}>
-        Tài khoản của bạn
+        Streak & XP của bạn
       </Text>
 
-      {isPending ? (
+      <View className="mt-5 flex-row gap-3">
+        <StatTile Icon={Flame} color={colors.accentWarm} value={`${learnerStats.streak}`} label="Ngày liên tiếp" />
+        <StatTile Icon={Zap} color={colors.xpDeep} value={`${learnerStats.xp}`} label="Tổng XP" />
+        <StatTile Icon={Trophy} color={colors.skill.listening} value={`${doneNodes}`} label="Node xong" />
+      </View>
+
+      <Card className="mt-4">
+        <Text weight="extrabold" className="text-base">
+          Tuần này
+        </Text>
+        <View className="mt-3 flex-row justify-between">
+          {weekDays.map((day, index) => (
+            <View key={day} className="items-center gap-1.5">
+              <View
+                className="h-10 w-10 items-center justify-center rounded-full"
+                style={{ backgroundColor: weekDone[index] ? colors.accent : colors.line }}>
+                {weekDone[index] ? (
+                  <Flame size={16} color="#fff" fill="#fff" />
+                ) : (
+                  <Text weight="bold" className="text-xs text-muted">
+                    {day}
+                  </Text>
+                )}
+              </View>
+              <Text weight="bold" className="text-[10px] text-muted">
+                {day}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </Card>
+
+      {!authEnabled ? (
+        <Card className="mt-4 items-center py-6">
+          <View className="h-14 w-14 items-center justify-center rounded-2xl bg-accent-soft">
+            <UserRound size={28} color={colors.accentDeep} />
+          </View>
+          <Text weight="extrabold" className="mt-4 text-lg">
+            Đang xem với tư cách khách
+          </Text>
+          <Text className="mt-1.5 text-center text-sm leading-5 text-muted">
+            Streak và XP đang là bản demo trên máy. Đồng bộ tài khoản khi bật auth.
+          </Text>
+        </Card>
+      ) : isPending ? (
         <View className="mt-10 items-center gap-3">
           <ActivityIndicator color={colors.accentDeep} />
           <Text className="text-sm text-muted">Đang mở không gian học tập…</Text>
@@ -95,51 +121,77 @@ export default function ProfileScreen() {
           <Button variant="secondary" label="Thử lại" onPress={() => refetch()} />
         </View>
       ) : user ? (
-        <Card className="mt-6">
-          <View className="flex-row items-center gap-4">
-            <View className="h-16 w-16 items-center justify-center rounded-3xl bg-accent">
-              <Text weight="black" className="text-2xl text-white">
-                {initial}
-              </Text>
-            </View>
-            <View className="flex-1">
-              <Text weight="extrabold" className="text-xl" numberOfLines={2}>
-                {user.fullName}
-              </Text>
-              <View className="mt-1.5 flex-row flex-wrap gap-1.5">
-                {user.roles.map((role) => (
-                  <View key={role.id} className="rounded-full bg-accent-soft px-2.5 py-1">
-                    <Text weight="bold" className="text-[11px] text-accent-deep">
-                      {roleLabels[role.name] ?? role.name}
-                    </Text>
-                  </View>
-                ))}
+        <>
+          <Card className="mt-4">
+            <View className="flex-row items-center gap-4">
+              <View className="h-16 w-16 items-center justify-center rounded-full bg-accent">
+                <Text weight="black" className="text-2xl text-white">
+                  {initial}
+                </Text>
+              </View>
+              <View className="flex-1">
+                <Text weight="extrabold" className="text-xl" numberOfLines={2}>
+                  {user.fullName}
+                </Text>
+                <View className="mt-1.5 flex-row flex-wrap gap-1.5">
+                  {user.roles.map((role) => (
+                    <View key={role.id} className="rounded-full bg-accent-soft px-2.5 py-1">
+                      <Text weight="bold" className="text-[11px] text-accent-deep">
+                        {roleLabels[role.name] ?? role.name}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
               </View>
             </View>
-          </View>
 
-          <View className="mt-5 gap-3 border-t border-line pt-4">
-            <InfoRow Icon={Mail} label="Email" value={user.email} />
-            <InfoRow Icon={Phone} label="Số điện thoại" value={user.phoneNumber || 'Chưa cập nhật'} />
-            <InfoRow
-              Icon={ShieldCheck}
-              label="Trạng thái"
-              value={user.status === 'ACTIVE' ? 'Đang hoạt động' : user.status}
-            />
-          </View>
-        </Card>
+            <View className="mt-5 gap-3 border-t border-line pt-4">
+              <InfoRow Icon={Mail} label="Email" value={user.email} />
+              <InfoRow Icon={Phone} label="Số điện thoại" value={user.phoneNumber || 'Chưa cập nhật'} />
+              <InfoRow
+                Icon={ShieldCheck}
+                label="Trạng thái"
+                value={user.status === 'ACTIVE' ? 'Đang hoạt động' : user.status}
+              />
+            </View>
+          </Card>
+
+          <Button
+            className="mt-6"
+            variant="danger"
+            label="Đăng xuất"
+            loadingLabel="Đang đăng xuất…"
+            loading={signingOut}
+            icon={<LogOut size={18} color={colors.danger} />}
+            onPress={confirmSignOut}
+          />
+        </>
       ) : null}
-
-      <Button
-        className="mt-6"
-        variant="danger"
-        label="Đăng xuất"
-        loadingLabel="Đang đăng xuất…"
-        loading={signingOut}
-        icon={<LogOut size={18} color={colors.danger} />}
-        onPress={confirmSignOut}
-      />
     </ScrollView>
+  );
+}
+
+function StatTile({
+  Icon,
+  color,
+  value,
+  label,
+}: {
+  Icon: LucideIcon;
+  color: string;
+  value: string;
+  label: string;
+}) {
+  return (
+    <View className="flex-1 items-center rounded-3xl border border-line border-b-4 border-b-edge bg-surface px-2 py-3">
+      <Icon size={20} color={color} />
+      <Text weight="black" className="mt-1 text-xl" style={{ color }}>
+        {value}
+      </Text>
+      <Text weight="bold" className="text-center text-[10px] text-muted">
+        {label}
+      </Text>
+    </View>
   );
 }
 
