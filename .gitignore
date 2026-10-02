@@ -9,6 +9,19 @@ dist/
 web-build/
 expo-env.d.ts
 
+# AI / agent tooling 
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+.cursorrules
+.cursor/
+.claude/
+.agents/
+agents/
+plans/
+.plan/
+plan/
+
 # Native
 .kotlin/
 *.orig.*
@@ -32,6 +45,9 @@ yarn-error.*
 
 # local env files
 .env*.local
+.env
+.env.*
+!.env.example
 
 # typescript
 *.tsbuildinfo
@@ -39,3 +55,11 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# IDE
+.idea/
+.vscode/
+
+coverage/
+Thumbs.db
+*.log
