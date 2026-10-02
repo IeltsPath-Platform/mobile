@@ -99,6 +99,7 @@ function RootNavigator() {
     return (
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas } }}>
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="learn" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" options={{ headerShown: true, title: 'Không tìm thấy' }} />
       </Stack>
     );
@@ -108,6 +109,7 @@ function RootNavigator() {
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas } }}>
       <Stack.Protected guard={isAuthenticated}>
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="learn" options={{ headerShown: false }} />
       </Stack.Protected>
       <Stack.Protected guard={!isAuthenticated}>
         <Stack.Screen name="(auth)" />

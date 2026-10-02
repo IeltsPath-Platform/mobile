@@ -17,6 +17,8 @@ export declare const colors: {
   dangerSoft: string;
   success: string;
   successSoft: string;
+  heroStart: string;
+  heroEnd: string;
   skill: Record<'listening' | 'reading' | 'writing' | 'speaking' | 'full', string>;
 };
 

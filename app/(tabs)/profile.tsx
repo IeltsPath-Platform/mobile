@@ -9,6 +9,7 @@ import { FormAlert } from '@/src/components/ui/form-alert';
 import { Text } from '@/src/components/ui/text';
 import { useAuth, useCurrentUser } from '@/src/features/auth/auth-provider';
 import { learnerStats, pathUnits } from '@/src/features/practice/path';
+import { useStreak } from '@/src/features/progress/use-streak';
 import { colors } from '@/src/theme';
 
 const roleLabels: Record<string, string> = {
@@ -25,6 +26,7 @@ const weekDone = [true, true, true, true, false, false, false];
 export default function ProfileScreen() {
   const { authEnabled, signOut } = useAuth();
   const { data: user, error, isPending, isRefetching, refetch } = useCurrentUser();
+  const { currentDays, longestDays, isMock: streakMock, refetch: refetchStreak } = useStreak();
   const [signingOut, setSigningOut] = useState(false);
   const doneNodes = pathUnits.flatMap((unit) => unit.nodes).filter((node) => node.status === 'done').length;
 
@@ -56,7 +58,14 @@ export default function ProfileScreen() {
       contentContainerClassName="px-5 pb-12 pt-5"
       refreshControl={
         authEnabled ? (
-          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.accentDeep} />
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={() => {
+              void refetch();
+              void refetchStreak();
+            }}
+            tintColor={colors.accentDeep}
+          />
         ) : undefined
       }>
       <Text weight="bold" className="text-xs uppercase tracking-widest text-accent-deep">
@@ -65,12 +74,18 @@ export default function ProfileScreen() {
       <Text weight="black" className="mt-1.5 text-3xl leading-10" style={{ letterSpacing: -0.8 }}>
         Streak & XP của bạn
       </Text>
+      <Text className="mt-1 text-xs text-muted">
+        Streak: {streakMock ? 'mock/fallback' : 'BE'} · XP path: mock · Node xong: mock
+      </Text>
 
       <View className="mt-5 flex-row gap-3">
-        <StatTile Icon={Flame} color={colors.accentWarm} value={`${learnerStats.streak}`} label="Ngày liên tiếp" />
+        <StatTile Icon={Flame} color={colors.accentWarm} value={`${currentDays}`} label="Ngày liên tiếp" />
         <StatTile Icon={Zap} color={colors.xpDeep} value={`${learnerStats.xp}`} label="Tổng XP" />
         <StatTile Icon={Trophy} color={colors.skill.listening} value={`${doneNodes}`} label="Node xong" />
       </View>
+      {!streakMock ? (
+        <Text className="mt-2 text-xs text-muted">Kỷ lục streak: {longestDays} ngày</Text>
+      ) : null}
 
       <Card className="mt-4">
         <Text weight="extrabold" className="text-base">

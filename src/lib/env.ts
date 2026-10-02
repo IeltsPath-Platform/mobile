@@ -9,3 +9,6 @@ export const REQUEST_TIMEOUT_MS = 15_000;
 
 // Flip to true when gateway + user DB are up. While false, tabs open without login.
 export const AUTH_ENABLED = process.env.EXPO_PUBLIC_AUTH_ENABLED === 'true';
+
+/** Learning path: mock by default; set false to use Gateway `/api/learning/**`. */
+export const USE_MOCK_LEARNING = process.env.EXPO_PUBLIC_USE_MOCK_LEARNING !== 'false';

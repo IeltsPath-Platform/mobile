@@ -1,32 +1,36 @@
 /**
- * IELTSPath mobile tokens — amber/orange brand aligned with FE.
- * Path UI stays Duolingo-like (icon-first); colors stay IELTSPath orange.
+ * IELTS mobile tokens — aligned with FE classroom/site brand.
+ * Source: frontend/src/styles/globals.css + practice.css
  */
 const colors = {
-  canvas: '#faf8f5',
+  canvas: '#f8f9fc',
   surface: '#ffffff',
-  surfaceTint: '#fbf4e4',
-  ink: '#1c1917',
-  muted: '#57534e',
-  line: '#ede8df',
-  edge: '#e2dad0',
-  accent: '#f59e0b',
-  accentDeep: '#d97706',
-  accentSoft: '#fef3c7',
-  accentEdge: '#b45309',
-  accentWarm: '#ea580c',
-  xp: '#fbbf24',
-  xpDeep: '#d97706',
-  danger: '#dc2626',
-  dangerSoft: '#fef2f2',
-  success: '#16a34a',
-  successSoft: '#f0fdf4',
+  surfaceTint: '#eef3ff',
+  ink: '#202633',
+  muted: '#77808e',
+  line: '#e3e7ef',
+  edge: '#e9edf4',
+  // Primary = FE --classroom-primary
+  accent: '#123ab5',
+  accentDeep: '#0d2b8d',
+  accentSoft: '#eef3ff',
+  accentEdge: '#0d2b8d',
+  // CTA / streak warm = FE --classroom-warning / site-orange
+  accentWarm: '#ff7624',
+  xp: '#ff7624',
+  xpDeep: '#ff7100',
+  danger: '#c2332b',
+  dangerSoft: '#fdecea',
+  success: '#13845a',
+  successSoft: '#e6f5ee',
+  heroStart: '#061c64',
+  heroEnd: '#1647d6',
   skill: {
-    listening: '#0284c7',
-    reading: '#d97706',
-    writing: '#e11d48',
-    speaking: '#059669',
-    full: '#7c3aed',
+    listening: '#0e44cf',
+    reading: '#ff7624',
+    writing: '#c2332b',
+    speaking: '#13845a',
+    full: '#123ab5',
   },
 };
 

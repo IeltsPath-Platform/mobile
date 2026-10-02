@@ -6,9 +6,12 @@ import { ColorfulTabBar, type ColorfulTabBarProps } from '@/src/components/navig
 import { BrandLogo } from '@/src/components/ui/brand-logo';
 import { Text } from '@/src/components/ui/text';
 import { learnerStats } from '@/src/features/practice/path';
+import { useStreak } from '@/src/features/progress/use-streak';
 import { colors } from '@/src/theme';
 
 export default function TabLayout() {
+  const { currentDays } = useStreak();
+
   return (
     <Tabs
       tabBar={(props) => <ColorfulTabBar {...(props as unknown as ColorfulTabBarProps)} />}
@@ -20,7 +23,7 @@ export default function TabLayout() {
               <View className="flex-row items-center gap-1 rounded-full bg-accent-soft px-2.5 py-1">
                 <Flame size={14} color={colors.accentWarm} fill={colors.accentWarm} />
                 <Text weight="extrabold" className="text-xs text-accent-deep">
-                  {learnerStats.streak}
+                  {currentDays}
                 </Text>
               </View>
               <View className="flex-row items-center gap-1 rounded-full bg-accent-soft px-2.5 py-1">

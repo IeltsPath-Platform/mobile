@@ -12,12 +12,25 @@ Feature tree tham chiếu: `../260913-ielts-platform-feature-tree.md`
 | Language | **TypeScript** |
 | Routing | **Expo Router** |
 | Styling | **NativeWind** (Tailwind CSS cho RN) |
+| Brand | Đồng bộ FE: primary `#123ab5`, CTA `#ff7624`, canvas `#f8f9fc` |
 | UI kit | NativeWind + component riêng (**không** dùng shadcn web) |
 | Server state | **TanStack Query** |
 | Forms | **React Hook Form** + **Zod** (+ `@hookform/resolvers`) |
 | Bundler | Metro (Expo) — **không Vite** |
 | Push (sau này) | Expo Notifications |
 | Audio (sau này) | `expo-av` |
+
+### API thật vs mock (phase 1 + learning-path)
+
+| Phần | Nguồn |
+|------|--------|
+| Auth / me | BE gateway (`EXPO_PUBLIC_AUTH_ENABLED=true`) |
+| Streak | BE `/api/learning-support/streak` (fallback mock) |
+| Community feed | BE `/api/community/posts` (fallback mock) |
+| Vocab search | BE `/api/content/vocabulary/search` (fallback mock) |
+| **Learning path Reading** | **Mock mặc định** (`EXPO_PUBLIC_USE_MOCK_LEARNING`); HTTP `/api/learning/**` khi `=false` |
+| Daily Duolingo path (tab Hôm nay) | Mock UX riêng — khác contract learning |
+| Skill progress cards cũ | Thay bằng lộ trình topic trên tab Luyện đề |
 
 ### Không dùng trên mobile
 

@@ -7,10 +7,12 @@ import { LearningPath } from '@/src/features/practice/components/learning-path';
 import { LessonSheet } from '@/src/features/practice/components/lesson-sheet';
 import { StreakBar } from '@/src/features/practice/components/streak-bar';
 import { learnerStats, pathUnits, type PathNode } from '@/src/features/practice/path';
+import { useStreak } from '@/src/features/progress/use-streak';
 import { colors } from '@/src/theme';
 
 export default function HomeScreen() {
   const [selected, setSelected] = useState<PathNode | null>(null);
+  const { currentDays, isMock: streakMock } = useStreak();
   const current = useMemo(
     () => pathUnits.flatMap((unit) => unit.nodes).find((node) => node.status === 'current') ?? null,
     [],
@@ -19,7 +21,7 @@ export default function HomeScreen() {
   const startLesson = (nodeId: string) => {
     const node = pathUnits.flatMap((unit) => unit.nodes).find((item) => item.id === nodeId);
     const message = node
-      ? `Sắp luyện: ${node.title}. Phiên ngắn sẽ mở đầy đủ trong bản tới — bạn có thể xem kho đề ngay.`
+      ? `Sắp luyện: ${node.title}. Phiên ngắn sẽ mở đầy đủ khi learning-service sẵn sàng — bạn có thể xem kho đề ngay.`
       : 'Phiên luyện sẽ mở trong bản tới.';
     if (Platform.OS === 'web') {
       window.alert(message);
@@ -34,8 +36,15 @@ export default function HomeScreen() {
   return (
     <View className="flex-1 bg-canvas">
       <ScrollView contentContainerClassName="px-5 pb-28 pt-4" showsVerticalScrollIndicator={false}>
+        <View className="mb-3 self-start rounded-full bg-accent-soft px-3 py-1">
+          <Text weight="bold" className="text-[11px] text-accent-deep">
+            Path học · MOCK (đợi /api/learning)
+            {streakMock ? ' · streak fallback' : ' · streak BE'}
+          </Text>
+        </View>
+
         <StreakBar
-          streak={learnerStats.streak}
+          streak={currentDays}
           xp={learnerStats.xp}
           dailyXp={learnerStats.dailyXp}
           dailyGoal={learnerStats.dailyGoal}

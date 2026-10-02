@@ -1,44 +1,96 @@
-import { router } from 'expo-router';
-import { Pressable, ScrollView, View } from 'react-native';
+import { useQuery } from '@tanstack/react-query';
+import { Search } from 'lucide-react-native';
+import { useMemo, useState } from 'react';
+import { ScrollView, TextInput, View } from 'react-native';
 
+import { Card } from '@/src/components/ui/card';
 import { Text } from '@/src/components/ui/text';
-import { fullTest, skills } from '@/src/features/practice/skills';
-
-const skillProgress: Record<string, number> = {
-  listening: 0.65,
-  reading: 0.4,
-  writing: 0.25,
-  speaking: 0.1,
-  full: 0,
-};
+import { useAuth } from '@/src/features/auth/auth-provider';
+import { TopicList } from '@/src/features/learning/components/topic-list';
+import { MOCK_VOCAB, vocabApi, type VocabularyItem } from '@/src/features/vocab/api';
+import { colors } from '@/src/theme';
 
 export default function PracticeScreen() {
+  const { authEnabled, status } = useAuth();
+  const canFetch = authEnabled && status === 'authenticated';
+  const [query, setQuery] = useState('');
+
+  const searchQuery = useQuery({
+    queryKey: ['vocab', 'search', query],
+    queryFn: () => vocabApi.search(query.trim()),
+    enabled: canFetch && query.trim().length >= 2,
+    retry: 1,
+  });
+
+  const results: VocabularyItem[] = useMemo(() => {
+    if (!query.trim()) return [];
+    if (canFetch && searchQuery.data) return searchQuery.data;
+    if (canFetch && searchQuery.isFetching) return [];
+    const q = query.trim().toLowerCase();
+    return MOCK_VOCAB.filter(
+      (item) =>
+        item.lemma.toLowerCase().includes(q) ||
+        item.senses.some((s) => s.vietnameseMeaning?.toLowerCase().includes(q)),
+    );
+  }, [canFetch, query, searchQuery.data, searchQuery.isFetching]);
+
+  const showingMock = !canFetch || Boolean(searchQuery.error);
+
   return (
     <ScrollView className="flex-1 bg-canvas" contentContainerClassName="px-5 pb-12 pt-5" showsVerticalScrollIndicator={false}>
-      <View className="mt-2 flex-row flex-wrap justify-between gap-y-3">
-        {[...skills, fullTest].map((skill) => {
-          const progress = skillProgress[skill.key] ?? 0;
-          const { Icon, color, label, description } = skill;
-          return (
-            <Pressable
-              key={skill.key}
-              accessibilityRole="button"
-              accessibilityLabel={`${label}. ${description}. ${Math.round(progress * 100)} phần trăm`}
-              onPress={() => router.push('/')}
-              className="w-[48%] items-center rounded-3xl border border-line border-b-4 border-b-edge bg-surface px-3 py-5 active:translate-y-0.5">
-              <View className="h-16 w-16 items-center justify-center rounded-full" style={{ backgroundColor: `${color}22` }}>
-                <Icon size={30} color={color} />
-              </View>
-              <View className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-line">
-                <View className="h-full rounded-full" style={{ width: `${progress * 100}%`, backgroundColor: color }} />
-              </View>
-              <Text weight="extrabold" className="mt-2 text-sm" style={{ color }}>
-                {label}
-              </Text>
-            </Pressable>
-          );
-        })}
+      <Text weight="black" className="text-2xl" style={{ letterSpacing: -0.5 }}>
+        Luyện đề
+      </Text>
+      <Text className="mt-1 text-sm text-muted">
+        Lộ trình Reading (topic → lesson → ôn → đề cuối) theo contract `/api/learning`
+      </Text>
+
+      <View className="mt-5">
+        <TopicList />
       </View>
+
+      <Text weight="bold" className="mb-2 mt-8 text-sm text-muted">
+        Tra từ vựng
+      </Text>
+      <View className="flex-row items-center rounded-2xl border border-line bg-surface px-3 py-2.5">
+        <Search size={18} color={colors.muted} />
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Tra từ IELTS (vd: achieve)"
+          placeholderTextColor={colors.muted}
+          autoCapitalize="none"
+          className="ml-2 flex-1 py-1 text-base text-ink"
+        />
+      </View>
+      {query.trim().length > 0 ? (
+        <Text className="mt-2 text-xs text-muted">
+          {showingMock ? 'Nguồn: mock local (hoặc API lỗi)' : 'Nguồn: BE vocabulary'}
+        </Text>
+      ) : null}
+
+      {results.map((item) => {
+        const sense = item.senses[0];
+        return (
+          <Card key={item.id} className="mt-3">
+            <Text weight="extrabold" className="text-base text-accent">
+              {item.lemma}
+              {item.ipa ? (
+                <Text weight="medium" className="text-sm text-muted">
+                  {' '}
+                  {item.ipa}
+                </Text>
+              ) : null}
+            </Text>
+            {sense?.vietnameseMeaning ? (
+              <Text className="mt-1 text-sm text-ink">{sense.vietnameseMeaning}</Text>
+            ) : null}
+            {sense?.englishDefinition ? (
+              <Text className="mt-0.5 text-xs text-muted">{sense.englishDefinition}</Text>
+            ) : null}
+          </Card>
+        );
+      })}
     </ScrollView>
   );
 }
