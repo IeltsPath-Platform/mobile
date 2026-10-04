@@ -31,19 +31,71 @@ export const learnerStats = {
   league: 'Đồng',
 };
 
+/** Deep-clone path (statuses are mutable on Home mock progress). */
+export function clonePathUnits(units: PathUnit[] = pathUnits): PathUnit[] {
+  return units.map((unit) => ({
+    ...unit,
+    nodes: unit.nodes.map((node) => ({ ...node })),
+  }));
+}
+
+export function flattenNodes(units: PathUnit[]): PathNode[] {
+  return units.flatMap((unit) => unit.nodes);
+}
+
+export function findCurrentNode(units: PathUnit[]): PathNode | null {
+  return flattenNodes(units).find((node) => node.status === 'current') ?? null;
+}
+
+/** Mark node done, unlock the next unfinished node as current. Returns next current id (if any). */
+export function completePathNode(
+  units: PathUnit[],
+  nodeId: string,
+): { units: PathUnit[]; nextNodeId: string | null } {
+  const next = clonePathUnits(units);
+  const nodes = flattenNodes(next);
+  const index = nodes.findIndex((node) => node.id === nodeId);
+  if (index < 0) return { units: next, nextNodeId: null };
+  if (nodes[index].status === 'locked') return { units: next, nextNodeId: null };
+
+  nodes[index].status = 'done';
+
+  let nextNodeId: string | null = null;
+  for (let i = 0; i < nodes.length; i++) {
+    if (i === index) continue;
+    if (nodes[i].status === 'current') {
+      nodes[i].status = i < index ? 'done' : 'locked';
+    }
+  }
+  for (let i = index + 1; i < nodes.length; i++) {
+    if (nodes[i].status !== 'done') {
+      nodes[i].status = 'current';
+      nextNodeId = nodes[i].id;
+      break;
+    }
+  }
+
+  for (const unit of next) {
+    const done = unit.nodes.filter((n) => n.status === 'done').length;
+    unit.progress = unit.nodes.length ? done / unit.nodes.length : 0;
+  }
+
+  return { units: next, nextNodeId };
+}
+
 export const pathUnits: PathUnit[] = [
   {
     id: 'unit-1',
     label: 'Unit 1',
     title: 'Khởi động 4 kỹ năng',
-    progress: 0.5,
+    progress: 0,
     nodes: [
       {
         id: 'n1',
         title: 'Listening · Form',
         subtitle: '5 câu note completion',
         skill: 'listening',
-        status: 'done',
+        status: 'current',
         xp: 20,
         Icon: Headphones,
         color: colors.skill.listening,
@@ -53,7 +105,7 @@ export const pathUnits: PathUnit[] = [
         title: 'Reading · TFNG',
         subtitle: '6 câu True / False / NG',
         skill: 'reading',
-        status: 'done',
+        status: 'locked',
         xp: 20,
         Icon: BookOpen,
         color: colors.skill.reading,
@@ -63,7 +115,7 @@ export const pathUnits: PathUnit[] = [
         title: 'Writing · Overview',
         subtitle: 'Viết 1 câu overview Task 1',
         skill: 'writing',
-        status: 'current',
+        status: 'locked',
         xp: 30,
         Icon: PenLine,
         color: colors.skill.writing,

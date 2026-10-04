@@ -1,53 +1,77 @@
-import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, View } from 'react-native';
 
 import { Text } from '@/src/components/ui/text';
 import { LearningPath } from '@/src/features/practice/components/learning-path';
 import { LessonSheet } from '@/src/features/practice/components/lesson-sheet';
 import { StreakBar } from '@/src/features/practice/components/streak-bar';
-import { learnerStats, pathUnits, type PathNode } from '@/src/features/practice/path';
+import {
+  clonePathUnits,
+  completePathNode,
+  findCurrentNode,
+  flattenNodes,
+  learnerStats,
+  type PathNode,
+} from '@/src/features/practice/path';
 import { useStreak } from '@/src/features/progress/use-streak';
+import { useAppSettings } from '@/src/features/settings/use-app-settings';
 import { colors } from '@/src/theme';
 
 export default function HomeScreen() {
+  const [units, setUnits] = useState(() => clonePathUnits());
   const [selected, setSelected] = useState<PathNode | null>(null);
-  const { currentDays, isMock: streakMock } = useStreak();
-  const current = useMemo(
-    () => pathUnits.flatMap((unit) => unit.nodes).find((node) => node.status === 'current') ?? null,
-    [],
+  const [mascotNodeId, setMascotNodeId] = useState<string | null>(
+    () => findCurrentNode(clonePathUnits())?.id ?? null,
   );
+  const [travelToNodeId, setTravelToNodeId] = useState<string | null>(null);
+  const [bonusXp, setBonusXp] = useState(0);
+
+  const { currentDays } = useStreak();
+  const { settings } = useAppSettings();
+  const dailyGoal = settings.dailyXpGoal;
+  const current = useMemo(() => findCurrentNode(units), [units]);
 
   const startLesson = (nodeId: string) => {
-    const node = pathUnits.flatMap((unit) => unit.nodes).find((item) => item.id === nodeId);
-    const message = node
-      ? `Sắp luyện: ${node.title}. Phiên ngắn sẽ mở đầy đủ khi learning-service sẵn sàng — bạn có thể xem kho đề ngay.`
-      : 'Phiên luyện sẽ mở trong bản tới.';
+    const node = flattenNodes(units).find((item) => item.id === nodeId);
+    const message = node ? `Sắp luyện: ${node.title}.` : 'Phiên luyện sẽ mở trong bản tới.';
     if (Platform.OS === 'web') {
       window.alert(message);
       return;
     }
-    Alert.alert('Bắt đầu luyện', message, [
-      { text: 'Ở lại path', style: 'cancel' },
-      { text: 'Mở kho đề', onPress: () => router.push('/practice') },
-    ]);
+    Alert.alert('Bắt đầu luyện', message, [{ text: 'OK' }]);
   };
+
+  const completeLesson = useCallback(
+    (nodeId: string) => {
+      if (travelToNodeId) return;
+      const node = flattenNodes(units).find((item) => item.id === nodeId);
+      const { units: nextUnits, nextNodeId } = completePathNode(units, nodeId);
+      setUnits(nextUnits);
+      setBonusXp((xp) => xp + (node?.xp ?? 0));
+      setMascotNodeId(nodeId);
+      if (nextNodeId) {
+        // Remeasure then travel — slight delay so layouts settle after status change
+        setTimeout(() => setTravelToNodeId(nextNodeId), 120);
+      }
+    },
+    [travelToNodeId, units],
+  );
+
+  const onMascotArrived = useCallback(() => {
+    setTravelToNodeId((target) => {
+      if (target) setMascotNodeId(target);
+      return null;
+    });
+  }, []);
 
   return (
     <View className="flex-1 bg-canvas">
       <ScrollView contentContainerClassName="px-5 pb-28 pt-4" showsVerticalScrollIndicator={false}>
-        <View className="mb-3 self-start rounded-full bg-accent-soft px-3 py-1">
-          <Text weight="bold" className="text-[11px] text-accent-deep">
-            Path học · MOCK (đợi /api/learning)
-            {streakMock ? ' · streak fallback' : ' · streak BE'}
-          </Text>
-        </View>
-
         <StreakBar
           streak={currentDays}
-          xp={learnerStats.xp}
-          dailyXp={learnerStats.dailyXp}
-          dailyGoal={learnerStats.dailyGoal}
+          xp={learnerStats.xp + bonusXp}
+          dailyXp={Math.min(dailyGoal, learnerStats.dailyXp + bonusXp)}
+          dailyGoal={dailyGoal}
         />
 
         {current ? (
@@ -56,10 +80,16 @@ export default function HomeScreen() {
             accessibilityLabel={`Bắt đầu ${current.title}, cộng ${current.xp} XP`}
             onPress={() => setSelected(current)}
             className="mt-5 overflow-hidden rounded-3xl border border-b-4 active:translate-y-0.5"
-            style={{ borderColor: `${current.color}55`, borderBottomColor: current.color, backgroundColor: colors.surface }}>
+            style={{
+              borderColor: `${current.color}55`,
+              borderBottomColor: current.color,
+              backgroundColor: colors.surface,
+            }}>
             <View className="h-1.5" style={{ backgroundColor: current.color }} />
             <View className="flex-row items-center gap-3 px-4 py-4">
-              <View className="h-14 w-14 items-center justify-center rounded-full" style={{ backgroundColor: current.color }}>
+              <View
+                className="h-14 w-14 items-center justify-center rounded-full"
+                style={{ backgroundColor: current.color }}>
                 <current.Icon size={26} color="#fff" />
               </View>
               <View className="flex-1">
@@ -80,11 +110,15 @@ export default function HomeScreen() {
           </Pressable>
         ) : null}
 
-        <Text weight="bold" className="mb-3 mt-7 text-sm text-muted">
-          Path học · chạm vòng tròn đang sáng
-        </Text>
-
-        <LearningPath units={pathUnits} onSelectNode={setSelected} />
+        <View className="mt-7">
+          <LearningPath
+            units={units}
+            onSelectNode={setSelected}
+            mascotNodeId={mascotNodeId}
+            travelToNodeId={travelToNodeId}
+            onMascotArrived={onMascotArrived}
+          />
+        </View>
       </ScrollView>
 
       {current ? (
@@ -107,6 +141,7 @@ export default function HomeScreen() {
         visible={selected != null}
         onClose={() => setSelected(null)}
         onStart={startLesson}
+        onComplete={completeLesson}
       />
     </View>
   );

@@ -48,6 +48,7 @@ export default function TabLayout() {
       <Tabs.Screen name="practice" options={{ title: 'Luyện đề' }} />
       <Tabs.Screen name="community" options={{ title: 'Cộng đồng' }} />
       <Tabs.Screen name="profile" options={{ title: 'Tiến độ' }} />
+      <Tabs.Screen name="account" options={{ title: 'Profile' }} />
     </Tabs>
   );
 }

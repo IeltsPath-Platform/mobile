@@ -15,20 +15,29 @@ import { colors } from '@/src/theme';
 
 import type { PathNode } from '../path';
 
+export type NodeAlign = 'left' | 'center' | 'right';
+
 type PathNodeButtonProps = {
   node: PathNode;
-  align: 'left' | 'center' | 'right';
+  align: NodeAlign;
   showConnector?: boolean;
   onPress?: () => void;
+  ringRef?: (ref: View | null) => void;
 };
 
 const ALIGN = {
-  left: 'items-start self-start',
+  left: 'items-start self-start ml-2',
   center: 'items-center self-center',
-  right: 'items-end self-end',
+  right: 'items-end self-end mr-2',
 } as const;
 
-export function PathNodeButton({ node, align, showConnector = true, onPress }: PathNodeButtonProps) {
+export function PathNodeButton({
+  node,
+  align,
+  showConnector = true,
+  onPress,
+  ringRef,
+}: PathNodeButtonProps) {
   const locked = node.status === 'locked';
   const current = node.status === 'current';
   const done = node.status === 'done';
@@ -60,7 +69,7 @@ export function PathNodeButton({ node, align, showConnector = true, onPress }: P
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ disabled: false }}
-        accessibilityHint={locked ? 'Bài khóa, chạm để xem vì sao' : 'Chạm để xem chi tiết và bắt đầu'}
+        accessibilityHint={locked ? 'Bài khóa' : 'Xem chi tiết bài học'}
         accessibilityLabel={`${node.title}. ${current ? 'Bài tiếp theo' : done ? 'Đã xong' : 'Đã khóa'}`}
         onPress={onPress}
         className="items-center"
@@ -77,6 +86,8 @@ export function PathNodeButton({ node, align, showConnector = true, onPress }: P
 
         <Animated.View style={current ? ringStyle : undefined}>
           <View
+            ref={ringRef}
+            collapsable={false}
             className="h-[76px] w-[76px] items-center justify-center rounded-full border-[5px]"
             style={{
               backgroundColor: done || current ? fill : colors.surface,
@@ -84,6 +95,11 @@ export function PathNodeButton({ node, align, showConnector = true, onPress }: P
               borderBottomWidth: 8,
               borderBottomColor: edge,
               opacity: locked ? 0.75 : 1,
+              shadowColor: fill,
+              shadowOpacity: current ? 0.35 : 0.12,
+              shadowRadius: 10,
+              shadowOffset: { width: 0, height: 4 },
+              elevation: current ? 6 : 2,
             }}>
             {done ? (
               <Check size={30} color="#fff" strokeWidth={3.5} />
@@ -104,8 +120,11 @@ export function PathNodeButton({ node, align, showConnector = true, onPress }: P
 
       {showConnector ? (
         <View
-          className="mt-2 h-8 w-1 self-center rounded-full"
-          style={{ backgroundColor: done ? colors.accent : colors.line, marginLeft: align === 'left' ? 37 : align === 'right' ? undefined : 0, marginRight: align === 'right' ? 37 : 0 }}
+          className="mt-1 h-10 w-1.5 self-center rounded-full"
+          style={{
+            backgroundColor: done ? colors.accentWarm : colors.line,
+            opacity: done ? 0.9 : 0.7,
+          }}
           pointerEvents="none"
         />
       ) : null}

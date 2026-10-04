@@ -1,4 +1,4 @@
-import { BookOpen, ChartLine, House, Users } from 'lucide-react-native';
+import { BookOpen, ChartLine, House, UserRound, Users } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import Animated, {
@@ -74,6 +74,13 @@ const TAB_META: Record<
     color: colors.success,
     soft: colors.successSoft,
     Icon: ChartLine,
+  },
+  account: {
+    label: 'Profile',
+    short: 'Profile',
+    color: colors.accentDeep,
+    soft: colors.accentSoft,
+    Icon: UserRound,
   },
 };
 

@@ -12,13 +12,16 @@ type LessonSheetProps = {
   visible: boolean;
   onClose: () => void;
   onStart: (nodeId: string) => void;
+  /** Mock complete — advances path + mascot run. */
+  onComplete?: (nodeId: string) => void;
 };
 
-export function LessonSheet({ node, visible, onClose, onStart }: LessonSheetProps) {
+export function LessonSheet({ node, visible, onClose, onStart, onComplete }: LessonSheetProps) {
   if (!node) return null;
 
   const locked = node.status === 'locked';
   const done = node.status === 'done';
+  const current = node.status === 'current';
   const Icon = node.Icon;
 
   return (
@@ -61,10 +64,10 @@ export function LessonSheet({ node, visible, onClose, onStart }: LessonSheetProp
           <View className="mt-5 rounded-2xl bg-canvas px-4 py-3">
             <Text weight="bold" className="text-sm text-muted">
               {locked
-                ? 'Bài này còn khóa. Xong bài đang sáng trên path rồi quay lại.'
+                ? 'Bài này còn khóa. Hoàn thành bài đang mở rồi quay lại.'
                 : done
                   ? 'Bạn đã làm bài này. Có thể luyện lại để giữ nhịp.'
-                  : 'Bài tiếp theo của bạn. Bấm Bắt đầu — khoảng 5–8 phút.'}
+                  : 'Bài tiếp theo của bạn. Khoảng 5–8 phút.'}
             </Text>
           </View>
 
@@ -72,13 +75,25 @@ export function LessonSheet({ node, visible, onClose, onStart }: LessonSheetProp
             {locked ? (
               <Button variant="secondary" label="Đã hiểu" onPress={onClose} />
             ) : (
-              <Button
-                label={done ? 'Luyện lại' : 'Bắt đầu ngay'}
-                onPress={() => {
-                  onClose();
-                  onStart(node.id);
-                }}
-              />
+              <>
+                <Button
+                  label={done ? 'Luyện lại' : 'Bắt đầu ngay'}
+                  onPress={() => {
+                    onClose();
+                    onStart(node.id);
+                  }}
+                />
+                {current && onComplete ? (
+                  <Button
+                    variant="secondary"
+                    label="Hoàn thành"
+                    onPress={() => {
+                      onClose();
+                      onComplete(node.id);
+                    }}
+                  />
+                ) : null}
+              </>
             )}
           </View>
         </Pressable>
