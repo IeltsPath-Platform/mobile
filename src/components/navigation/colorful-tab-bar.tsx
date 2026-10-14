@@ -1,4 +1,4 @@
-import { BookOpen, ChartLine, House, UserRound, Users } from 'lucide-react-native';
+import { ChartLine, House, Layers, UserRound, Users } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import Animated, {
@@ -37,52 +37,21 @@ export type ColorfulTabBarProps = {
   };
 };
 
-const TAB_META: Record<
-  string,
-  {
-    label: string;
-    short: string;
-    color: string;
-    soft: string;
-    Icon: typeof House;
-  }
-> = {
-  index: {
-    label: 'Hôm nay',
-    short: 'Hôm nay',
-    color: colors.accent,
-    soft: colors.accentSoft,
-    Icon: House,
-  },
-  practice: {
-    label: 'Luyện đề',
-    short: 'Luyện',
-    color: colors.skill.listening,
-    soft: '#e8effc',
-    Icon: BookOpen,
-  },
-  community: {
-    label: 'Cộng đồng',
-    short: 'Cộng đồng',
-    color: colors.accentWarm,
-    soft: '#fff1e7',
-    Icon: Users,
-  },
-  profile: {
-    label: 'Tiến độ',
-    short: 'Tiến độ',
-    color: colors.success,
-    soft: colors.successSoft,
-    Icon: ChartLine,
-  },
-  account: {
-    label: 'Profile',
-    short: 'Profile',
-    color: colors.accentDeep,
-    soft: colors.accentSoft,
-    Icon: UserRound,
-  },
+const TAB_META: Record<string, { label: string; short: string; tone: 'accent' | 'listening' | 'warm' | 'success' | 'deep'; Icon: typeof House }> = {
+  index: { label: 'Hôm nay', short: 'Hôm nay', tone: 'accent', Icon: House },
+  practice: { label: 'Flashcards', short: 'Flashcards', tone: 'listening', Icon: Layers },
+  community: { label: 'Cộng đồng', short: 'Cộng đồng', tone: 'warm', Icon: Users },
+  profile: { label: 'Tiến độ', short: 'Tiến độ', tone: 'success', Icon: ChartLine },
+  account: { label: 'Profile', short: 'Profile', tone: 'deep', Icon: UserRound },
 };
+
+function tabTone(tone: (typeof TAB_META)[string]['tone']) {
+  if (tone === 'success') return { color: colors.success, soft: colors.successSoft };
+  if (tone === 'warm') return { color: colors.accentWarm, soft: colors.warmSoft };
+  if (tone === 'listening') return { color: colors.skill.listening, soft: colors.listeningSoft };
+  if (tone === 'deep') return { color: colors.accentDeep, soft: colors.accentSoft };
+  return { color: colors.accent, soft: colors.accentSoft };
+}
 
 function TabItem({
   focused,
@@ -168,9 +137,9 @@ export function ColorfulTabBar({ state, descriptors, navigation }: ColorfulTabBa
           backgroundColor: colors.surface,
           borderRadius: 26,
           borderWidth: 1,
-          borderColor: 'rgba(231, 226, 215, 0.95)',
+          borderColor: colors.line,
           paddingHorizontal: 4,
-          shadowColor: '#ea580c',
+          shadowColor: colors.accent,
           shadowOpacity: 0.12,
           shadowRadius: 18,
           shadowOffset: { width: 0, height: 8 },
@@ -178,24 +147,21 @@ export function ColorfulTabBar({ state, descriptors, navigation }: ColorfulTabBa
         }}>
         {state.routes.map((route, index) => {
           const focused = state.index === index;
-          const meta = TAB_META[route.name] ?? {
-            label: descriptors[route.key]?.options.title ?? route.name,
-            short: descriptors[route.key]?.options.title ?? route.name,
-            color: colors.accentDeep,
-            soft: colors.accentSoft,
-            Icon: House,
-          };
+          const meta = TAB_META[route.name];
+          const tone = meta ? tabTone(meta.tone) : { color: colors.accentDeep, soft: colors.accentSoft };
+          const label = meta?.short ?? descriptors[route.key]?.options.title ?? route.name;
+          const Icon = meta?.Icon ?? House;
           const { options } = descriptors[route.key];
 
           return (
             <TabItem
               key={route.key}
               focused={focused}
-              label={meta.short}
-              color={meta.color}
-              soft={meta.soft}
-              Icon={meta.Icon}
-              accessibilityLabel={options.tabBarAccessibilityLabel ?? meta.label}
+              label={label}
+              color={tone.color}
+              soft={tone.soft}
+              Icon={Icon}
+              accessibilityLabel={options.tabBarAccessibilityLabel ?? meta?.label ?? label}
               onPress={() => {
                 const event = navigation.emit({
                   type: 'tabPress',

@@ -1,3 +1,24 @@
+:root {
+  --font-scale: 1;
+  --c-canvas: 248 249 252;
+  --c-surface: 255 255 255;
+  --c-tint: 238 243 255;
+  --c-ink: 32 38 51;
+  --c-muted: 119 128 142;
+  --c-line: 227 231 239;
+  --c-edge: 233 237 244;
+  --c-accent: 18 58 181;
+  --c-accent-deep: 13 43 141;
+  --c-accent-soft: 238 243 255;
+  --c-accent-edge: 13 43 141;
+  --c-xp: 255 118 36;
+  --c-xp-deep: 255 113 0;
+  --c-danger: 194 51 43;
+  --c-danger-soft: 253 236 234;
+  --c-success: 19 132 90;
+  --c-success-soft: 230 245 238;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

@@ -10,7 +10,7 @@ import { TextField } from '@/src/components/ui/text-field';
 import { authApi } from '@/src/features/auth/api';
 import { AuthLink } from '@/src/features/auth/components/auth-link';
 import { AuthScreen } from '@/src/features/auth/components/auth-screen';
-import { applyApiError } from '@/src/features/auth/form-errors';
+import { applyApiError, FEATURE_COMING_SOON, isFeatureUnavailable } from '@/src/features/auth/form-errors';
 import { resetPasswordSchema, type ResetPasswordInput } from '@/src/features/auth/schemas';
 
 export default function ResetPasswordScreen() {
@@ -36,7 +36,9 @@ export default function ResetPasswordScreen() {
       const response = await authApi.resetPassword({ token: token.trim(), newPassword });
       setDoneMessage(response.message);
     } catch (error) {
-      setFormError(applyApiError(error, setError, ['token', 'newPassword']));
+      setFormError(
+        isFeatureUnavailable(error) ? FEATURE_COMING_SOON : applyApiError(error, setError, ['token', 'newPassword']),
+      );
     }
   });
 

@@ -2,6 +2,7 @@ import { forwardRef, useState } from 'react';
 import { Pressable, TextInput, View, type TextInputProps } from 'react-native';
 import { Eye, EyeOff } from 'lucide-react-native';
 
+import { useTheme } from '@/src/theme/app-theme';
 import { colors, fonts } from '@/src/theme';
 
 import { Text } from './text';
@@ -17,6 +18,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
   { label, error, hint, secureToggle = false, secureTextEntry, onFocus, onBlur, ...props },
   ref,
 ) {
+  const { fontScale } = useTheme();
   const [focused, setFocused] = useState(false);
   const [hidden, setHidden] = useState(true);
   const isSecure = secureToggle ? hidden : secureTextEntry;
@@ -32,8 +34,8 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
         <TextInput
           ref={ref}
           className="flex-1 py-3 text-base text-ink"
-          style={{ fontFamily: fonts.regular }}
-          placeholderTextColor="#a8a29e"
+          style={{ fontFamily: fonts.regular, fontSize: Math.round(16 * fontScale) }}
+          placeholderTextColor={colors.muted}
           selectionColor={colors.accentDeep}
           secureTextEntry={isSecure}
           accessibilityLabel={label}

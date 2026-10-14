@@ -45,7 +45,7 @@ export default function TabLayout() {
         sceneStyle: { backgroundColor: colors.canvas },
       }}>
       <Tabs.Screen name="index" options={{ title: 'Hôm nay' }} />
-      <Tabs.Screen name="practice" options={{ title: 'Luyện đề' }} />
+      <Tabs.Screen name="practice" options={{ title: 'Flashcards' }} />
       <Tabs.Screen name="community" options={{ title: 'Cộng đồng' }} />
       <Tabs.Screen name="profile" options={{ title: 'Tiến độ' }} />
       <Tabs.Screen name="account" options={{ title: 'Profile' }} />

@@ -38,7 +38,11 @@ async function readSettings(): Promise<AppSettings> {
       return memoryCache;
     }
     const parsed = JSON.parse(raw) as Partial<AppSettings>;
-    memoryCache = { ...DEFAULT_APP_SETTINGS, ...parsed, theme: 'light' };
+    memoryCache = {
+      ...DEFAULT_APP_SETTINGS,
+      ...parsed,
+      theme: parsed.theme === 'dark' ? 'dark' : 'light',
+    };
     return memoryCache;
   } catch {
     memoryCache = { ...DEFAULT_APP_SETTINGS };
@@ -83,12 +87,8 @@ export function useAppSettings() {
 
   const update = useCallback(async (patch: Partial<AppSettings>) => {
     const current = await readSettings();
-    // Dark theme is placeholder — always persist light for now.
-    const next: AppSettings = {
-      ...current,
-      ...patch,
-      theme: 'light',
-    };
+    const next: AppSettings = { ...current, ...patch };
+    if (next.theme !== 'dark') next.theme = 'light';
     await writeSettings(next);
     setSettings(next);
   }, []);

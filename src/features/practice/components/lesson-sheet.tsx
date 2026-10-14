@@ -12,16 +12,13 @@ type LessonSheetProps = {
   visible: boolean;
   onClose: () => void;
   onStart: (nodeId: string) => void;
-  /** Mock complete — advances path + mascot run. */
-  onComplete?: (nodeId: string) => void;
 };
 
-export function LessonSheet({ node, visible, onClose, onStart, onComplete }: LessonSheetProps) {
+export function LessonSheet({ node, visible, onClose, onStart }: LessonSheetProps) {
   if (!node) return null;
 
   const locked = node.status === 'locked';
   const done = node.status === 'done';
-  const current = node.status === 'current';
   const Icon = node.Icon;
 
   return (
@@ -83,16 +80,6 @@ export function LessonSheet({ node, visible, onClose, onStart, onComplete }: Les
                     onStart(node.id);
                   }}
                 />
-                {current && onComplete ? (
-                  <Button
-                    variant="secondary"
-                    label="Hoàn thành"
-                    onPress={() => {
-                      onClose();
-                      onComplete(node.id);
-                    }}
-                  />
-                ) : null}
               </>
             )}
           </View>

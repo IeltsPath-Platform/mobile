@@ -1,7 +1,9 @@
 import Constants from 'expo-constants';
 import * as WebBrowser from 'expo-web-browser';
 import {
+  BadgeCheck,
   Bell,
+  Calendar,
   ChevronRight,
   Flame,
   KeyRound,
@@ -48,6 +50,18 @@ const roleLabels: Record<string, string> = {
   SALES_STAFF: 'Tư vấn viên',
 };
 
+const statusLabels: Record<string, string> = {
+  ACTIVE: 'Đang hoạt động',
+  INACTIVE: 'Tạm ngưng',
+  LOCKED: 'Bị khóa',
+};
+
+function formatJoined(iso: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleDateString('vi-VN');
+}
+
 const appVersion = Constants.expoConfig?.version ?? Constants.nativeAppVersion ?? '1.0.0';
 const FONT_OPTIONS: FontSizeOption[] = ['S', 'M', 'L'];
 const XP_PRESETS = [30, 50, 80, 100] as const;
@@ -59,7 +73,6 @@ export default function AccountScreen() {
   const queryClient = useQueryClient();
   const [signingOut, setSigningOut] = useState(false);
   const [clearing, setClearing] = useState(false);
-  const [showProfileDetail, setShowProfileDetail] = useState(false);
 
   const doSignOut = async () => {
     setSigningOut(true);
@@ -72,7 +85,7 @@ export default function AccountScreen() {
 
   const confirmSignOut = () => {
     if (Platform.OS === 'web') {
-      void doSignOut();
+      if (window.confirm('Bạn muốn đăng xuất khỏi IELTSPath?')) void doSignOut();
       return;
     }
     Alert.alert('Đăng xuất', 'Bạn muốn đăng xuất khỏi IELTSPath?', [
@@ -82,7 +95,7 @@ export default function AccountScreen() {
   };
 
   const onChangePassword = () => {
-    const message = 'Đổi mật khẩu sẽ mở khi auth-service sẵn sàng.';
+    const message = 'Đổi mật khẩu sẽ mở khi BE sẵn sàng.';
     if (Platform.OS === 'web') window.alert(message);
     else Alert.alert('Đổi mật khẩu', message);
   };
@@ -109,7 +122,7 @@ export default function AccountScreen() {
     };
 
     if (Platform.OS === 'web') {
-      void run();
+      if (window.confirm('Xóa cài đặt đã lưu và cache dữ liệu tạm trên máy?')) void run();
       return;
     }
     Alert.alert('Xóa cache local', 'Xóa cài đặt đã lưu và cache dữ liệu tạm trên máy?', [
@@ -182,19 +195,7 @@ export default function AccountScreen() {
               </Text>
             </View>
           </View>
-        </Card>
-      ) : null}
-
-      {/* Tài khoản */}
-      <SettingsSection title="Tài khoản">
-        <SettingsRow
-          Icon={UserRound}
-          label="Xem hồ sơ"
-          hint={user?.fullName ?? 'Thông tin tài khoản'}
-          onPress={() => setShowProfileDetail((v) => !v)}
-        />
-        {showProfileDetail && user ? (
-          <View className="mb-2 gap-3 rounded-2xl bg-canvas px-3 py-3">
+          <View className="mt-4 gap-3 border-t border-line pt-4">
             <InfoRow Icon={Mail} label="Email" value={user.email} />
             <InfoRow Icon={Phone} label="Số điện thoại" value={user.phoneNumber || 'Chưa cập nhật'} />
             <InfoRow
@@ -202,8 +203,14 @@ export default function AccountScreen() {
               label="Vai trò"
               value={user.roles.map((r) => roleLabels[r.name] ?? r.name).join(', ') || '—'}
             />
+            <InfoRow Icon={BadgeCheck} label="Trạng thái" value={statusLabels[user.status] ?? user.status} />
+            <InfoRow Icon={Calendar} label="Tham gia" value={formatJoined(user.createdAt)} />
           </View>
-        ) : null}
+        </Card>
+      ) : null}
+
+      {/* Tài khoản */}
+      <SettingsSection title="Tài khoản">
         <SettingsRow Icon={KeyRound} label="Đổi mật khẩu" hint="Sắp có" onPress={onChangePassword} />
         {authEnabled && user ? (
           <SettingsRow
@@ -306,18 +313,31 @@ export default function AccountScreen() {
             );
           })}
         </View>
-        <View className="mt-4 flex-row items-center justify-between gap-3 border-t border-line pt-4">
-          <View className="flex-1">
-            <Text weight="semibold" className="text-sm">
-              Theme sáng
-            </Text>
-            <Text className="text-xs text-muted">Theme tối sẽ có sau</Text>
-          </View>
-          <View className="rounded-full bg-accent-soft px-3 py-1">
-            <Text weight="bold" className="text-xs text-accent-deep">
-              Light
-            </Text>
-          </View>
+        <Text weight="semibold" className="mb-2 mt-4 text-sm">
+          Giao diện
+        </Text>
+        <View className="flex-row gap-2">
+          {(['light', 'dark'] as const).map((theme) => {
+            const active = settings.theme === theme;
+            const label = theme === 'light' ? 'Sáng' : 'Tối';
+            return (
+              <Pressable
+                key={theme}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                onPress={() => void update({ theme })}
+                className="flex-1 items-center rounded-2xl border border-b-4 py-2.5"
+                style={{
+                  borderColor: active ? colors.accent : colors.line,
+                  borderBottomColor: active ? colors.accentEdge : colors.edge,
+                  backgroundColor: active ? colors.accentSoft : colors.surface,
+                }}>
+                <Text weight="extrabold" className="text-sm" style={{ color: active ? colors.accentDeep : colors.ink }}>
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
       </SettingsSection>
 

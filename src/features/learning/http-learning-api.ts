@@ -1,11 +1,10 @@
 import { apiRequest, ApiError } from '@/src/lib/api-client';
 
-import { LearningApiError, learningErrorFromBody, type LearningErrorCode } from './api-error';
+import { LearningApiError, type LearningErrorCode } from './api-error';
 import type { LearningApi } from './learning-api';
 import type {
   ExerciseSubmissionRequest,
   ExerciseSubmissionResultDto,
-  LearningErrorBody,
   LessonCompletionDto,
   LessonDetailDto,
   ReviewDetailDto,
@@ -27,15 +26,8 @@ async function learningRequest<T>(path: string, options: Parameters<typeof apiRe
       if (error.isNetworkError) {
         throw new LearningApiError(0, 'NETWORK_ERROR', error.message);
       }
-      const body: LearningErrorBody = {
-        detail: error.message,
-        code: (error.details?.code as string) || undefined,
-      };
-      // ApiError.details is Record<string,string> — reviews may not map; use message/code.
-      throw learningErrorFromBody(error.status, {
-        detail: error.message,
-        code: (error.details.code as LearningErrorCode) || body.code,
-      });
+      const code = (error.code || error.details.code || (error.status === 404 ? 'NOT_FOUND' : 'SERVER_ERROR')) as LearningErrorCode;
+      throw new LearningApiError(error.status, code, error.message, error.reviews);
     }
     throw error;
   }

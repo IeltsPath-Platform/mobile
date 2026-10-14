@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { ActivityIndicator, ScrollView, View } from 'react-native';
 
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
@@ -9,6 +9,8 @@ import { FormAlert } from '@/src/components/ui/form-alert';
 import { Text } from '@/src/components/ui/text';
 import { isLearningApiError, learningApi } from '@/src/features/learning';
 import type { LessonBlockDto } from '@/src/features/learning/types';
+import { ChoiceButtons } from '@/src/features/session/components/choice-buttons';
+import { FillInput } from '@/src/features/session/components/fill-input';
 import { colors } from '@/src/theme';
 
 function newRequestId() {
@@ -130,39 +132,22 @@ export default function LessonScreen() {
                     {q.sortOrder}. {q.stem}
                   </Text>
                   {q.options ? (
-                    <View className="mt-2 gap-2">
-                      {q.options.map((opt) => {
-                        const selected = answers[q.questionVersionId] === opt.optionKey;
-                        return (
-                          <Pressable
-                            key={opt.optionKey}
-                            onPress={() =>
-                              setAnswers((prev) => ({ ...prev, [q.questionVersionId]: opt.optionKey }))
-                            }
-                            className="rounded-xl border px-3 py-2.5"
-                            style={{
-                              borderColor: selected ? colors.accent : colors.line,
-                              backgroundColor: selected ? colors.accentSoft : colors.surface,
-                            }}>
-                            <Text className="text-sm">
-                              <Text weight="bold">{opt.optionKey}. </Text>
-                              {opt.content}
-                            </Text>
-                          </Pressable>
-                        );
-                      })}
+                    <View className="mt-2">
+                      <ChoiceButtons
+                        options={q.options}
+                        value={answers[q.questionVersionId] ?? ''}
+                        onChange={(optionKey) =>
+                          setAnswers((prev) => ({ ...prev, [q.questionVersionId]: optionKey }))
+                        }
+                      />
                     </View>
                   ) : (
-                    <TextInput
-                      value={answers[q.questionVersionId] ?? ''}
-                      onChangeText={(text) =>
-                        setAnswers((prev) => ({ ...prev, [q.questionVersionId]: text }))
-                      }
-                      placeholder="Nhập đáp án"
-                      placeholderTextColor={colors.muted}
-                      autoCapitalize="none"
-                      className="mt-2 rounded-xl border border-line bg-canvas px-3 py-2.5 text-ink"
-                    />
+                    <View className="mt-2">
+                      <FillInput
+                        value={answers[q.questionVersionId] ?? ''}
+                        onChange={(text) => setAnswers((prev) => ({ ...prev, [q.questionVersionId]: text }))}
+                      />
+                    </View>
                   )}
                 </View>
               ))}

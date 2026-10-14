@@ -9,7 +9,7 @@ import { TextField } from '@/src/components/ui/text-field';
 import { authApi } from '@/src/features/auth/api';
 import { AuthLink } from '@/src/features/auth/components/auth-link';
 import { AuthScreen } from '@/src/features/auth/components/auth-screen';
-import { applyApiError } from '@/src/features/auth/form-errors';
+import { applyApiError, FEATURE_COMING_SOON, isFeatureUnavailable } from '@/src/features/auth/form-errors';
 import { forgotPasswordSchema, type ForgotPasswordInput } from '@/src/features/auth/schemas';
 
 export default function ForgotPasswordScreen() {
@@ -33,7 +33,7 @@ export default function ForgotPasswordScreen() {
       const response = await authApi.forgotPassword(email.trim());
       setSentMessage(response.message);
     } catch (error) {
-      setFormError(applyApiError(error, setError, ['email']));
+      setFormError(isFeatureUnavailable(error) ? FEATURE_COMING_SOON : applyApiError(error, setError, ['email']));
     }
   });
 

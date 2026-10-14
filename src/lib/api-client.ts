@@ -4,19 +4,37 @@ import { tokenStorage, type SessionTokens } from './token-storage';
 type ErrorBody = {
   status?: number;
   message?: string;
+  detail?: string;
+  code?: string;
   path?: string;
   details?: Record<string, string> | null;
+  reviews?: unknown;
+};
+
+export type ApiReviewRef = {
+  reviewId: string;
+  lessonId: string;
+  knowledgePointId: string;
 };
 
 export class ApiError extends Error {
   readonly status: number;
   readonly details: Record<string, string>;
+  readonly code?: string;
+  readonly reviews: ApiReviewRef[];
 
-  constructor(status: number, message: string, details?: Record<string, string> | null) {
+  constructor(
+    status: number,
+    message: string,
+    details?: Record<string, string> | null,
+    extras?: { code?: string; reviews?: ApiReviewRef[] },
+  ) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.details = details ?? {};
+    this.code = extras?.code ?? details?.code;
+    this.reviews = extras?.reviews ?? [];
   }
 
   get isNetworkError() {
@@ -74,9 +92,28 @@ async function parse<T>(response: Response): Promise<T> {
 
   if (!response.ok) {
     const body = (data ?? {}) as ErrorBody;
-    throw new ApiError(response.status, body.message || FALLBACK_ERROR_MESSAGE, body.details);
+    throw new ApiError(response.status, body.message || body.detail || FALLBACK_ERROR_MESSAGE, body.details, {
+      code: body.code,
+      reviews: readReviews(body.reviews),
+    });
   }
   return data as T;
+}
+
+function readReviews(value: unknown): ApiReviewRef[] {
+  if (!Array.isArray(value)) return [];
+  const reviews: ApiReviewRef[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== 'object') continue;
+    const row = item as Record<string, unknown>;
+    if (typeof row.reviewId !== 'string' || typeof row.lessonId !== 'string') continue;
+    reviews.push({
+      reviewId: row.reviewId,
+      lessonId: row.lessonId,
+      knowledgePointId: typeof row.knowledgePointId === 'string' ? row.knowledgePointId : '',
+    });
+  }
+  return reviews;
 }
 
 function safeJson(text: string): unknown {

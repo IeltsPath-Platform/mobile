@@ -5,10 +5,9 @@ import { BeVietnamPro_700Bold } from '@expo-google-fonts/be-vietnam-pro/700Bold'
 import { BeVietnamPro_800ExtraBold } from '@expo-google-fonts/be-vietnam-pro/800ExtraBold';
 import { BeVietnamPro_900Black } from '@expo-google-fonts/be-vietnam-pro/900Black';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { DefaultTheme, Stack, ThemeProvider, type ErrorBoundaryProps } from 'expo-router';
+import { Stack, type ErrorBoundaryProps } from 'expo-router';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
-import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { View } from 'react-native';
 import 'react-native-reanimated';
@@ -19,25 +18,14 @@ import { Text } from '@/src/components/ui/text';
 import { AuthProvider, useAuth } from '@/src/features/auth/auth-provider';
 import { AUTH_ENABLED } from '@/src/lib/env';
 import { queryClient } from '@/src/lib/query-client';
+import { AppThemeProvider } from '@/src/theme/app-theme';
 import { colors } from '@/src/theme';
 
 // Do not block first paint on fonts — returning null left a blank cream screen on web/SSR.
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 export const unstable_settings = {
-  initialRouteName: '(tabs)',
-};
-
-const navigationTheme = {
-  ...DefaultTheme,
-  colors: {
-    ...DefaultTheme.colors,
-    primary: colors.accentDeep,
-    background: colors.canvas,
-    card: colors.surface,
-    text: colors.ink,
-    border: colors.line,
-  },
+  initialRouteName: AUTH_ENABLED ? '(auth)' : '(tabs)',
 };
 
 export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
@@ -77,12 +65,11 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <ThemeProvider value={navigationTheme}>
-          <StatusBar style="dark" />
+      <AppThemeProvider>
+        <AuthProvider>
           <RootNavigator />
-        </ThemeProvider>
-      </AuthProvider>
+        </AuthProvider>
+      </AppThemeProvider>
     </QueryClientProvider>
   );
 }
@@ -100,6 +87,7 @@ function RootNavigator() {
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas } }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="learn" options={{ headerShown: false }} />
+        <Stack.Screen name="flashcards" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" options={{ headerShown: true, title: 'Không tìm thấy' }} />
       </Stack>
     );
@@ -110,6 +98,7 @@ function RootNavigator() {
       <Stack.Protected guard={isAuthenticated}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="learn" options={{ headerShown: false }} />
+        <Stack.Screen name="flashcards" options={{ headerShown: false }} />
       </Stack.Protected>
       <Stack.Protected guard={!isAuthenticated}>
         <Stack.Screen name="(auth)" />

@@ -35,7 +35,7 @@ export function AuthScreen({ eyebrow, title, description, showIntro = false, chi
                   Từng bài luyện đưa bạn gần band mục tiêu hơn.
                 </Text>
                 <Text className="mt-2 text-sm leading-5 text-muted">
-                  Kho đề bốn kỹ năng, mô phỏng thi máy và feedback rõ ràng để biết chính xác bước tiếp theo.
+                  Từng bài ngắn trên lộ trình, rồi ôn từ bằng flashcards.
                 </Text>
               </View>
             ) : null}

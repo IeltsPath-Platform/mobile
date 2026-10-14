@@ -9,6 +9,7 @@ import { TextField } from '@/src/components/ui/text-field';
 import { useAuth } from '@/src/features/auth/auth-provider';
 import { AuthLink } from '@/src/features/auth/components/auth-link';
 import { AuthScreen } from '@/src/features/auth/components/auth-screen';
+import { GoogleSignInButton } from '@/src/features/auth/components/google-sign-in-button';
 import { applyApiError } from '@/src/features/auth/form-errors';
 import { registerSchema, type RegisterInput } from '@/src/features/auth/schemas';
 
@@ -154,6 +155,7 @@ export default function RegisterScreen() {
       />
 
       <Button label="Tạo tài khoản" loadingLabel="Đang tạo phiên…" loading={isSubmitting} onPress={onSubmit} />
+      <GoogleSignInButton />
     </AuthScreen>
   );
 }

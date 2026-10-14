@@ -16,28 +16,31 @@ type ButtonProps = Omit<PressableProps, 'children'> & {
   className?: string;
 };
 
-const variantStyles: Record<ButtonVariant, { container: string; text: string; spinner: string }> = {
+const variantStyles: Record<ButtonVariant, { container: string; text: string }> = {
   primary: {
     container: 'bg-accent border-b-4 border-accent-edge',
     text: 'text-white',
-    spinner: '#ffffff',
   },
   secondary: {
     container: 'bg-surface border border-line border-b-4 border-b-edge',
     text: 'text-ink',
-    spinner: colors.ink,
   },
   ghost: {
     container: 'bg-transparent',
     text: 'text-accent-deep',
-    spinner: colors.accentDeep,
   },
   danger: {
     container: 'bg-danger-soft border border-danger/20 border-b-4 border-b-danger/40',
     text: 'text-danger',
-    spinner: colors.danger,
   },
 };
+
+function spinnerColor(variant: ButtonVariant) {
+  if (variant === 'secondary') return colors.ink;
+  if (variant === 'ghost') return colors.accentDeep;
+  if (variant === 'danger') return colors.danger;
+  return '#ffffff';
+}
 
 export function Button({
   label,
@@ -61,7 +64,7 @@ export function Button({
       className={`min-h-12 flex-row items-center justify-center gap-2 rounded-2xl px-5 active:translate-y-0.5 active:opacity-90 ${style.container} ${isDisabled ? 'opacity-60' : ''} ${className ?? ''}`}
       style={variant === 'primary' ? primaryShadow : undefined}
       {...props}>
-      {loading ? <ActivityIndicator size="small" color={style.spinner} /> : icon}
+      {loading ? <ActivityIndicator size="small" color={spinnerColor(variant)} /> : icon}
       <View>
         <Text weight="bold" className={`text-base ${style.text}`}>
           {loading && loadingLabel ? loadingLabel : label}

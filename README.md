@@ -29,8 +29,8 @@ Feature tree tham chiếu: `../260913-ielts-platform-feature-tree.md`
 | Community feed | BE `/api/community/posts` (fallback mock) |
 | Vocab search | BE `/api/content/vocabulary/search` (fallback mock) |
 | **Learning path Reading** | **Mock mặc định** (`EXPO_PUBLIC_USE_MOCK_LEARNING`); HTTP `/api/learning/**` khi `=false` |
-| Daily Duolingo path (tab Hôm nay) | Mock UX riêng — khác contract learning |
-| Skill progress cards cũ | Thay bằng lộ trình topic trên tab Luyện đề |
+| Daily path (tab Hôm nay) | Mock `pathUnits` khi `USE_MOCK_LEARNING`; map topic/lesson khi HTTP |
+| Flashcards | `GET /api/learning-support/decks` (fallback bộ mẫu). SRS lưu trên máy |
 
 ### Không dùng trên mobile
 
@@ -67,18 +67,23 @@ EXPO_PUBLIC_API_BASE_URL=http://192.168.1.10:8080
 |-----------|-----------|
 | iOS simulator, web | `http://localhost:8080` (mặc định) |
 | Android emulator | `http://10.0.2.2:8080` (mặc định) |
-| Máy thật (Expo Go) | IP LAN của máy chạy backend, bắt buộc đặt biến trên |
+| Máy thật (Expo Go) | IP của Metro (`exp://…:8081`), cổng 8080. Gateway Compose chỉ mở `127.0.0.1`, chạy `node scripts/lan-gateway-proxy.mjs` trên máy dev |
 
-Luồng auth (tạm tắt):
+Luồng auth (bắt buộc):
 
-Mặc định `AUTH_ENABLED=false` — app mở thẳng các tab, không bắt đăng nhập (chưa có DB). Khi backend sẵn sàng, đặt trong `mobile/.env`:
+Mặc định phải đăng nhập mới vào Hôm nay, learn và flashcards. Copy `mobile/.env.example` thành `mobile/.env`. Chỉ đặt `false` khi làm UI local mà không có gateway:
 
 ```bash
 EXPO_PUBLIC_AUTH_ENABLED=true
 EXPO_PUBLIC_API_BASE_URL=http://192.168.1.10:8080
 ```
 
-Khi bật lại:
+```bash
+# Dev only — mở tab không cần phiên
+EXPO_PUBLIC_AUTH_ENABLED=false
+```
+
+Khi bật (mặc định):
 
 - `POST /auth/login` → lưu `accessToken` + `refreshToken` vào SecureStore (Keychain/Keystore; web dùng `localStorage`).
 - Request cần đăng nhập gửi `Authorization: Bearer <accessToken>`; gặp 401 thì gọi `POST /auth/refresh` một lần (dùng chung cho các request song song vì refresh token xoay vòng), refresh lỗi thì về màn đăng nhập.
@@ -97,11 +102,13 @@ Font custom tự mang weight, nên dùng `<Text weight="bold">` (`src/components
 app/
   _layout.tsx        # Font, providers, guard (Stack.Protected)
   (auth)/            # login, register, forgot-password, reset-password
-  (tabs)/            # Hôm nay, Luyện đề, Cộng đồng, Tiến độ (hồ sơ + đăng xuất)
+  (tabs)/            # Hôm nay, Flashcards, Cộng đồng, Tiến độ, Profile
 src/
   components/ui/     # Text, Button, TextField, Card, FormAlert, BrandLogo
   features/auth/     # api, schemas (Zod khớp DTO backend), AuthProvider, màn auth
-  features/practice/ # danh sách kỹ năng + SkillCard
+  features/practice/ # lộ trình Hôm nay (path nodes)
+  features/session/  # micro-session CHOICE / TFNG / FILL
+  features/flashcards/ # lật thẻ + SRS local
   lib/               # env, api-client (Bearer + refresh), token-storage, query-client
   schemas/learner.ts # Zod stubs
   theme/             # design tokens

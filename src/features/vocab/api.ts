@@ -32,13 +32,31 @@ export type FlashcardDeck = {
   updatedAt: string;
 };
 
+/** Library page payload. BE record is `items`; `content` kept if a proxy still sends it. */
 type PageResponse<T> = {
-  content: T[];
+  items?: T[];
+  content?: T[];
   page: number;
   size: number;
-  totalElements: number;
-  totalPages: number;
+  total?: number;
+  totalElements?: number;
+  totalPages?: number;
 };
+
+export type DeckItem = {
+  deckId: string;
+  flashcardId: string;
+  sortOrder: number;
+  addedAt: string;
+  front: string;
+  back: string;
+  sourceType: string;
+  status: string;
+};
+
+function pageItems<T>(page: PageResponse<T>): T[] {
+  return page.items ?? page.content ?? [];
+}
 
 export const vocabApi = {
   search: (query: string) =>
@@ -52,9 +70,39 @@ export const vocabApi = {
       '/api/learning-support/decks?page=0&size=20',
       { auth: true },
     );
-    return page.content;
+    return pageItems(page);
+  },
+
+  listDeckItems: async (deckId: string) => {
+    const page = await apiRequest<PageResponse<DeckItem>>(
+      `/api/learning-support/decks/${deckId}/items?page=0&size=50`,
+      { auth: true },
+    );
+    return pageItems(page);
   },
 };
+
+/** Local decks when signed out or the decks API fails. */
+export const MOCK_DECKS: FlashcardDeck[] = [
+  {
+    id: 'mock-deck-academic',
+    userId: 'local',
+    name: 'Academic basics',
+    description: '8 từ học thuật hay gặp trong Reading',
+    status: 'ACTIVE',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'mock-deck-tfng',
+    userId: 'local',
+    name: 'True / False / NG',
+    description: 'Cụm từ giúp nhận ra thông tin không được nêu',
+    status: 'ACTIVE',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  },
+];
 
 /** Local fallback when BE empty / offline */
 export const MOCK_VOCAB: VocabularyItem[] = [

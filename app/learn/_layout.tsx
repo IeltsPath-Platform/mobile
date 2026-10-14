@@ -13,6 +13,7 @@ export default function LearnLayout() {
       }}>
       <Stack.Screen name="topic/[topicId]" options={{ title: 'Chủ đề' }} />
       <Stack.Screen name="lesson/[lessonId]" options={{ title: 'Bài học' }} />
+      <Stack.Screen name="session/[lessonId]" options={{ title: 'Luyện' }} />
       <Stack.Screen name="review/[reviewId]" options={{ title: 'Ôn tập' }} />
     </Stack>
   );

@@ -9,6 +9,7 @@ import { TextField } from '@/src/components/ui/text-field';
 import { useAuth } from '@/src/features/auth/auth-provider';
 import { AuthLink } from '@/src/features/auth/components/auth-link';
 import { AuthScreen } from '@/src/features/auth/components/auth-screen';
+import { GoogleSignInButton } from '@/src/features/auth/components/google-sign-in-button';
 import { applyApiError } from '@/src/features/auth/form-errors';
 import { loginSchema, type LoginInput } from '@/src/features/auth/schemas';
 
@@ -92,6 +93,7 @@ export default function LoginScreen() {
       </View>
 
       <Button label="Vào không gian học" loadingLabel="Đang vào học…" loading={isSubmitting} onPress={onSubmit} />
+      <GoogleSignInButton />
     </AuthScreen>
   );
 }
