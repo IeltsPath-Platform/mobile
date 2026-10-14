@@ -39,9 +39,7 @@ export default function LoginScreen() {
 
   return (
     <AuthScreen
-      showIntro
-      eyebrow="Chào mừng trở lại"
-      title="Tiếp tục lộ trình của bạn"
+      title="Đăng nhập"
       footer={<AuthLink prompt="Chưa có tài khoản?" label="Đăng ký" href="/register" />}>
       {formError ? <FormAlert message={formError} /> : null}
 
@@ -92,7 +90,7 @@ export default function LoginScreen() {
         <AuthLink label="Quên mật khẩu?" href="/forgot-password" replace={false} />
       </View>
 
-      <Button label="Vào không gian học" loadingLabel="Đang vào học…" loading={isSubmitting} onPress={onSubmit} />
+      <Button label="Đăng nhập" loadingLabel="Đang vào học…" loading={isSubmitting} onPress={onSubmit} />
       <GoogleSignInButton />
     </AuthScreen>
   );

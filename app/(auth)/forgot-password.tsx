@@ -39,9 +39,8 @@ export default function ForgotPasswordScreen() {
 
   return (
     <AuthScreen
-      eyebrow="Khôi phục tài khoản"
       title="Quên mật khẩu"
-      description="Nhập email đã đăng ký, chúng tôi sẽ gửi mã đặt lại mật khẩu."
+      description="Nhập email đã đăng ký."
       footer={<AuthLink prompt="Nhớ ra rồi?" label="Đăng nhập" href="/login" />}>
       {formError ? <FormAlert message={formError} /> : null}
       {sentMessage ? <FormAlert tone="success" message={sentMessage} /> : null}

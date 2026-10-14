@@ -1,27 +1,23 @@
 import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
 import { router, useFocusEffect, type Href } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, ScrollView, View } from 'react-native';
 
 import { Text } from '@/src/components/ui/text';
 import { learningApi } from '@/src/features/learning';
 import type { TopicLessonsDto } from '@/src/features/learning/types';
 import { LearningPath } from '@/src/features/practice/components/learning-path';
 import { LessonSheet } from '@/src/features/practice/components/lesson-sheet';
-import { StreakBar } from '@/src/features/practice/components/streak-bar';
 import {
   clonePathUnits,
   completePathNode,
   findCurrentNode,
   flattenNodes,
-  learnerStats,
   mapLessonsToPathUnits,
   type PathNode,
   type PathUnit,
 } from '@/src/features/practice/path';
 import { SESSION_DONE_KEY, type SessionDone } from '@/src/features/session/completion';
-import { useStreak } from '@/src/features/progress/use-streak';
-import { useAppSettings } from '@/src/features/settings/use-app-settings';
 import { USE_MOCK_LEARNING } from '@/src/lib/env';
 import { colors } from '@/src/theme';
 
@@ -35,7 +31,6 @@ export default function HomeScreen() {
   );
   const [travelToNodeId, setTravelToNodeId] = useState<string | null>(null);
   const [pendingUnlock, setPendingUnlock] = useState<string | null>(null);
-  const [bonusXp, setBonusXp] = useState(0);
 
   const topicsQuery = useQuery({
     queryKey: ['learning', 'topics'],
@@ -83,10 +78,11 @@ export default function HomeScreen() {
   const travelRef = useRef(travelToNodeId);
   travelRef.current = travelToNodeId;
 
-  const { currentDays } = useStreak();
-  const { settings } = useAppSettings();
-  const dailyGoal = settings.dailyXpGoal;
   const current = useMemo(() => findCurrentNode(units), [units]);
+  const activeUnit = useMemo(() => {
+    if (current) return units.find((unit) => unit.nodes.some((node) => node.id === current.id)) ?? units[0] ?? null;
+    return units[0] ?? null;
+  }, [units, current]);
 
   useEffect(() => {
     if (travelToNodeId || pendingUnlock) return;
@@ -114,7 +110,7 @@ export default function HomeScreen() {
       if (!payload?.lessonCompleted) return;
       queryClient.removeQueries({ queryKey: SESSION_DONE_KEY, exact: true });
       if (travelRef.current) return;
-      setBonusXp((xp) => xp + payload.xp);
+      queryClient.setQueryData<number>(['progress', 'sessionXp'], (xp) => (xp ?? 0) + payload.xp);
       setSelected(null);
 
       if (usingMockRef.current) {
@@ -148,87 +144,40 @@ export default function HomeScreen() {
 
   return (
     <View className="flex-1 bg-canvas">
-      <ScrollView contentContainerClassName="px-5 pb-28 pt-4" showsVerticalScrollIndicator={false}>
-        <StreakBar
-          streak={currentDays}
-          xp={learnerStats.xp + bonusXp}
-          dailyXp={Math.min(dailyGoal, learnerStats.dailyXp + bonusXp)}
-          dailyGoal={dailyGoal}
-        />
-
-        {usingMockPath ? (
-          <Text className="mt-3 text-xs text-muted">
-            {failed ? 'Không tải được lộ trình. Đang hiện bản mẫu.' : 'Đang xem lộ trình mẫu.'}
-          </Text>
-        ) : null}
-
+      <ScrollView contentContainerClassName="px-4 pb-8 pt-5" showsVerticalScrollIndicator={false}>
         {waiting ? (
           <View className="mt-10 items-center">
             <ActivityIndicator color={colors.accent} />
           </View>
         ) : null}
 
-        {!waiting && current ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Bắt đầu ${current.title}, cộng ${current.xp} XP`}
-            onPress={() => setSelected(current)}
-            className="mt-5 overflow-hidden rounded-3xl border border-b-4 active:translate-y-0.5"
-            style={{
-              borderColor: `${current.color}55`,
-              borderBottomColor: current.color,
-              backgroundColor: colors.surface,
-            }}>
-            <View className="h-1.5" style={{ backgroundColor: current.color }} />
-            <View className="flex-row items-center gap-3 px-4 py-4">
-              <View className="h-14 w-14 items-center justify-center rounded-full" style={{ backgroundColor: current.color }}>
-                <current.Icon size={26} color="#fff" />
-              </View>
-              <View className="flex-1">
-                <Text weight="bold" className="text-xs uppercase tracking-wide text-accent-deep">
-                  Bài tiếp theo
-                </Text>
-                <Text weight="black" className="mt-0.5 text-lg leading-6">
-                  {current.title}
-                </Text>
-                <Text className="mt-0.5 text-sm text-muted">{current.subtitle}</Text>
-              </View>
-              <View className="rounded-2xl px-3 py-2" style={{ backgroundColor: current.color }}>
-                <Text weight="extrabold" className="text-sm text-white">
-                  Bắt đầu
-                </Text>
-              </View>
+        {!waiting && activeUnit ? (
+          <View className="mb-1 px-2">
+            <Text weight="bold" className="text-xs text-muted">
+              {activeUnit.label}
+            </Text>
+            <View className="mt-0.5 flex-row items-end justify-between gap-3">
+              <Text weight="black" className="flex-1 text-xl leading-7">
+                {activeUnit.title}
+              </Text>
+              <Text weight="extrabold" className="text-sm text-xp">
+                {Math.round(activeUnit.progress * 100)}%
+              </Text>
             </View>
-          </Pressable>
+          </View>
         ) : null}
 
         {!waiting ? (
-          <View className="mt-7">
-            <LearningPath
-              units={units}
-              onSelectNode={setSelected}
-              mascotNodeId={mascotNodeId}
-              travelToNodeId={travelToNodeId}
-              onMascotArrived={onMascotArrived}
-            />
-          </View>
+          <LearningPath
+            units={units}
+            onSelectNode={setSelected}
+            mascotNodeId={mascotNodeId}
+            travelToNodeId={travelToNodeId}
+            onMascotArrived={onMascotArrived}
+            quietUnitId={activeUnit?.id ?? null}
+          />
         ) : null}
       </ScrollView>
-
-      {!waiting && current ? (
-        <View className="absolute bottom-0 left-0 right-0 border-t border-line bg-surface px-5 pb-5 pt-3">
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Bắt đầu ${current.title}`}
-            onPress={() => setSelected(current)}
-            className="h-14 flex-row items-center justify-center gap-2 rounded-2xl border border-accent-edge border-b-4 bg-accent active:translate-y-0.5">
-            <current.Icon size={22} color="#fff" />
-            <Text weight="extrabold" className="text-base text-white">
-              Bắt đầu · +{current.xp} XP
-            </Text>
-          </Pressable>
-        </View>
-      ) : null}
 
       <LessonSheet node={selected} visible={selected != null} onClose={() => setSelected(null)} onStart={startLesson} />
     </View>

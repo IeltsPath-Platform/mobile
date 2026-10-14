@@ -44,9 +44,8 @@ export default function ResetPasswordScreen() {
 
   return (
     <AuthScreen
-      eyebrow="Khôi phục tài khoản"
       title="Đặt lại mật khẩu"
-      description="Dán mã đặt lại bạn nhận được và chọn mật khẩu mới."
+      description="Nhập mã và mật khẩu mới."
       footer={<AuthLink label="Quay lại đăng nhập" href="/login" />}>
       {formError ? <FormAlert message={formError} /> : null}
       {doneMessage ? <FormAlert tone="success" message={doneMessage} /> : null}

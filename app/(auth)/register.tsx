@@ -42,9 +42,7 @@ export default function RegisterScreen() {
 
   return (
     <AuthScreen
-      eyebrow="Bắt đầu lộ trình"
-      title="Tạo tài khoản học tập"
-      description="Miễn phí, không cần thẻ. Tài khoản dùng chung cho web và mobile."
+      title="Tạo tài khoản"
       footer={<AuthLink prompt="Đã có tài khoản?" label="Đăng nhập" href="/login" />}>
       {formError ? <FormAlert message={formError} /> : null}
 

@@ -1,31 +1,35 @@
-import { BeVietnamPro_400Regular } from '@expo-google-fonts/be-vietnam-pro/400Regular';
-import { BeVietnamPro_500Medium } from '@expo-google-fonts/be-vietnam-pro/500Medium';
-import { BeVietnamPro_600SemiBold } from '@expo-google-fonts/be-vietnam-pro/600SemiBold';
-import { BeVietnamPro_700Bold } from '@expo-google-fonts/be-vietnam-pro/700Bold';
-import { BeVietnamPro_800ExtraBold } from '@expo-google-fonts/be-vietnam-pro/800ExtraBold';
-import { BeVietnamPro_900Black } from '@expo-google-fonts/be-vietnam-pro/900Black';
-import { QueryClientProvider } from '@tanstack/react-query';
-import { Stack, type ErrorBoundaryProps } from 'expo-router';
-import { useFonts } from 'expo-font';
-import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
-import { View } from 'react-native';
-import 'react-native-reanimated';
-import '../global.css';
+import { BeVietnamPro_400Regular } from "@expo-google-fonts/be-vietnam-pro/400Regular";
+import { BeVietnamPro_500Medium } from "@expo-google-fonts/be-vietnam-pro/500Medium";
+import { BeVietnamPro_600SemiBold } from "@expo-google-fonts/be-vietnam-pro/600SemiBold";
+import { BeVietnamPro_700Bold } from "@expo-google-fonts/be-vietnam-pro/700Bold";
+import { BeVietnamPro_800ExtraBold } from "@expo-google-fonts/be-vietnam-pro/800ExtraBold";
+import { BeVietnamPro_900Black } from "@expo-google-fonts/be-vietnam-pro/900Black";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { Stack, type ErrorBoundaryProps } from "expo-router";
+import { useFonts } from "expo-font";
+import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
+import { useEffect } from "react";
+import { Image, View } from "react-native";
+import "react-native-reanimated";
+import "../global.css";
 
-import { Button } from '@/src/components/ui/button';
-import { Text } from '@/src/components/ui/text';
-import { AuthProvider, useAuth } from '@/src/features/auth/auth-provider';
-import { AUTH_ENABLED } from '@/src/lib/env';
-import { queryClient } from '@/src/lib/query-client';
-import { AppThemeProvider } from '@/src/theme/app-theme';
-import { colors } from '@/src/theme';
+import { Button } from "@/src/components/ui/button";
+import { Text } from "@/src/components/ui/text";
+import { AuthProvider, useAuth } from "@/src/features/auth/auth-provider";
+import { useOnboarding } from "@/src/features/onboarding/use-onboarding";
+import { AUTH_ENABLED } from "@/src/lib/env";
+import { queryClient } from "@/src/lib/query-client";
+import { AppThemeProvider } from "@/src/theme/app-theme";
+import { colors } from "@/src/theme";
+
+const SPLASH = "#ff7624";
 
 // Do not block first paint on fonts — returning null left a blank cream screen on web/SSR.
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 export const unstable_settings = {
-  initialRouteName: AUTH_ENABLED ? '(auth)' : '(tabs)',
+  initialRouteName: "welcome",
 };
 
 export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
@@ -76,34 +80,61 @@ export default function RootLayout() {
 
 function RootNavigator() {
   const { status } = useAuth();
-  const isAuthenticated = status === 'authenticated';
+  const { ready, onboarded } = useOnboarding();
+  const isAuthenticated = status === "authenticated";
 
-  if (AUTH_ENABLED && status === 'loading') {
-    return <View className="flex-1 bg-canvas" />;
-  }
-
-  if (!AUTH_ENABLED) {
+  if (!ready || (AUTH_ENABLED && status === "loading")) {
     return (
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas } }}>
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="learn" options={{ headerShown: false }} />
-        <Stack.Screen name="flashcards" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" options={{ headerShown: true, title: 'Không tìm thấy' }} />
-      </Stack>
+      <View
+        className="flex-1 items-center justify-center"
+        style={{ backgroundColor: SPLASH }}
+      >
+        <StatusBar style="light" />
+        <Image
+          source={require("@/assets/images/splash-mascot.png")}
+          style={{ width: 220, height: 220 }}
+          resizeMode="contain"
+          accessibilityIgnoresInvertColors
+        />
+        <Text
+          weight="black"
+          className="mt-1 text-4xl"
+          style={{ color: "#ffffff", letterSpacing: -1 }}
+        >
+          ieltspath
+        </Text>
+      </View>
     );
   }
 
+  const enterApp =
+    (AUTH_ENABLED && isAuthenticated) || (!AUTH_ENABLED && onboarded);
+
   return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas } }}>
-      <Stack.Protected guard={isAuthenticated}>
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="learn" options={{ headerShown: false }} />
-        <Stack.Screen name="flashcards" options={{ headerShown: false }} />
-      </Stack.Protected>
-      <Stack.Protected guard={!isAuthenticated}>
-        <Stack.Screen name="(auth)" />
-      </Stack.Protected>
-      <Stack.Screen name="+not-found" options={{ headerShown: true, title: 'Không tìm thấy' }} />
-    </Stack>
+    <>
+      <StatusBar style={enterApp ? "dark" : "light"} />
+      <Stack
+        initialRouteName={enterApp ? "(tabs)" : "welcome"}
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.canvas },
+        }}
+      >
+        <Stack.Protected guard={!enterApp}>
+          <Stack.Screen name="welcome" />
+          <Stack.Screen name="onboarding" />
+          <Stack.Screen name="(auth)" />
+        </Stack.Protected>
+        <Stack.Protected guard={enterApp}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="learn" options={{ headerShown: false }} />
+          <Stack.Screen name="flashcards" options={{ headerShown: false }} />
+        </Stack.Protected>
+        <Stack.Screen
+          name="+not-found"
+          options={{ headerShown: true, title: "Không tìm thấy" }}
+        />
+      </Stack>
+    </>
   );
 }

@@ -18,6 +18,8 @@ type LearningPathProps = {
   /** When set, mascot runs toward this node. */
   travelToNodeId?: string | null;
   onMascotArrived?: () => void;
+  /** Skip the inline title for the unit already shown as the Home banner. */
+  quietUnitId?: string | null;
 };
 
 const zigZag: NodeAlign[] = ['center', 'right', 'center', 'left'];
@@ -30,6 +32,7 @@ export function LearningPath({
   mascotNodeId,
   travelToNodeId = null,
   onMascotArrived,
+  quietUnitId = null,
 }: LearningPathProps) {
   const mapRef = useRef<View>(null);
   const ringRefs = useRef<Record<string, View | null>>({});
@@ -80,7 +83,7 @@ export function LearningPath({
     <View
       ref={mapRef}
       collapsable={false}
-      className="overflow-hidden rounded-[28px] border border-line bg-canvas"
+      className="overflow-hidden bg-canvas"
       onLayout={(e) => {
         const { width, height } = e.nativeEvent.layout;
         setMapSize({ width, height });
@@ -120,24 +123,16 @@ export function LearningPath({
       <View className="relative z-10 gap-7 px-3 pb-16 pt-5">
         {units.map((unit) => (
           <View key={unit.id} className="gap-1">
-            <View className="mx-2 mb-2 flex-row items-center gap-3 rounded-2xl border border-b-4 border-line border-b-accent bg-surface/95 px-3 py-2.5">
-              <View className="h-10 w-10 items-center justify-center rounded-xl bg-accent-soft">
-                <Text weight="black" className="text-sm text-accent">
-                  {unit.label.replace('Unit ', 'U')}
-                </Text>
-              </View>
-              <View className="flex-1">
-                <Text weight="bold" className="text-[11px] uppercase tracking-widest text-accent-deep">
-                  {unit.label}
-                </Text>
-                <Text weight="black" className="text-base leading-5">
+            {unit.id === quietUnitId ? null : (
+              <View className="mx-2 mb-1 flex-row items-baseline justify-between px-1">
+                <Text weight="extrabold" className="text-sm text-ink">
                   {unit.title}
                 </Text>
+                <Text weight="bold" className="text-xs text-muted">
+                  {Math.round(unit.progress * 100)}%
+                </Text>
               </View>
-              <Text weight="extrabold" className="text-xs text-xp">
-                {Math.round(unit.progress * 100)}%
-              </Text>
-            </View>
+            )}
 
             <View className="items-center px-1 pt-2">
               {unit.nodes.map((node, index) => (

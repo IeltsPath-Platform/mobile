@@ -8,7 +8,6 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Text } from '@/src/components/ui/text';
 import { colors } from '@/src/theme';
 
 type TabRoute = {
@@ -39,10 +38,10 @@ export type ColorfulTabBarProps = {
 
 const TAB_META: Record<string, { label: string; short: string; tone: 'accent' | 'listening' | 'warm' | 'success' | 'deep'; Icon: typeof House }> = {
   index: { label: 'Hôm nay', short: 'Hôm nay', tone: 'accent', Icon: House },
-  practice: { label: 'Flashcards', short: 'Flashcards', tone: 'listening', Icon: Layers },
+  practice: { label: 'Luyện đề', short: 'Luyện đề', tone: 'listening', Icon: Layers },
   community: { label: 'Cộng đồng', short: 'Cộng đồng', tone: 'warm', Icon: Users },
   profile: { label: 'Tiến độ', short: 'Tiến độ', tone: 'success', Icon: ChartLine },
-  account: { label: 'Profile', short: 'Profile', tone: 'deep', Icon: UserRound },
+  account: { label: 'Hồ sơ', short: 'Hồ sơ', tone: 'deep', Icon: UserRound },
 };
 
 function tabTone(tone: (typeof TAB_META)[string]['tone']) {
@@ -55,7 +54,6 @@ function tabTone(tone: (typeof TAB_META)[string]['tone']) {
 
 function TabItem({
   focused,
-  label,
   color,
   soft,
   Icon,
@@ -64,7 +62,6 @@ function TabItem({
   accessibilityLabel,
 }: {
   focused: boolean;
-  label: string;
   color: string;
   soft: string;
   Icon: typeof House;
@@ -95,22 +92,16 @@ function TabItem({
       <Animated.View style={animatedStyle}>
         <View
           style={{
-            flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: focused ? 6 : 0,
-            minWidth: 44,
+            width: 44,
             height: 36,
-            paddingHorizontal: focused ? 12 : 10,
             borderRadius: 18,
+            borderWidth: focused ? 1.5 : 0,
+            borderColor: focused ? color : 'transparent',
             backgroundColor: focused ? soft : 'transparent',
           }}>
-          <Icon size={20} color={focused ? color : colors.muted} strokeWidth={focused ? 2.5 : 2} />
-          {focused ? (
-            <Text weight="extrabold" style={{ fontSize: 12, color, letterSpacing: -0.2 }} numberOfLines={1}>
-              {label}
-            </Text>
-          ) : null}
+          <Icon size={22} color={focused ? color : colors.muted} strokeWidth={focused ? 2.6 : 2} />
         </View>
       </Animated.View>
     </Pressable>
@@ -149,7 +140,6 @@ export function ColorfulTabBar({ state, descriptors, navigation }: ColorfulTabBa
           const focused = state.index === index;
           const meta = TAB_META[route.name];
           const tone = meta ? tabTone(meta.tone) : { color: colors.accentDeep, soft: colors.accentSoft };
-          const label = meta?.short ?? descriptors[route.key]?.options.title ?? route.name;
           const Icon = meta?.Icon ?? House;
           const { options } = descriptors[route.key];
 
@@ -157,11 +147,10 @@ export function ColorfulTabBar({ state, descriptors, navigation }: ColorfulTabBa
             <TabItem
               key={route.key}
               focused={focused}
-              label={label}
               color={tone.color}
               soft={tone.soft}
               Icon={Icon}
-              accessibilityLabel={options.tabBarAccessibilityLabel ?? meta?.label ?? label}
+              accessibilityLabel={options.tabBarAccessibilityLabel ?? meta?.label ?? options.title ?? route.name}
               onPress={() => {
                 const event = navigation.emit({
                   type: 'tabPress',

@@ -5,6 +5,7 @@ import {
   Bell,
   Calendar,
   ChevronRight,
+  CreditCard,
   Flame,
   KeyRound,
   LogOut,
@@ -13,6 +14,7 @@ import {
   ShieldCheck,
   Trash2,
   UserRound,
+  Wallet,
   Zap,
 } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
@@ -66,6 +68,21 @@ const appVersion = Constants.expoConfig?.version ?? Constants.nativeAppVersion ?
 const FONT_OPTIONS: FontSizeOption[] = ['S', 'M', 'L'];
 const XP_PRESETS = [30, 50, 80, 100] as const;
 
+type PlanId = 'basic' | 'premium30' | 'premium90';
+
+const PLANS: { id: PlanId; name: string; price: string; detail: string }[] = [
+  { id: 'basic', name: 'Basic', price: 'Miễn phí', detail: 'Lộ trình và flashcards cơ bản' },
+  { id: 'premium30', name: 'Premium 30 ngày', price: '199.000đ', detail: '4 lượt chấm giáo viên' },
+  { id: 'premium90', name: 'Premium 90 ngày', price: '499.000đ', detail: '12 lượt chấm giáo viên' },
+];
+
+const TOPUP = [
+  { points: 50, price: '49.000đ' },
+  { points: 100, price: '89.000đ' },
+];
+
+const checkoutUrl = process.env.EXPO_PUBLIC_CHECKOUT_URL;
+
 export default function AccountScreen() {
   const { authEnabled, signOut } = useAuth();
   const { data: user, error, isPending, isRefetching, refetch } = useCurrentUser();
@@ -73,6 +90,39 @@ export default function AccountScreen() {
   const queryClient = useQueryClient();
   const [signingOut, setSigningOut] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [planId, setPlanId] = useState<PlanId>('basic');
+  const [points, setPoints] = useState(0);
+
+  const currentPlan = PLANS.find((plan) => plan.id === planId) ?? PLANS[0];
+
+  const confirmAction = (title: string, message: string, onOk: () => void) => {
+    if (checkoutUrl) {
+      void WebBrowser.openBrowserAsync(checkoutUrl);
+      return;
+    }
+    if (Platform.OS === 'web') {
+      if (window.confirm(`${title}\n${message}`)) onOk();
+      return;
+    }
+    Alert.alert(title, message, [
+      { text: 'Huỷ', style: 'cancel' },
+      { text: 'Xác nhận', onPress: onOk },
+    ]);
+  };
+
+  const buyPlan = (id: PlanId) => {
+    const plan = PLANS.find((item) => item.id === id);
+    if (!plan || id === planId) return;
+    confirmAction('Mua gói', `${plan.name} · ${plan.price}. Đây là thanh toán demo, chưa trừ tiền thật.`, () =>
+      setPlanId(id),
+    );
+  };
+
+  const topUp = (amount: number, price: string) => {
+    confirmAction('Nạp điểm', `Nạp ${amount} điểm · ${price}. Đây là giao dịch demo.`, () =>
+      setPoints((value) => value + amount),
+    );
+  };
 
   const doSignOut = async () => {
     setSigningOut(true);
@@ -151,9 +201,21 @@ export default function AccountScreen() {
       <Text weight="bold" className="text-xs uppercase tracking-widest text-accent-deep">
         Profile
       </Text>
-      <Text weight="black" className="mt-1.5 text-3xl leading-10" style={{ letterSpacing: -0.8 }}>
-        Cài đặt
-      </Text>
+      <View className="mt-1.5 flex-row items-end justify-between gap-3">
+        <Text weight="black" className="flex-1 text-3xl leading-10" style={{ letterSpacing: -0.8 }}>
+          Cài đặt
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${points} điểm. Nâng cấp gói học`}
+          onPress={() => buyPlan(planId === 'basic' ? 'premium30' : 'premium90')}
+          className="mb-1 flex-row items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5">
+          <Wallet size={14} color={colors.accentDeep} />
+          <Text weight="extrabold" className="text-xs text-accent-deep">
+            {points} điểm · Nâng cấp
+          </Text>
+        </Pressable>
+      </View>
 
       {/* Header user */}
       {!authEnabled ? (
@@ -208,6 +270,69 @@ export default function AccountScreen() {
           </View>
         </Card>
       ) : null}
+
+      <SettingsSection title="Gói học & thanh toán">
+        <View className="mb-3 rounded-2xl bg-canvas px-3 py-3">
+          <Text className="text-xs text-muted">Gói hiện tại</Text>
+          <Text weight="extrabold" className="mt-0.5 text-base">
+            {planId === 'basic' ? 'Chưa có gói trả phí' : currentPlan.name}
+          </Text>
+          <Text className="mt-0.5 text-xs text-muted">Số dư {points} điểm</Text>
+        </View>
+        <View className="gap-2">
+          {PLANS.map((plan) => {
+            const active = plan.id === planId;
+            return (
+              <View
+                key={plan.id}
+                className="flex-row items-center gap-3 rounded-2xl border px-3 py-3"
+                style={{
+                  borderColor: active ? colors.accent : colors.line,
+                  backgroundColor: active ? colors.accentSoft : colors.surface,
+                }}>
+                <CreditCard size={18} color={active ? colors.accentDeep : colors.muted} />
+                <View className="flex-1">
+                  <Text weight="extrabold" className="text-sm">
+                    {plan.name}
+                  </Text>
+                  <Text className="text-xs text-muted">{plan.detail}</Text>
+                </View>
+                <View className="items-end gap-1">
+                  <Text weight="extrabold" className="text-sm text-accent-deep">
+                    {plan.price}
+                  </Text>
+                  {plan.id !== 'basic' && !active ? (
+                    <Pressable accessibilityRole="button" accessibilityLabel={`Mua ${plan.name}`} onPress={() => buyPlan(plan.id)}>
+                      <Text weight="extrabold" className="text-xs text-xp-deep">
+                        Mua gói
+                      </Text>
+                    </Pressable>
+                  ) : active ? (
+                    <Text weight="bold" className="text-xs text-success">
+                      Đang dùng
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+            );
+          })}
+        </View>
+        <View className="mt-3 flex-row gap-2">
+          {TOPUP.map((pack) => (
+            <Pressable
+              key={pack.points}
+              accessibilityRole="button"
+              accessibilityLabel={`Nạp ${pack.points} điểm`}
+              onPress={() => topUp(pack.points, pack.price)}
+              className="flex-1 items-center rounded-2xl border border-b-4 border-line border-b-edge bg-surface py-2.5">
+              <Text weight="extrabold" className="text-sm">
+                +{pack.points} điểm
+              </Text>
+              <Text className="text-xs text-muted">{pack.price}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </SettingsSection>
 
       {/* Tài khoản */}
       <SettingsSection title="Tài khoản">
