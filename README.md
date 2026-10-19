@@ -67,7 +67,13 @@ EXPO_PUBLIC_API_BASE_URL=http://192.168.1.10:8080
 |-----------|-----------|
 | iOS simulator, web | `http://localhost:8080` (mặc định) |
 | Android emulator | `http://10.0.2.2:8080` (mặc định) |
-| Máy thật (Expo Go) | IP của Metro (`exp://…:8081`), cổng 8080. Gateway Compose chỉ mở `127.0.0.1`, chạy `node scripts/lan-gateway-proxy.mjs` trên máy dev |
+| Máy thật (Expo Go) | IP LAN của máy dev, cổng 8080. Gateway Compose chỉ mở `127.0.0.1`; chạy `npm run start:lan-proxy` trong một terminal riêng khi dùng điện thoại thật. Điện thoại và máy dev phải cùng Wi-Fi. |
+
+Nếu đổi mạng Wi-Fi, cập nhật `EXPO_PUBLIC_API_BASE_URL` trong `.env` theo IP LAN mới rồi khởi động lại Metro. Emulator Android dùng `http://10.0.2.2:8080`; web dùng `http://localhost:8080`.
+
+### Ảnh Community
+
+Chọn ảnh từ thư viện sẽ tải lên Community Storage. Nếu kho này chưa được cấu hình trên backend, app sẽ báo rõ và cho phép dán link HTTPS từ `images.unsplash.com`, `i.imgur.com` hoặc Supabase như FE web.
 
 Luồng auth (bắt buộc):
 

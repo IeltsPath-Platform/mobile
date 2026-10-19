@@ -129,6 +129,12 @@ function RootNavigator() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="learn" options={{ headerShown: false }} />
           <Stack.Screen name="flashcards" options={{ headerShown: false }} />
+          <Stack.Screen name="community/[postId]" options={{ headerShown: false }} />
+          <Stack.Screen name="community/bookmarked" options={{ headerShown: false }} />
+          <Stack.Screen name="community/users/[userId]" options={{ headerShown: false }} />
+          <Stack.Screen name="community/notifications" options={{ headerShown: false }} />
+          <Stack.Screen name="community/notification-preferences" options={{ headerShown: false }} />
+          <Stack.Screen name="community/composer" options={{ headerShown: false, presentation: 'modal' }} />
         </Stack.Protected>
         <Stack.Screen
           name="+not-found"

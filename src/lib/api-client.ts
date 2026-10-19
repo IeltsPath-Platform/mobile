@@ -63,7 +63,8 @@ export function onSessionExpired(listener: (() => void) | null) {
 
 async function send(path: string, options: RequestOptions, accessToken?: string): Promise<Response> {
   const headers: Record<string, string> = { Accept: 'application/json' };
-  if (options.body !== undefined) headers['Content-Type'] = 'application/json';
+  const multipart = typeof FormData !== 'undefined' && options.body instanceof FormData;
+  if (options.body !== undefined && !multipart) headers['Content-Type'] = 'application/json';
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
   const controller = new AbortController();
@@ -74,7 +75,7 @@ async function send(path: string, options: RequestOptions, accessToken?: string)
     return await fetch(`${API_BASE_URL}${path}`, {
       method: options.method ?? 'GET',
       headers,
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      body: options.body === undefined ? undefined : multipart ? options.body as FormData : JSON.stringify(options.body),
       // The backend prefers the refresh_token cookie over the body; mobile relies on the body only.
       credentials: 'omit',
       signal: controller.signal,

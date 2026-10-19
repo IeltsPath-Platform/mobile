@@ -37,6 +37,13 @@
           "backgroundColor": "#ff7624"
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Cho phép IELTSPath truy cập ảnh để bạn chia sẻ trong cộng đồng.",
+          "microphonePermission": false
+        }
+      ],
       "expo-secure-store"
     ],
     "experiments": {
