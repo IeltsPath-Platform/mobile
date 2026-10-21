@@ -16,8 +16,14 @@ export function useGameSocket(roomId: string | null, matchId: string | null, onE
         handshake = setTimeout(() => socket?.close(), 10000);
         socket.onmessage = ({ data }) => { if (disposed) return; try { const event = JSON.parse(String(data)) as GameEvent; if (!event || typeof event.type !== 'string') return; if (event.type === 'CONNECTED') { clearTimeout(handshake); failures = 0; setConnected(true); if (matchId) socket?.send(JSON.stringify({ type: 'RECONNECT', matchId })); } if (event.type === 'ROOM_CLOSED' || event.type === 'PLAYER_KICKED') terminal = true; onEvent(event); } catch { /* Ignore malformed server frames. */ } };
         socket.onclose = () => { clearTimeout(handshake); if (disposed) return; setConnected(false); if (!terminal && AppState.currentState === 'active') retry = setTimeout(() => void connect(), Math.min(1000 * 2 ** failures++, 10000)); };
-        socket.onerror = () => socket?.close();
-      } catch { if (!disposed && AppState.currentState === 'active') retry = setTimeout(() => void connect(), Math.min(1000 * 2 ** failures++, 10000)); }
+        socket.onerror = () => {
+          if (__DEV__ && failures === 0) console.warn('[game] WebSocket connection failed', { url: socket?.url, readyState: socket?.readyState });
+          socket?.close();
+        };
+      } catch (error) {
+        if (__DEV__ && failures === 0) console.warn('[game] WebSocket setup failed', error);
+        if (!disposed && AppState.currentState === 'active') retry = setTimeout(() => void connect(), Math.min(1000 * 2 ** failures++, 10000));
+      }
     };
     void connect();
     const app = AppState.addEventListener('change', (state) => { if (state === 'active' && !terminal) { clearTimeout(retry); void connect(); } else { clearTimeout(retry); socket?.close(); setConnected(false); } });

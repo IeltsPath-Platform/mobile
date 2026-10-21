@@ -84,7 +84,15 @@ async function send(path: string, options: RequestOptions, accessToken?: string)
       credentials: 'omit',
       signal: controller.signal,
     });
-  } catch {
+  } catch (cause) {
+    const reason = cause instanceof Error ? cause.message : String(cause);
+    if (__DEV__) {
+      console.warn('[api] Network request failed', {
+        method: options.method ?? 'GET',
+        url: `${API_BASE_URL}${path}`,
+        reason,
+      });
+    }
     throw new ApiError(0, timedOut ? 'Máy chủ phản hồi quá lâu. Vui lòng thử lại.' : NETWORK_ERROR_MESSAGE,
       null, { code: timedOut ? 'TIMEOUT' : options.signal?.aborted ? 'CANCELLED' : 'NETWORK' });
   } finally {
