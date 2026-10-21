@@ -12,6 +12,7 @@ export type CommunityPost = {
   bookmarkedByMe: boolean; followingAuthor: boolean;
 };
 export type CursorPage<T> = { content: T[]; nextCursor: string | null; hasNext: boolean; size: number };
+export type OffsetPage<T> = { content: T[]; page: number; size: number; totalElements: number; totalPages: number; last: boolean };
 export type Comment = { id: string; authorId: string; parentCommentId: string | null; body: string; createdAt?: string; updatedAt?: string; replyCount: number; author?: PublicProfile | null; myComment?: boolean };
 export type Notification = { id: string; actorId: string; actor?: PublicProfile | null; eventType: string; postId?: string | null; commentId?: string | null; createdAt: string; readAt?: string | null };
 export type NotificationPreference = { eventType: string; enabled: boolean };
@@ -28,6 +29,32 @@ const page = <T,>(value: unknown): CursorPage<T> => {
   return { content: Array.isArray(result.content) ? result.content : [], nextCursor: result.nextCursor ?? null, hasNext: Boolean(result.hasNext), size: result.size ?? result.content?.length ?? 0 };
 };
 const profilePage = async (path: string) => page<PublicProfile>(await apiRequest(path, { auth: true }));
+export function parseOffsetPage<T>(value: unknown, pageNumber: number, size: number): OffsetPage<T> {
+  const data = (value ?? {}) as Partial<OffsetPage<T>>;
+  const content = Array.isArray(data.content) ? data.content : [];
+  return { content: content as T[], page: data.page ?? pageNumber, size: data.size ?? size,
+    totalElements: data.totalElements ?? content.length, totalPages: data.totalPages ?? (content.length < size ? pageNumber + 1 : pageNumber + 2),
+    last: data.last ?? content.length < size };
+}
+export function notificationHasNext(items: unknown[], size: number) { return items.length === size; }
+export function parseMentionMarkup(body: string) {
+  const result: { text: string; userId?: string }[] = [];
+  const pattern = /@\[([^\]]+)\]\(([0-9a-f]{8}-[0-9a-f-]{27,})\)/giu;
+  let offset = 0;
+  for (const match of body.matchAll(pattern)) {
+    const start = match.index ?? 0;
+    if (start > offset) result.push({ text: body.slice(offset, start) });
+    result.push({ text: `@${match[1]}`, userId: match[2] });
+    offset = start + match[0].length;
+  }
+  if (offset < body.length) result.push({ text: body.slice(offset) });
+  return result.length ? result : [{ text: body }];
+}
+export function insertMention(body: string, mention: PublicProfile) {
+  if (parseMentionMarkup(body).filter((part) => part.userId).length >= 5) return null;
+  return body.replace(/@[^\s@]*$/u, `@[${mention.displayName}](${mention.id}) `);
+}
+const offsetPage = async <T,>(path: string, pageNumber: number, size = 20) => parseOffsetPage<T>(await apiRequest(path, { auth: true }), pageNumber, size);
 
 export const communityApi = {
   feed: async (cursor?: string, scope: 'ALL' | 'FOLLOWING' = 'ALL', category?: PostCategory, q?: string) => page<CommunityPost>(await apiRequest(`/api/community/posts?${query({ pagination: 'cursor', size: '10', scope, category, q, cursor })}`, { auth: true })),
@@ -40,8 +67,8 @@ export const communityApi = {
   react: (id: string, type: ReactionType = 'LIKE') => apiRequest<void>(`/api/community/posts/${id}/reactions/${type}`, { method: 'PUT', auth: true }),
   removeReaction: (id: string, type: ReactionType = 'LIKE') => apiRequest<void>(`/api/community/posts/${id}/reactions/${type}`, { method: 'DELETE', auth: true }),
   bookmark: (id: string, active: boolean) => apiRequest<void>(`/api/community/posts/${id}/bookmark`, { method: active ? 'DELETE' : 'POST', auth: true }),
-  comments: async (id: string) => page<Comment>(await apiRequest(`/api/community/posts/${id}/comments?threaded=true&page=0&size=20`, { auth: true })),
-  replies: async (id: string) => page<Comment>(await apiRequest(`/api/community/comments/${id}/replies?page=0&size=20`, { auth: true })),
+  comments: async (id: string, pageNumber = 0) => offsetPage<Comment>(`/api/community/posts/${id}/comments?threaded=true&page=${pageNumber}&size=20`, pageNumber),
+  replies: async (id: string, pageNumber = 0) => offsetPage<Comment>(`/api/community/comments/${id}/replies?page=${pageNumber}&size=20`, pageNumber),
   comment: (id: string, body: string, parentCommentId?: string) => apiRequest<Comment>(`/api/community/posts/${id}/comments`, { method: 'POST', body: { body, parentCommentId }, auth: true }),
   updateComment: (id: string, body: string) => apiRequest<Comment>(`/api/community/comments/${id}`, { method: 'PUT', body: { body }, auth: true }),
   deleteComment: (id: string) => apiRequest<void>(`/api/community/comments/${id}`, { method: 'DELETE', auth: true }),
@@ -52,7 +79,7 @@ export const communityApi = {
   profile: (id: string) => apiRequest<PublicProfile>(`/api/users/${id}/public-profile`, { auth: true }),
   mentionSuggestions: (q: string) => apiRequest<PublicProfile[]>(`/api/community/users/mention-suggestions?${query({ q })}`, { auth: true }),
   report: (contentType: 'POST' | 'COMMENT', contentId: string, reason: string) => apiRequest<void>('/api/community/reports', { method: 'POST', body: { contentType, contentId, reason }, auth: true }),
-  notifications: () => apiRequest<Notification[]>('/api/notifications?size=20', { auth: true }),
+  notifications: async (pageNumber = 0, size = 20) => apiRequest<Notification[]>(`/api/notifications?page=${pageNumber}&size=${size}`, { auth: true }),
   unread: () => apiRequest<{ count: number }>('/api/notifications/unread-count', { auth: true }),
   markRead: (id: string) => apiRequest<void>(`/api/notifications/${id}/read`, { method: 'PUT', auth: true }),
   markAll: () => apiRequest<void>('/api/notifications/read-all', { method: 'PUT', auth: true }),

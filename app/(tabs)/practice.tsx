@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { router, type Href } from 'expo-router';
-import { Layers, Search } from 'lucide-react-native';
+import { ChevronRight, Gamepad2, Layers, Search } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, TextInput, View } from 'react-native';
 
@@ -50,10 +50,23 @@ export default function PracticeScreen() {
 
   return (
     <ScrollView className="flex-1 bg-canvas" contentContainerClassName="px-5 pb-28 pt-5" showsVerticalScrollIndicator={false}>
-      <Text weight="black" className="text-2xl" style={{ letterSpacing: -0.5 }}>
-        Flashcards
-      </Text>
-      <Text className="mt-1 text-sm text-muted">Lật thẻ và ôn từ theo bộ. Đề full vẫn làm trên web.</Text>
+      <View className="mb-4">
+        <Text weight="semibold" className="text-xs uppercase tracking-widest text-accent">GÓC HỌC TẬP</Text>
+        <Text weight="black" className="mt-1 text-2xl leading-8">Luyện tập</Text>
+        <Text className="mt-1 text-sm leading-5 text-muted">Chọn một hoạt động để giữ nhịp học hôm nay.</Text>
+      </View>
+
+      <Pressable onPress={() => router.push('/games' as never)} accessibilityRole="button" className="overflow-hidden rounded-3xl bg-accent-deep px-5 py-5">
+        <View className="flex-row items-center">
+          <View className="h-12 w-12 items-center justify-center rounded-2xl bg-white/15"><Gamepad2 size={23} color="white" /></View>
+          <View className="ml-3 flex-1"><Text weight="bold" className="text-xs uppercase tracking-wide text-white/75">HỌC QUA TRÒ CHƠI</Text><Text weight="black" className="mt-1 text-xl text-white">Thử thách Wordly</Text></View>
+          <ChevronRight size={21} color="white" />
+        </View>
+        <Text className="mt-3 text-sm leading-5 text-white/85">Ôn từ vựng qua câu đố nhanh, chơi một mình hoặc cùng bạn bè.</Text>
+        <View className="mt-4 self-start rounded-full bg-white px-4 py-2.5"><Text weight="bold" className="text-xs text-accent-deep">Chọn chế độ chơi</Text></View>
+      </Pressable>
+
+      <View className="mb-1 mt-7 flex-row items-end justify-between"><View><Text weight="black" className="text-xl">Flashcards</Text><Text className="mt-1 text-sm text-muted">Ôn tập theo bộ thẻ của bạn</Text></View><View className="rounded-full bg-accent-soft px-3 py-1.5"><Text weight="bold" className="text-xs text-accent">{decks.length} bộ</Text></View></View>
 
       {usingMock ? (
         <Text className="mt-3 text-xs text-muted">Nguồn: bộ mẫu (chưa đăng nhập hoặc API lỗi)</Text>
@@ -82,7 +95,7 @@ export default function PracticeScreen() {
         </Card>
       ) : null}
 
-      <View className="mt-4 gap-3">
+      <View className="mt-3 gap-3">
         {decks.map((deck) => (
           <Pressable
             key={deck.id}
@@ -112,9 +125,7 @@ export default function PracticeScreen() {
         ))}
       </View>
 
-      <Text weight="bold" className="mb-2 mt-8 text-sm text-muted">
-        Tra từ
-      </Text>
+      <Text weight="black" className="mb-2 mt-8 text-xl">Tra từ</Text><Text className="-mt-1 mb-3 text-sm text-muted">Tìm nhanh nghĩa và cách dùng</Text>
       <View className="flex-row items-center rounded-2xl border border-line bg-surface px-3 py-2.5">
         <Search size={18} color={colors.muted} />
         <TextInput

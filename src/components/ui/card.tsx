@@ -7,7 +7,7 @@ type CardProps = ViewProps & {
 export function Card({ className, style, ...props }: CardProps) {
   return (
     <View
-      className={`rounded-3xl border border-line border-b-4 border-b-edge bg-surface p-5 ${className ?? ''}`}
+      className={`rounded-3xl border border-line bg-surface p-5 ${className ?? ''}`}
       style={[cardShadow, style]}
       {...props}
     />
@@ -15,9 +15,9 @@ export function Card({ className, style, ...props }: CardProps) {
 }
 
 const cardShadow = {
-  shadowColor: '#1c1917',
-  shadowOpacity: 0.05,
-  shadowRadius: 16,
-  shadowOffset: { width: 0, height: 8 },
+  shadowColor: '#273858',
+  shadowOpacity: 0.045,
+  shadowRadius: 14,
+  shadowOffset: { width: 0, height: 5 },
   elevation: 1,
 };

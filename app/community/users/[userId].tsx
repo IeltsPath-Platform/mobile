@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
 import { Text } from '@/src/components/ui/text';
@@ -17,7 +17,7 @@ export default function PublicProfileScreen() {
   const relation = useQuery({ queryKey: ['community', 'relationship', userId], queryFn: () => communityApi.relationship(userId) });
   const list = useInfiniteQuery<CursorPage<CommunityPost | PublicProfile>>({ queryKey: ['community', 'profile-list', userId, tab], initialPageParam: undefined as string | undefined, queryFn: async ({ pageParam }) => tab === 'posts' ? communityApi.userPosts(userId, pageParam as string | undefined) : communityApi[tab](userId, pageParam as string | undefined), getNextPageParam: (page) => page.hasNext ? page.nextCursor ?? undefined : undefined });
   const entries = list.data?.pages.flatMap((page) => page.content) ?? []; const own = current.data?.id === userId;
-  const toggleFollow = async () => { setBusy(true); try { await communityApi.follow(userId, Boolean(relation.data?.following)); await Promise.all([relation.refetch(), qc.invalidateQueries({ queryKey: ['community', 'feed'] })]); } finally { setBusy(false); } };
+  const toggleFollow = async () => { setBusy(true); try { await communityApi.follow(userId, Boolean(relation.data?.following)); await Promise.all([relation.refetch(), qc.invalidateQueries({ queryKey: ['community', 'feed'] })]); } catch (error) { Alert.alert('Không thể cập nhật theo dõi', error instanceof Error ? error.message : 'Vui lòng thử lại.'); } finally { setBusy(false); } };
   const refresh = () => { void Promise.all([profile.refetch(), relation.refetch(), list.refetch()]); };
   if (profile.isPending) return <View className="flex-1 items-center justify-center"><ActivityIndicator color={colors.accent} /></View>;
   if (!profile.data) return <View className="flex-1 justify-center px-5"><Text>Không tải được hồ sơ.</Text><View className="mt-3"><Button label="Thử lại" onPress={() => void profile.refetch()} /></View></View>;

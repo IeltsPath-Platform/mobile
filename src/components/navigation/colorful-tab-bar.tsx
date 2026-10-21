@@ -1,173 +1,114 @@
-import { ChartLine, House, Layers, UserRound, Users } from 'lucide-react-native';
-import type { ReactNode } from 'react';
+import { Bell, House, Layers, UserRound, Users } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQueryClient } from '@tanstack/react-query';
 
-import { colors } from '@/src/theme';
-
-type TabRoute = {
-  key: string;
-  name: string;
-  params?: object;
-};
-
-type TabDescriptor = {
-  options: {
-    title?: string;
-    tabBarLabel?: string | ((props: { focused: boolean; color: string; position: string; children: string }) => ReactNode);
-    tabBarAccessibilityLabel?: string;
-  };
-};
+import { Text } from '@/src/components/ui/text';
+import { useUnread } from '@/src/features/community/use-unread';
+import { colors, spacing, touchTarget } from '@/src/theme';
 
 export type ColorfulTabBarProps = {
-  state: {
-    index: number;
-    routes: TabRoute[];
-  };
-  descriptors: Record<string, TabDescriptor>;
+  state: { index: number; routes: { key: string; name: string; params?: object }[] };
+  descriptors: Record<string, { options: { title?: string; tabBarAccessibilityLabel?: string } }>;
   navigation: {
     emit: (event: { type: string; target?: string; canPreventDefault?: boolean }) => { defaultPrevented: boolean };
     navigate: (name: string, params?: object) => void;
   };
 };
 
-const TAB_META: Record<string, { label: string; short: string; tone: 'accent' | 'listening' | 'warm' | 'success' | 'deep'; Icon: typeof House }> = {
-  index: { label: 'Hôm nay', short: 'Hôm nay', tone: 'accent', Icon: House },
-  practice: { label: 'Luyện đề', short: 'Luyện đề', tone: 'listening', Icon: Layers },
-  community: { label: 'Cộng đồng', short: 'Cộng đồng', tone: 'warm', Icon: Users },
-  profile: { label: 'Tiến độ', short: 'Tiến độ', tone: 'success', Icon: ChartLine },
-  account: { label: 'Hồ sơ', short: 'Hồ sơ', tone: 'deep', Icon: UserRound },
+const tabs = {
+  index: { label: 'Hôm nay', Icon: House },
+  practice: { label: 'Luyện', Icon: Layers },
+  community: { label: 'Cộng đồng', Icon: Users },
+  notifications: { label: 'Thông báo', Icon: Bell },
+  account: { label: 'Hồ sơ', Icon: UserRound },
 };
 
-function tabTone(tone: (typeof TAB_META)[string]['tone']) {
-  if (tone === 'success') return { color: colors.success, soft: colors.successSoft };
-  if (tone === 'warm') return { color: colors.accentWarm, soft: colors.warmSoft };
-  if (tone === 'listening') return { color: colors.skill.listening, soft: colors.listeningSoft };
-  if (tone === 'deep') return { color: colors.accentDeep, soft: colors.accentSoft };
-  return { color: colors.accent, soft: colors.accentSoft };
-}
-
-function TabItem({
-  focused,
-  color,
-  soft,
-  Icon,
-  onPress,
-  onLongPress,
-  accessibilityLabel,
-}: {
-  focused: boolean;
-  color: string;
-  soft: string;
-  Icon: typeof House;
-  onPress: () => void;
-  onLongPress: () => void;
-  accessibilityLabel: string;
-}) {
-  const scale = useSharedValue(1);
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={focused ? { selected: true } : {}}
-      accessibilityLabel={accessibilityLabel}
-      onPress={onPress}
-      onLongPress={onLongPress}
-      onPressIn={() => {
-        scale.value = withSpring(0.92, { damping: 18, stiffness: 320 });
-      }}
-      onPressOut={() => {
-        scale.value = withSpring(1, { damping: 14, stiffness: 260 });
-      }}
-      hitSlop={8}
-      style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 44 }}>
-      <Animated.View style={animatedStyle}>
-        <View
-          style={{
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 44,
-            height: 36,
-            borderRadius: 18,
-            borderWidth: focused ? 1.5 : 0,
-            borderColor: focused ? color : 'transparent',
-            backgroundColor: focused ? soft : 'transparent',
-          }}>
-          <Icon size={22} color={focused ? color : colors.muted} strokeWidth={focused ? 2.6 : 2} />
-        </View>
-      </Animated.View>
-    </Pressable>
-  );
-}
-
-export function ColorfulTabBar({ state, descriptors, navigation }: ColorfulTabBarProps) {
+export function ColorfulTabBar({ state, navigation }: ColorfulTabBarProps) {
   const insets = useSafeAreaInsets();
+  const unread = useUnread();
+  const queryClient = useQueryClient();
+  const unreadCount = unread.data?.count ?? 0;
 
   return (
     <View
-      pointerEvents="box-none"
       style={{
-        backgroundColor: 'transparent',
-        paddingBottom: Math.max(insets.bottom, 8),
-        paddingTop: 4,
-        paddingHorizontal: 16,
+        flexDirection: 'row',
+        paddingTop: spacing.sm,
+        paddingBottom: Math.max(insets.bottom, spacing.sm),
+        paddingHorizontal: spacing.xs,
+        backgroundColor: colors.surface,
+        borderTopWidth: 1,
+        borderTopColor: colors.line,
       }}>
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          height: 52,
-          backgroundColor: colors.surface,
-          borderRadius: 26,
-          borderWidth: 1,
-          borderColor: colors.line,
-          paddingHorizontal: 4,
-          shadowColor: colors.accent,
-          shadowOpacity: 0.12,
-          shadowRadius: 18,
-          shadowOffset: { width: 0, height: 8 },
-          elevation: 8,
-        }}>
-        {state.routes.map((route, index) => {
-          const focused = state.index === index;
-          const meta = TAB_META[route.name];
-          const tone = meta ? tabTone(meta.tone) : { color: colors.accentDeep, soft: colors.accentSoft };
-          const Icon = meta?.Icon ?? House;
-          const { options } = descriptors[route.key];
+      {state.routes
+        .filter((route) => route.name in tabs)
+        .map((route) => {
+          const { label, Icon } = tabs[route.name as keyof typeof tabs];
+          const focused = state.routes[state.index]?.key === route.key;
+          const hasUnread = route.name === 'notifications' && unreadCount > 0;
+
+          const onPress = () => {
+            const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+            if (event.defaultPrevented) return;
+
+            void queryClient.invalidateQueries({ queryKey: ['community', 'unread'] });
+            if (route.name === 'notifications') {
+              void queryClient.invalidateQueries({ queryKey: ['community', 'notifications'] });
+            }
+            if (!focused) navigation.navigate(route.name, route.params);
+          };
 
           return (
-            <TabItem
+            <Pressable
               key={route.key}
-              focused={focused}
-              color={tone.color}
-              soft={tone.soft}
-              Icon={Icon}
-              accessibilityLabel={options.tabBarAccessibilityLabel ?? meta?.label ?? options.title ?? route.name}
-              onPress={() => {
-                const event = navigation.emit({
-                  type: 'tabPress',
-                  target: route.key,
-                  canPreventDefault: true,
-                });
-                if (!focused && !event.defaultPrevented) {
-                  navigation.navigate(route.name, route.params);
-                }
-              }}
-              onLongPress={() => {
-                navigation.emit({ type: 'tabLongPress', target: route.key });
-              }}
-            />
+              accessibilityRole="tab"
+              accessibilityState={{ selected: focused }}
+              accessibilityLabel={`${label}${hasUnread ? `, ${unreadCount} chưa đọc` : ''}`}
+              onPress={onPress}
+              onLongPress={() => navigation.emit({ type: 'tabLongPress', target: route.key })}
+              style={{
+                flex: 1,
+                minHeight: touchTarget + 12,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 18,
+              }}>
+              <View
+                style={{
+                  width: 52,
+                  height: 30,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: 15,
+                  backgroundColor: focused ? colors.accentSoft : 'transparent',
+                }}>
+                <Icon size={21} color={focused ? colors.accentDeep : colors.muted} strokeWidth={focused ? 2.3 : 1.8} />
+                {hasUnread ? (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      right: 5,
+                      top: 0,
+                      minWidth: 17,
+                      paddingHorizontal: 4,
+                      borderRadius: 10,
+                      backgroundColor: colors.danger,
+                    }}>
+                    <Text weight="bold" style={{ color: '#fff', fontSize: 9, textAlign: 'center' }}>
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+              <Text
+                weight={focused ? 'bold' : 'medium'}
+                style={{ fontSize: 10, marginTop: 3, color: focused ? colors.accentDeep : colors.muted }}>
+                {label}
+              </Text>
+            </Pressable>
           );
         })}
-      </View>
     </View>
   );
 }

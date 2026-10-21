@@ -1,11 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { useAuth } from '@/src/features/auth/auth-provider';
-import { learnerStats } from '@/src/features/practice/path';
 
 import { streakApi } from './streak-api';
 
-/** Live streak when auth on; otherwise mock learnerStats. */
+/** Missing or failed live data stays unavailable, never replaced with demo values. */
 export function useStreak() {
   const { authEnabled, status } = useAuth();
   const enabled = authEnabled && status === 'authenticated';
@@ -18,9 +17,9 @@ export function useStreak() {
     retry: 1,
   });
 
-  const currentDays = enabled && query.data ? query.data.currentDays : learnerStats.streak;
-  const longestDays = enabled && query.data ? query.data.longestDays : learnerStats.streak;
-  const isMock = !enabled || Boolean(query.error);
+  const currentDays = enabled && query.data ? query.data.currentDays : null;
+  const longestDays = enabled && query.data ? query.data.longestDays : null;
+  const isMock = false;
 
   return {
     currentDays,

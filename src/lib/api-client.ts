@@ -1,4 +1,4 @@
-import { API_BASE_URL, REQUEST_TIMEOUT_MS } from './env';
+import { API_BASE_URL, API_CONFIGURATION_ERROR, REQUEST_TIMEOUT_MS } from './env';
 import { tokenStorage, type SessionTokens } from './token-storage';
 
 type ErrorBody = {
@@ -62,14 +62,18 @@ export function onSessionExpired(listener: (() => void) | null) {
 }
 
 async function send(path: string, options: RequestOptions, accessToken?: string): Promise<Response> {
+  if (API_CONFIGURATION_ERROR) throw new ApiError(0, API_CONFIGURATION_ERROR, null, { code: 'API_CONFIGURATION' });
   const headers: Record<string, string> = { Accept: 'application/json' };
   const multipart = typeof FormData !== 'undefined' && options.body instanceof FormData;
   if (options.body !== undefined && !multipart) headers['Content-Type'] = 'application/json';
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  options.signal?.addEventListener('abort', () => controller.abort());
+  let timedOut = false;
+  const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, REQUEST_TIMEOUT_MS);
+  const abort = () => controller.abort();
+  options.signal?.addEventListener('abort', abort, { once: true });
+  if (options.signal?.aborted) controller.abort();
 
   try {
     return await fetch(`${API_BASE_URL}${path}`, {
@@ -81,9 +85,11 @@ async function send(path: string, options: RequestOptions, accessToken?: string)
       signal: controller.signal,
     });
   } catch {
-    throw new ApiError(0, NETWORK_ERROR_MESSAGE);
+    throw new ApiError(0, timedOut ? 'Máy chủ phản hồi quá lâu. Vui lòng thử lại.' : NETWORK_ERROR_MESSAGE,
+      null, { code: timedOut ? 'TIMEOUT' : options.signal?.aborted ? 'CANCELLED' : 'NETWORK' });
   } finally {
     clearTimeout(timeout);
+    options.signal?.removeEventListener('abort', abort);
   }
 }
 
@@ -93,7 +99,8 @@ async function parse<T>(response: Response): Promise<T> {
 
   if (!response.ok) {
     const body = (data ?? {}) as ErrorBody;
-    throw new ApiError(response.status, body.message || body.detail || FALLBACK_ERROR_MESSAGE, body.details, {
+    const fallback = response.status === 503 ? 'Dịch vụ tạm chưa sẵn sàng. Kiểm tra backend rồi thử lại.' : FALLBACK_ERROR_MESSAGE;
+    throw new ApiError(response.status, body.message || body.detail || fallback, body.details, {
       code: body.code,
       reviews: readReviews(body.reviews),
     });
@@ -132,11 +139,14 @@ async function refreshTokens(): Promise<SessionTokens | null> {
   try {
     const response = await send('/auth/refresh', { method: 'POST', body: { refreshToken: current.refreshToken } });
     const pair = await parse<TokenPair>(response);
+    if (!pair?.accessToken || !pair?.refreshToken) throw new ApiError(502, 'Phản hồi làm mới phiên không hợp lệ.');
     const next = { accessToken: pair.accessToken, refreshToken: pair.refreshToken };
+    if ((await tokenStorage.load())?.refreshToken !== current.refreshToken) return tokenStorage.load();
     await tokenStorage.save(next);
     return next;
   } catch (error) {
-    if (error instanceof ApiError && error.isNetworkError) throw error;
+    if (!(error instanceof ApiError) || ![400, 401, 403].includes(error.status)) throw error;
+    if ((await tokenStorage.load())?.refreshToken !== current.refreshToken) return tokenStorage.load();
     await tokenStorage.clear();
     return null;
   }

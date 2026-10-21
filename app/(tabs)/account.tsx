@@ -14,7 +14,6 @@ import {
   ShieldCheck,
   Trash2,
   UserRound,
-  Wallet,
   Zap,
 } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
@@ -43,6 +42,7 @@ import {
 } from '@/src/features/settings/use-app-settings';
 import { API_BASE_URL } from '@/src/lib/env';
 import { colors } from '@/src/theme';
+import { useRouter } from 'expo-router';
 
 const roleLabels: Record<string, string> = {
   ADMIN: 'Quản trị viên',
@@ -84,6 +84,7 @@ const TOPUP = [
 const checkoutUrl = process.env.EXPO_PUBLIC_CHECKOUT_URL;
 
 export default function AccountScreen() {
+  const router = useRouter();
   const { authEnabled, signOut } = useAuth();
   const { data: user, error, isPending, isRefetching, refetch } = useCurrentUser();
   const { settings, update, setDailyXpGoal } = useAppSettings();
@@ -92,6 +93,8 @@ export default function AccountScreen() {
   const [clearing, setClearing] = useState(false);
   const [planId, setPlanId] = useState<PlanId>('basic');
   const [points, setPoints] = useState(0);
+  const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const [showAccountDetails, setShowAccountDetails] = useState(false);
 
   const currentPlan = PLANS.find((plan) => plan.id === planId) ?? PLANS[0];
 
@@ -198,23 +201,9 @@ export default function AccountScreen() {
           />
         ) : undefined
       }>
-      <Text weight="bold" className="text-xs uppercase tracking-widest text-accent-deep">
-        Profile
-      </Text>
-      <View className="mt-1.5 flex-row items-end justify-between gap-3">
-        <Text weight="black" className="flex-1 text-3xl leading-10" style={{ letterSpacing: -0.8 }}>
-          Cài đặt
-        </Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`${points} điểm. Nâng cấp gói học`}
-          onPress={() => buyPlan(planId === 'basic' ? 'premium30' : 'premium90')}
-          className="mb-1 flex-row items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5">
-          <Wallet size={14} color={colors.accentDeep} />
-          <Text weight="extrabold" className="text-xs text-accent-deep">
-            {points} điểm · Nâng cấp
-          </Text>
-        </Pressable>
+      <View className="mb-1">
+        <Text weight="black" className="text-2xl">Hồ sơ</Text>
+        <Text className="mt-1 text-sm text-muted">Thông tin cá nhân và cài đặt</Text>
       </View>
 
       {/* Header user */}
@@ -257,21 +246,22 @@ export default function AccountScreen() {
               </Text>
             </View>
           </View>
-          <View className="mt-4 gap-3 border-t border-line pt-4">
+          <Pressable accessibilityRole="button" accessibilityState={{ expanded: showAccountDetails }} onPress={() => setShowAccountDetails((value) => !value)} className="mt-4 min-h-11 flex-row items-center justify-between border-t border-line pt-3"><Text weight="semibold" className="text-sm text-accent">{showAccountDetails ? "Ẩn thông tin chi tiết" : "Xem thông tin chi tiết"}</Text><ChevronRight size={18} color={colors.muted} style={{ transform: [{ rotate: showAccountDetails ? '90deg' : '0deg' }] }} /></Pressable>
+          {showAccountDetails ? <View className="mt-2 gap-3">
             <InfoRow Icon={Mail} label="Email" value={user.email} />
             <InfoRow Icon={Phone} label="Số điện thoại" value={user.phoneNumber || 'Chưa cập nhật'} />
-            <InfoRow
-              Icon={ShieldCheck}
-              label="Vai trò"
-              value={user.roles.map((r) => roleLabels[r.name] ?? r.name).join(', ') || '—'}
-            />
+            <InfoRow Icon={ShieldCheck} label="Vai trò" value={user.roles.map((r) => roleLabels[r.name] ?? r.name).join(', ') || '—'} />
             <InfoRow Icon={BadgeCheck} label="Trạng thái" value={statusLabels[user.status] ?? user.status} />
             <InfoRow Icon={Calendar} label="Tham gia" value={formatJoined(user.createdAt)} />
-          </View>
+          </View> : null}
         </Card>
       ) : null}
 
-      <SettingsSection title="Gói học & thanh toán">
+      <SettingsSection title="Học tập & thông báo" expanded={expandedSection === "Học tập & thông báo"} onToggle={() => setExpandedSection((current) => current === "Học tập & thông báo" ? null : "Học tập & thông báo")} >
+        <Button variant="ghost" label="Tiến độ học tập" onPress={() => router.push('/progress' as never)} />
+        <Button variant="ghost" label="Tuỳ chọn thông báo cộng đồng" onPress={() => router.push('/community/notification-preferences' as never)} />
+      </SettingsSection>
+      <SettingsSection title="Gói học & thanh toán" expanded={expandedSection === "Gói học & thanh toán"} onToggle={() => setExpandedSection((current) => current === "Gói học & thanh toán" ? null : "Gói học & thanh toán")} >
         <View className="mb-3 rounded-2xl bg-canvas px-3 py-3">
           <Text className="text-xs text-muted">Gói hiện tại</Text>
           <Text weight="extrabold" className="mt-0.5 text-base">
@@ -335,7 +325,7 @@ export default function AccountScreen() {
       </SettingsSection>
 
       {/* Tài khoản */}
-      <SettingsSection title="Tài khoản">
+      <SettingsSection title="Tài khoản" expanded={expandedSection === "Tài khoản"} onToggle={() => setExpandedSection((current) => current === "Tài khoản" ? null : "Tài khoản")} >
         <SettingsRow Icon={KeyRound} label="Đổi mật khẩu" hint="Sắp có" onPress={onChangePassword} />
         {authEnabled && user ? (
           <SettingsRow
@@ -352,7 +342,7 @@ export default function AccountScreen() {
       </SettingsSection>
 
       {/* Học tập */}
-      <SettingsSection title="Học tập">
+      <SettingsSection title="Học tập" expanded={expandedSection === "Học tập"} onToggle={() => setExpandedSection((current) => current === "Học tập" ? null : "Học tập")} >
         <View className="mb-1 flex-row items-center gap-3 px-1">
           <View className="h-9 w-9 items-center justify-center rounded-xl bg-canvas">
             <Zap size={18} color={colors.xpDeep} />
@@ -389,7 +379,7 @@ export default function AccountScreen() {
       </SettingsSection>
 
       {/* Thông báo */}
-      <SettingsSection title="Thông báo">
+      <SettingsSection title="Thông báo" expanded={expandedSection === "Thông báo"} onToggle={() => setExpandedSection((current) => current === "Thông báo" ? null : "Thông báo")} >
         <ToggleRow
           Icon={Bell}
           label="Nhắc học"
@@ -407,7 +397,7 @@ export default function AccountScreen() {
       </SettingsSection>
 
       {/* Giao diện */}
-      <SettingsSection title="Giao diện">
+      <SettingsSection title="Giao diện" expanded={expandedSection === "Giao diện"} onToggle={() => setExpandedSection((current) => current === "Giao diện" ? null : "Giao diện")} >
         <Text weight="semibold" className="mb-2 text-sm">
           Cỡ chữ
         </Text>
@@ -467,7 +457,7 @@ export default function AccountScreen() {
       </SettingsSection>
 
       {/* Ứng dụng */}
-      <SettingsSection title="Ứng dụng">
+      <SettingsSection title="Ứng dụng" expanded={expandedSection === "Ứng dụng"} onToggle={() => setExpandedSection((current) => current === "Ứng dụng" ? null : "Ứng dụng")} >
         <SettingsRow Icon={ShieldCheck} label="Phiên bản" hint={`v${appVersion}`} />
         <SettingsRow label="Điều khoản" hint="Chính sách sử dụng" onPress={onTerms} />
         <SettingsRow label="Hỗ trợ" hint="Liên hệ đội ngũ" onPress={onSupport} />
@@ -496,17 +486,17 @@ export default function AccountScreen() {
   );
 }
 
-function SettingsSection({ title, children }: { title: string; children: ReactNode }) {
+function SettingsSection({ title, children, expanded = false, onToggle }: { title: string; children: ReactNode; expanded?: boolean; onToggle?: () => void }) {
   return (
-    <Card className="mt-4">
-      <Text weight="extrabold" className="mb-3 text-base">
-        {title}
-      </Text>
-      <View className="gap-1">{children}</View>
-    </Card>
+    <View className="mt-3 overflow-hidden rounded-3xl border border-line bg-surface">
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded }} onPress={onToggle} className="min-h-14 flex-row items-center justify-between px-4 py-3">
+        <Text weight="bold" className="flex-1 text-sm">{title}</Text>
+        <ChevronRight size={18} color={colors.muted} style={{ transform: [{ rotate: expanded ? '90deg' : '0deg' }] }} />
+      </Pressable>
+      {expanded ? <View className="gap-1 border-t border-line px-4 py-3">{children}</View> : null}
+    </View>
   );
 }
-
 function SettingsRow({
   Icon,
   label,

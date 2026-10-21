@@ -1,23 +1,17 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+import { resolveApiUrl } from './api-url';
 
-function expoLanHost(): string | null {
-  const hostUri = Constants.expoConfig?.hostUri ?? Constants.expoGoConfig?.debuggerHost;
-  const host = hostUri?.split(':')[0];
-  if (!host || host === 'localhost' || host === '127.0.0.1') return null;
-  return host;
-}
-
-function fallbackBaseUrl() {
-  if (Platform.OS === 'web') return 'http://localhost:8080';
-  // Expo Go on a phone cannot reach the PC via localhost. Metro's host is that PC.
-  const lanHost = expoLanHost();
-  if (lanHost) return `http://${lanHost}:8080`;
-  if (Platform.OS === 'android') return 'http://10.0.2.2:8080';
-  return 'http://localhost:8080';
-}
-
-export const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL || fallbackBaseUrl()).replace(/\/+$/, '');
+const apiLocation = resolveApiUrl({
+  explicit: process.env.EXPO_PUBLIC_API_BASE_URL,
+  port: process.env.EXPO_PUBLIC_API_PORT,
+  device: process.env.EXPO_PUBLIC_DEVICE,
+  platform: Platform.OS,
+  metroHost: Constants.expoConfig?.hostUri ?? Constants.expoGoConfig?.debuggerHost,
+  webHost: Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.hostname : undefined,
+});
+export const API_BASE_URL = apiLocation.url;
+export const API_CONFIGURATION_ERROR = apiLocation.error;
 
 export const REQUEST_TIMEOUT_MS = 15_000;
 

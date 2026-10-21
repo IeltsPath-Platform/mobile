@@ -6,7 +6,7 @@ import { Text } from '@/src/components/ui/text';
 import { useOnboarding } from '@/src/features/onboarding/use-onboarding';
 import { AUTH_ENABLED } from '@/src/lib/env';
 
-const BRAND = '#ff7624';
+const BRAND = '#123ab5';
 
 export default function WelcomeScreen() {
   const { onboarded } = useOnboarding();

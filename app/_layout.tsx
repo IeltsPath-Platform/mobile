@@ -23,7 +23,7 @@ import { queryClient } from "@/src/lib/query-client";
 import { AppThemeProvider } from "@/src/theme/app-theme";
 import { colors } from "@/src/theme";
 
-const SPLASH = "#ff7624";
+const SPLASH = "#123ab5";
 
 // Do not block first paint on fonts — returning null left a blank cream screen on web/SSR.
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
@@ -127,6 +127,8 @@ function RootNavigator() {
         </Stack.Protected>
         <Stack.Protected guard={enterApp}>
           <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="progress" />
+          <Stack.Screen name="games" />
           <Stack.Screen name="learn" options={{ headerShown: false }} />
           <Stack.Screen name="flashcards" options={{ headerShown: false }} />
           <Stack.Screen name="community/[postId]" options={{ headerShown: false }} />

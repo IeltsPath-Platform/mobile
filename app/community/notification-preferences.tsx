@@ -7,7 +7,13 @@ import { Text } from '@/src/components/ui/text';
 import { communityApi } from '@/src/features/community/api';
 import { colors } from '@/src/theme';
 
-const readableName = (type: string) => type.replaceAll('_', ' ').toLowerCase().replace(/^./, (letter) => letter.toUpperCase());
+const readableName = (type: string) => ({
+  'community.post-commented.v1': 'Có người bình luận bài viết',
+  'community.comment-replied.v1': 'Có người trả lời bình luận',
+  'community.comment-mentioned.v1': 'Có người nhắc đến bạn',
+  'community.post-reacted.v1': 'Có người bày tỏ cảm xúc',
+  'community.user-followed.v1': 'Có người theo dõi bạn',
+}[type] ?? 'Hoạt động cộng đồng khác');
 
 export default function NotificationPreferencesScreen() {
   const router = useRouter();

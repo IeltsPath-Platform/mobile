@@ -1,13 +1,16 @@
 import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
 import { router, useFocusEffect, type Href } from 'expo-router';
+import { ChevronRight, UserRound } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 
 import { Text } from '@/src/components/ui/text';
 import { learningApi } from '@/src/features/learning';
 import type { TopicLessonsDto } from '@/src/features/learning/types';
 import { LearningPath } from '@/src/features/practice/components/learning-path';
 import { LessonSheet } from '@/src/features/practice/components/lesson-sheet';
+import { ProgressSummary } from '@/src/features/progress/progress-summary';
+import { useCurrentUser } from '@/src/features/auth/auth-provider';
 import {
   clonePathUnits,
   completePathNode,
@@ -22,6 +25,7 @@ import { USE_MOCK_LEARNING } from '@/src/lib/env';
 import { colors } from '@/src/theme';
 
 export default function HomeScreen() {
+  const user = useCurrentUser();
   const httpMode = !USE_MOCK_LEARNING;
   const queryClient = useQueryClient();
   const [mockUnits, setMockUnits] = useState(() => clonePathUnits());
@@ -144,7 +148,19 @@ export default function HomeScreen() {
 
   return (
     <View className="flex-1 bg-canvas">
-      <ScrollView contentContainerClassName="px-4 pb-8 pt-5" showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerClassName="px-5 pb-8 pt-4" showsVerticalScrollIndicator={false}>
+        <View className="mb-1 flex-row items-center justify-between">
+          <View className="flex-1 pr-4">
+            <Text weight="semibold" className="text-sm text-muted">HÔM NAY</Text>
+            <Text weight="black" className="mt-1 text-2xl leading-8">Chào {user.data?.fullName?.split(' ')[0] ?? 'bạn'} 👋</Text>
+            <Text className="mt-1 text-sm text-muted">Mình cùng tiến thêm một bước nhé.</Text>
+          </View>
+          <Pressable accessibilityRole="button" accessibilityLabel="Mở hồ sơ" onPress={() => router.push('/(tabs)/account' as never)} className="h-12 w-12 items-center justify-center rounded-2xl border border-line bg-surface">
+            {user.data?.fullName ? <Text weight="extrabold" className="text-lg text-accent">{user.data.fullName.trim().charAt(0).toUpperCase()}</Text> : <UserRound size={21} color={colors.accentDeep} />}
+          </Pressable>
+        </View>
+        <ProgressSummary compact />
+
         {waiting ? (
           <View className="mt-10 items-center">
             <ActivityIndicator color={colors.accent} />
@@ -152,22 +168,40 @@ export default function HomeScreen() {
         ) : null}
 
         {!waiting && activeUnit ? (
-          <View className="mb-1 px-2">
-            <Text weight="bold" className="text-xs text-muted">
-              {activeUnit.label}
-            </Text>
-            <View className="mt-0.5 flex-row items-end justify-between gap-3">
-              <Text weight="black" className="flex-1 text-xl leading-7">
-                {activeUnit.title}
-              </Text>
-              <Text weight="extrabold" className="text-sm text-xp">
-                {Math.round(activeUnit.progress * 100)}%
-              </Text>
+          <View className="mb-5 mt-1 rounded-3xl border border-line bg-surface px-4 py-4">
+            <View className="flex-row items-center justify-between gap-3">
+              <View className="flex-1">
+                <Text weight="bold" className="text-xs uppercase tracking-wide text-muted">
+                  {activeUnit.label}
+                </Text>
+                <Text weight="black" className="mt-1 text-xl leading-7">
+                  {activeUnit.title}
+                </Text>
+              </View>
+              <View className="rounded-full bg-accent-soft px-3 py-1.5">
+                <Text weight="extrabold" className="text-xs text-accent-deep">
+                  {Math.round(activeUnit.progress * 100)}%
+                </Text>
+              </View>
+            </View>
+            <View className="mt-4 h-2 overflow-hidden rounded-full bg-canvas">
+              <View
+                className="h-full rounded-full bg-accent"
+                style={{ width: `${Math.max(0, Math.min(100, Math.round(activeUnit.progress * 100)))}%` }}
+              />
+            </View>
+            <View className="mt-2 flex-row items-center justify-between">
+              <Text className="text-xs text-muted">Tiếp tục lộ trình của bạn</Text>
+              <ChevronRight size={15} color={colors.muted} />
             </View>
           </View>
         ) : null}
 
         {!waiting ? (
+          <View>
+          <View className="mb-2 flex-row items-end justify-between">
+            <View><Text weight="black" className="text-xl">Lộ trình học</Text><Text className="mt-1 text-sm text-muted">Học đều mỗi ngày, vững vàng từng bước.</Text></View>
+          </View>
           <LearningPath
             units={units}
             onSelectNode={setSelected}
@@ -176,6 +210,7 @@ export default function HomeScreen() {
             onMascotArrived={onMascotArrived}
             quietUnitId={activeUnit?.id ?? null}
           />
+          </View>
         ) : null}
       </ScrollView>
 

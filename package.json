@@ -35,14 +35,20 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.5"
   },
   "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web",
-    "start:lan-proxy": "node src/scripts/lan-gateway-proxy.mjs"
+    "start": "node src/scripts/start-mobile.mjs",
+    "android": "node src/scripts/start-mobile.mjs --android",
+    "ios": "node src/scripts/start-mobile.mjs --ios",
+    "web": "node src/scripts/start-mobile.mjs --web",
+    "start:lan-proxy": "node src/scripts/lan-gateway-proxy.mjs",
+    "postinstall": "node -e \"const fs=require('fs');if(!fs.existsSync('.env')){fs.copyFileSync('.env.example','.env');console.log('\\n✅  .env created from .env.example');console.log('   Edit EXPO_PUBLIC_API_BASE_URL if using a real device.\\n');}else{console.log('\\n✅  .env already exists\\n');}\"",
+    "start:remote": "node src/scripts/start-mobile.mjs --remote",
+    "backend:check": "node src/scripts/start-mobile.mjs --check",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "private": true
 }
