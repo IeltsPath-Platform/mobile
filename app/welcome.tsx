@@ -5,8 +5,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/src/components/ui/text';
 import { useOnboarding } from '@/src/features/onboarding/use-onboarding';
 import { AUTH_ENABLED } from '@/src/lib/env';
+import { colors } from '@/src/theme';
 
-const BRAND = '#123ab5';
+const BRAND = colors.accent;
 
 export default function WelcomeScreen() {
   const { onboarded } = useOnboarding();
@@ -23,7 +24,7 @@ export default function WelcomeScreen() {
     <SafeAreaView className="flex-1" style={{ backgroundColor: BRAND }} edges={['top', 'bottom']}>
       <View className="flex-1 items-center justify-center px-8">
         <Image
-          source={require('@/assets/images/splash-mascot.png')}
+          source={require('@/assets/images/owl/hero-wave.png')}
           style={{ width: 300, height: 300, backgroundColor: 'transparent' }}
           resizeMode="contain"
           accessibilityIgnoresInvertColors

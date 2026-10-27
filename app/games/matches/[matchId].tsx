@@ -9,39 +9,40 @@ import { gameApi } from '@/src/features/games/api';
 import { useGameSocket } from '@/src/features/games/use-game-socket';
 import type { GameEvent, CurrentWord, LetterStatus } from '@/src/features/games/types';
 import { dueAt } from '@/src/features/games/types';
+import { createRequestId } from '@/src/lib/request-id';
 import { colors } from '@/src/theme';
 
 const keyRows = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
 const statusColor: Record<LetterStatus, string> = { CORRECT: '#16845b', PRESENT: '#d89b14', ABSENT: '#64748b' };
-function requestId() { return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`; }
 
 export default function WordlyMatchScreen() {
   const { matchId } = useLocalSearchParams<{ matchId: string }>(); const router = useRouter(); const qc = useQueryClient();
   const [guess, setGuess] = useState(''); const [busy, setBusy] = useState(false); const [hintBusy, setHintBusy] = useState(false); const [error, setError] = useState(''); const [seconds, setSeconds] = useState<number | null>(null);
   const pendingGuess = useRef<{ wordId: string; guess: string; requestId: string } | null>(null); const hintRequest = useRef<{ wordId: string; requestId: string } | null>(null);
-  const match = useQuery({ queryKey: ['games', 'match', matchId], queryFn: () => gameApi.getMatch(matchId), enabled: Boolean(matchId), refetchInterval: 5000 });
-  const current = useQuery({ queryKey: ['games', 'current', matchId], queryFn: () => gameApi.current(matchId), enabled: Boolean(matchId), refetchInterval: (q) => q.state.data?.wordStatus === 'ACTIVE' ? 5000 : false, retry: (count, e) => count < 2 && !(e instanceof Error && /403|404|not active/i.test(e.message)) });
-  const ranking = useQuery({ queryKey: ['games', 'ranking', matchId], queryFn: () => gameApi.ranking(matchId), enabled: Boolean(matchId), refetchInterval: 5000 });
-  const onEvent = useCallback((event: GameEvent) => { if (event.match) qc.setQueryData(['games', 'match', matchId], event.match); if (event.ranking) qc.setQueryData(['games', 'ranking', matchId], event.ranking); if (event.type === 'MATCH_FINISHED') router.replace(`/games/results/${matchId}` as never); void qc.invalidateQueries({ queryKey: ['games', 'current', matchId] }); void qc.invalidateQueries({ queryKey: ['games', 'match', matchId] }); void qc.invalidateQueries({ queryKey: ['games', 'ranking', matchId] }); }, [matchId, qc, router]);
+  const match = useQuery({ queryKey: ['games', 'match', matchId], queryFn: () => gameApi.getMatch(matchId), enabled: Boolean(matchId), refetchInterval: 15_000 });
+  const current = useQuery({ queryKey: ['games', 'current', matchId], queryFn: () => gameApi.current(matchId), enabled: Boolean(matchId), refetchInterval: (q) => q.state.data?.wordStatus === 'ACTIVE' ? 5_000 : false, retry: (count, e) => count < 2 && !(e instanceof Error && /403|404|not active/i.test(e.message)) });
+  const ranking = useQuery({ queryKey: ['games', 'ranking', matchId], queryFn: () => gameApi.ranking(matchId), enabled: Boolean(matchId), refetchInterval: 10_000 });
+  const onEvent = useCallback((event: GameEvent) => { if (event.match) qc.setQueryData(['games', 'match', matchId], event.match); if (event.ranking) qc.setQueryData(['games', 'ranking', matchId], event.ranking); if (event.type === 'MATCH_FINISHED') router.replace({ pathname: '/games/results/[matchId]', params: { matchId, gameType: 'WORDLY' } } as never); void qc.invalidateQueries({ queryKey: ['games', 'current', matchId] }); void qc.invalidateQueries({ queryKey: ['games', 'match', matchId] }); void qc.invalidateQueries({ queryKey: ['games', 'ranking', matchId] }); }, [matchId, qc, router]);
   const connected = useGameSocket(match.data?.roomId ?? null, matchId, onEvent);
   const word = current.data; const myTurn = match.data?.playerMode === 'SOLO' || Boolean(match.data?.ownPlayer);
   useEffect(() => { if (!word?.deadlineAt || !word.timeEnabled) { setSeconds(null); return; } const tick = () => setSeconds(dueAt(word.deadlineAt, Date.now())); tick(); const timer = setInterval(tick, 1000); return () => clearInterval(timer); }, [word?.deadlineAt, word?.timeEnabled]);
   useEffect(() => { const sub = AppState.addEventListener('change', (state) => { if (state === 'active') { void current.refetch(); void match.refetch(); void ranking.refetch(); } }); return () => sub.remove(); }, [current.refetch, match.refetch, ranking.refetch]);
+  useEffect(() => { if (match.data?.status === 'COMPLETED') router.replace({ pathname: '/games/results/[matchId]', params: { matchId, gameType: 'WORDLY' } } as never); }, [match.data?.status, matchId, router]);
   const submit = async () => {
     if (!word || busy || guess.length !== word.columns) return;
     setBusy(true); setError('');
     const normalizedGuess = guess.toUpperCase();
-    if (pendingGuess.current?.wordId !== word.playerWordId || pendingGuess.current.guess !== normalizedGuess) pendingGuess.current = { wordId: word.playerWordId, guess: normalizedGuess, requestId: requestId() };
+    if (pendingGuess.current?.wordId !== word.playerWordId || pendingGuess.current.guess !== normalizedGuess) pendingGuess.current = { wordId: word.playerWordId, guess: normalizedGuess, requestId: createRequestId() };
     const body = { requestId: pendingGuess.current.requestId, playerWordId: word.playerWordId, guess: normalizedGuess };
     try {
       const result = await gameApi.guess(matchId, body);
       if ('code' in result && result.code === 'REQUEST_PENDING') { setError('Đang xử lý lượt đoán. Trạng thái sẽ tự đồng bộ ngay sau đó.'); }
-      else { const accepted = result as import('@/src/features/games/types').GuessResponse; pendingGuess.current = null; if (accepted.nextWord) qc.setQueryData(['games', 'current', matchId], accepted.nextWord); else void qc.invalidateQueries({ queryKey: ['games', 'current', matchId] }); if (accepted.matchFinished) { router.replace(`/games/results/${matchId}` as never); return; } setGuess(''); }
+      else { const accepted = result as import('@/src/features/games/types').GuessResponse; pendingGuess.current = null; if (accepted.nextWord) qc.setQueryData(['games', 'current', matchId], accepted.nextWord); else void qc.invalidateQueries({ queryKey: ['games', 'current', matchId] }); if (accepted.matchFinished) { router.replace({ pathname: '/games/results/[matchId]', params: { matchId, gameType: 'WORDLY' } } as never); return; } setGuess(''); }
       void qc.invalidateQueries({ queryKey: ['games', 'match', matchId] }); void qc.invalidateQueries({ queryKey: ['games', 'ranking', matchId] });
     } catch (e) { setError(e instanceof Error ? e.message : 'Không gửi được lượt đoán.'); }
     finally { setBusy(false); }
   };
-  const useHint = async () => { if (!word || hintBusy || word.hint?.hintUsed) return; if (hintRequest.current?.wordId !== word.playerWordId) hintRequest.current = { wordId: word.playerWordId, requestId: requestId() }; setHintBusy(true); setError(''); try { const hint = await gameApi.hint(matchId, word.playerWordId, hintRequest.current.requestId); hintRequest.current = null; qc.setQueryData<CurrentWord>(['games','current',matchId], (prev) => prev ? { ...prev, hint } : prev); } catch (e) { setError(e instanceof Error ? e.message : 'Không tải được gợi ý.'); } finally { setHintBusy(false); } };
+  const useHint = async () => { if (!word || hintBusy || word.hint?.hintUsed) return; if (hintRequest.current?.wordId !== word.playerWordId) hintRequest.current = { wordId: word.playerWordId, requestId: createRequestId() }; setHintBusy(true); setError(''); try { const hint = await gameApi.hint(matchId, word.playerWordId, hintRequest.current.requestId); hintRequest.current = null; qc.setQueryData<CurrentWord>(['games','current',matchId], (prev) => prev ? { ...prev, hint } : prev); } catch (e) { setError(e instanceof Error ? e.message : 'Không tải được gợi ý.'); } finally { setHintBusy(false); } };
   const guessedRows = useMemo(() => word?.guesses ?? [], [word]);
   if (match.isPending || current.isPending) return <View className="flex-1 items-center justify-center bg-canvas"><ActivityIndicator color={colors.accent} /><Text className="mt-3 text-sm text-muted">Đang đồng bộ ván chơi…</Text></View>;
   if (match.isError || !match.data) return <View className="flex-1 justify-center bg-canvas px-5"><Text weight="bold">Không tải được ván chơi.</Text><Button className="mt-4" label="Thử lại" onPress={() => { void match.refetch(); void current.refetch(); }} /></View>;

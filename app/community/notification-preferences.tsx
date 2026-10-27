@@ -32,7 +32,7 @@ export default function NotificationPreferencesScreen() {
   };
 
   return <View className="flex-1 bg-canvas">
-    <View className="border-b border-line bg-white px-4 pb-5 pt-3">
+    <View className="border-b border-line bg-surface px-4 pb-5 pt-3">
       <Pressable onPress={() => router.back()} className="h-11 w-11 items-center justify-center rounded-full bg-slate-50" accessibilityLabel="Quay lại">
         <ChevronLeft size={21} color={colors.ink} />
       </Pressable>
@@ -43,15 +43,15 @@ export default function NotificationPreferencesScreen() {
     </View>
     <ScrollView contentContainerClassName="px-4 pb-10 pt-4">
       {query.isPending ? <View className="items-center py-16"><ActivityIndicator color={colors.accent} /><Text className="mt-3 text-sm text-muted">Đang tải tuỳ chọn…</Text></View>
-        : query.isError ? <Pressable onPress={() => void query.refetch()} className="items-center rounded-3xl border border-line bg-white p-6"><Text weight="bold">Không tải được tuỳ chọn</Text><Text className="mt-2 text-sm text-accent">Chạm để thử lại</Text></Pressable>
-        : query.data?.length ? <View className="overflow-hidden rounded-3xl border border-line bg-white">
+        : query.isError ? <Pressable onPress={() => void query.refetch()} className="items-center rounded-3xl border border-line bg-surface p-6"><Text weight="bold">Không tải được tuỳ chọn</Text><Text className="mt-2 text-sm text-accent">Chạm để thử lại</Text></Pressable>
+        : query.data?.length ? <View className="overflow-hidden rounded-3xl border border-line bg-surface">
           {query.data.map((item, index) => <View key={item.eventType} className={`min-h-[76px] flex-row items-center px-4 py-3 ${index ? 'border-t border-line' : ''}`}>
             <View className="h-10 w-10 items-center justify-center rounded-xl bg-accent-soft"><SlidersHorizontal size={17} color={colors.accent} /></View>
             <View className="ml-3 flex-1 pr-3"><Text weight="semibold" className="text-sm">{readableName(item.eventType)}</Text><Text className="mt-1 text-xs text-muted">Thông báo về hoạt động này</Text></View>
             <Switch value={item.enabled} disabled={busy === item.eventType} trackColor={{ true: colors.accent }} onValueChange={(enabled) => void update(item.eventType, enabled)} />
           </View>)}
         </View>
-        : <View className="items-center rounded-3xl border border-line bg-white px-6 py-10"><Text weight="bold">Chưa có tuỳ chọn nào</Text><Text className="mt-2 text-center text-sm text-muted">Các loại thông báo có thể bật sẽ xuất hiện ở đây.</Text></View>}
+        : <View className="items-center rounded-3xl border border-line bg-surface px-6 py-10"><Text weight="bold">Chưa có tuỳ chọn nào</Text><Text className="mt-2 text-center text-sm text-muted">Các loại thông báo có thể bật sẽ xuất hiện ở đây.</Text></View>}
     </ScrollView>
   </View>;
 }

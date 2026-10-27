@@ -17,6 +17,7 @@ export declare const colors: {
   dangerSoft: string;
   success: string;
   successSoft: string;
+  community: Record<'general' | 'question' | 'discussion' | 'writing' | 'speaking' | 'resources', { foreground: string; background: string; border: string }>;
   heroStart: string;
   heroEnd: string;
   skill: Record<'listening' | 'reading' | 'writing' | 'speaking' | 'full', string>;

@@ -21,11 +21,11 @@ type PathMascotProps = {
   size?: number;
 };
 
-/** Path-only runner (quadruped). Classroom biped mascot stays elsewhere. */
+/** Walking poses use the same owl artwork as the web navigation mascot. */
 const RUN_FRAMES: ImageSourcePropType[] = [
-  require('@/assets/images/mascot-path-runner.png'),
-  require('@/assets/images/mascot-path-runner-f2.png'),
-  require('@/assets/images/mascot-path-runner-f3.png'),
+  require('@/assets/images/owl/nav-owl-stand.png'),
+  require('@/assets/images/owl/nav-owl-step-left.png'),
+  require('@/assets/images/owl/nav-owl-step-right.png'),
 ];
 
 /** Stand slightly below-right of the node ring so the button stays tappable. */

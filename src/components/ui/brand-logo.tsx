@@ -12,7 +12,7 @@ export function BrandLogo({ size = 'md' }: BrandLogoProps) {
   return (
     <View className="flex-row items-center gap-2" accessibilityRole="header" accessibilityLabel="IELTSPath">
       <Image
-        source={require('@/assets/images/icon.png')}
+        source={require('@/assets/images/owl/nav-owl-stand.png')}
         style={{ width: stamp, height: stamp, borderRadius: stamp * 0.28 }}
         resizeMode="cover"
         accessibilityIgnoresInvertColors

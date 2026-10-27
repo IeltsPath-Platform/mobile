@@ -1,66 +1,90 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import { Button } from '@/src/components/ui/button';
 import { Text } from '@/src/components/ui/text';
+import { createRequestId } from '@/src/lib/request-id';
 
 import { FlipCard } from './flip-card';
-import { applySrs, buildQueue } from '../srs';
-import type { SrsRating, SrsState, StudyCard } from '../types';
+import type { SrsRating, StudyCard } from '../types';
 
 type StudySessionProps = {
   cards: StudyCard[];
-  states: Record<string, SrsState>;
-  onPersist: (cardId: string, next: SrsState) => void;
+  onReview: (cardId: string, correct: boolean, requestId: string) => Promise<void>;
+  hasMoreCards: boolean;
+  onLoadMore: () => Promise<StudyCard[]>;
   onExit: () => void;
 };
 
-export function StudySession({ cards, states, onPersist, onExit }: StudySessionProps) {
-  const [queue, setQueue] = useState(() => buildQueue(cards, states, Date.now()));
+export function StudySession({ cards, onReview, hasMoreCards, onLoadMore, onExit }: StudySessionProps) {
+  const [queue, setQueue] = useState(cards);
   const [flipped, setFlipped] = useState(false);
   const [reviewed, setReviewed] = useState(0);
+  const [reviewing, setReviewing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState('');
+  const requestIds = useRef(new Map<string, string>());
+  const retried = useRef(new Set<string>());
   const current = queue[0];
+
+  const loadMore = async () => {
+    if (loadingMore) return;
+    setLoadingMore(true); setError('');
+    try {
+      const nextCards = await onLoadMore();
+      if (!nextCards.length) { setError('Không còn thẻ nào đến hạn trong bộ này.'); return; }
+      retried.current.clear();
+      setFlipped(false);
+      setQueue(nextCards);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Không tải thêm được thẻ. Hãy thử lại.');
+    } finally { setLoadingMore(false); }
+  };
 
   if (!current) {
     return (
       <View className="flex-1 justify-center px-5">
         <Text weight="black" className="text-3xl">
-          {cards.length === 0 ? 'Deck trống' : reviewed > 0 ? 'Hết lượt hôm nay' : 'Chưa có thẻ đến hạn'}
+          {cards.length === 0 ? 'Chưa có thẻ đến hạn' : 'Hoàn thành lượt ôn'}
         </Text>
         <Text className="mt-2 text-base leading-6 text-muted">
-          {cards.length === 0
-            ? 'Thêm thẻ vào deck trên web rồi quay lại.'
-            : `Bạn đã lật ${reviewed} thẻ trong lượt này.`}
+          {cards.length === 0 ? 'Bạn đã ôn hết thẻ đến hạn trong bộ này.' : `Bạn đã gửi ${reviewed} lượt ôn lên tài khoản.`}
         </Text>
         <View className="mt-6">
-          {cards.length === 0 ? (
-            <Button label="Về Flashcards" onPress={onExit} />
-          ) : (
-            <>
-              <Button label="Ôn lại tất cả" onPress={() => setQueue(cards.slice(0, 20))} />
-              <View className="mt-3">
-                <Button variant="secondary" label="Về Flashcards" onPress={onExit} />
-              </View>
-            </>
-          )}
+          {hasMoreCards ? <Button label={loadingMore ? 'Đang tải…' : 'Tiếp tục với thẻ còn lại'} loading={loadingMore} disabled={loadingMore} onPress={() => void loadMore()} /> : null}
+          <Button label="Về Flashcards" onPress={onExit} />
         </View>
       </View>
     );
   }
 
-  const grade = (rating: SrsRating) => {
-    const next = applySrs(states[current.id], rating, Date.now());
-    onPersist(current.id, next);
-    setReviewed((count) => count + 1);
-    setFlipped(false);
-    setQueue((items) => {
-      const rest = items.slice(1);
-      if (rating === 'again') {
-        const at = Math.min(2, rest.length);
-        rest.splice(at, 0, current);
-      }
-      return rest;
-    });
+  const grade = async (rating: SrsRating) => {
+    if (reviewing) return;
+    let id = requestIds.current.get(current.id);
+    if (!id) {
+      id = createRequestId();
+      requestIds.current.set(current.id, id);
+    }
+    setReviewing(true);
+    setError('');
+    try {
+      await onReview(current.id, rating === 'good', id);
+      requestIds.current.delete(current.id);
+      setReviewed((count) => count + 1);
+      setFlipped(false);
+      setQueue((items) => {
+        const rest = items.slice(1);
+        if (rating === 'again' && !retried.current.has(current.id)) {
+          retried.current.add(current.id);
+          rest.splice(Math.min(2, rest.length), 0, current);
+        }
+        return rest;
+      });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Chưa lưu được lượt ôn. Hãy thử lại.');
+    } finally {
+      setReviewing(false);
+    }
   };
 
   return (
@@ -73,15 +97,17 @@ export function StudySession({ cards, states, onPersist, onExit }: StudySessionP
           key={current.id}
           front={current.front}
           back={current.back}
+          imageUrl={current.imageUrl}
           flipped={flipped}
           onFlip={() => setFlipped((value) => !value)}
         />
       </View>
       <View className="mt-6 gap-3">
+        {error ? <Text accessibilityRole="alert" className="rounded-xl bg-danger-soft p-3 text-sm text-danger">{error}</Text> : null}
         {flipped ? (
           <>
-            <Button label="Chưa thuộc" variant="secondary" onPress={() => grade('again')} />
-            <Button label="Đã thuộc" onPress={() => grade('good')} />
+            <Button label={reviewing ? 'Đang lưu…' : 'Chưa thuộc'} loading={reviewing} disabled={reviewing} variant="secondary" onPress={() => void grade('again')} />
+            <Button label={reviewing ? 'Đang lưu…' : 'Đã thuộc'} loading={reviewing} disabled={reviewing} onPress={() => void grade('good')} />
           </>
         ) : (
           <Button label="Lật thẻ" onPress={() => setFlipped(true)} />

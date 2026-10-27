@@ -21,8 +21,8 @@ export function AuthScreen({ title, description, children, footer }: AuthScreenP
           showsVerticalScrollIndicator={false}>
           <View className="w-full max-w-[27rem] self-center">
             <Image
-              source={require('@/assets/images/mascot.png')}
-              style={{ width: 88, height: 88 }}
+              source={require('@/assets/images/owl/hero-wave.png')}
+              style={{ width: 104, height: 104 }}
               resizeMode="contain"
               accessibilityIgnoresInvertColors
             />

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Pressable, View, type ViewStyle } from 'react-native';
+import { Image, Pressable, View, type ViewStyle } from 'react-native';
 import Animated, { interpolate, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { Text } from '@/src/components/ui/text';
@@ -8,6 +8,7 @@ import { colors } from '@/src/theme';
 type FlipCardProps = {
   front: string;
   back: string;
+  imageUrl?: string | null;
   flipped: boolean;
   onFlip: () => void;
 };
@@ -28,7 +29,7 @@ const cardFace: ViewStyle = {
   backfaceVisibility: 'hidden',
 };
 
-export function FlipCard({ front, back, flipped, onFlip }: FlipCardProps) {
+export function FlipCard({ front, back, imageUrl, flipped, onFlip }: FlipCardProps) {
   const spin = useSharedValue(0);
 
   useEffect(() => {
@@ -63,6 +64,7 @@ export function FlipCard({ front, back, flipped, onFlip }: FlipCardProps) {
           <Text weight="bold" className="text-xs uppercase tracking-wide text-accent-deep">
             Nghĩa
           </Text>
+          {imageUrl ? <Image source={{ uri: imageUrl }} resizeMode="contain" className="mt-3 h-20 w-full" accessibilityLabel="Ảnh minh họa của thẻ" /> : null}
           <Text weight="extrabold" className="mt-3 text-center text-2xl leading-8 text-accent-deep">
             {back}
           </Text>

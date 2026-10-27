@@ -23,7 +23,7 @@ import { queryClient } from "@/src/lib/query-client";
 import { AppThemeProvider } from "@/src/theme/app-theme";
 import { colors } from "@/src/theme";
 
-const SPLASH = "#123ab5";
+const SPLASH = colors.accent;
 
 // Do not block first paint on fonts — returning null left a blank cream screen on web/SSR.
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
@@ -91,7 +91,7 @@ function RootNavigator() {
       >
         <StatusBar style="light" />
         <Image
-          source={require("@/assets/images/splash-mascot.png")}
+          source={require("@/assets/images/owl/hero-cheer.png")}
           style={{ width: 220, height: 220 }}
           resizeMode="contain"
           accessibilityIgnoresInvertColors

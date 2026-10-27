@@ -31,7 +31,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-mascot.png",
+          "image": "./assets/images/owl/hero-cheer.png",
           "resizeMode": "contain",
           "imageWidth": 220,
           "backgroundColor": "#123ab5"
