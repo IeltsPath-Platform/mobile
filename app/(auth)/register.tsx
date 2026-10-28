@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { TextInput } from 'react-native';
+import { type TextInputInstance } from 'react-native';
 
 import { Button } from '@/src/components/ui/button';
 import { FormAlert } from '@/src/components/ui/form-alert';
@@ -16,10 +16,10 @@ import { registerSchema, type RegisterInput } from '@/src/features/auth/schemas'
 export default function RegisterScreen() {
   const { signUp } = useAuth();
   const [formError, setFormError] = useState<string | null>(null);
-  const emailRef = useRef<TextInput>(null);
-  const phoneRef = useRef<TextInput>(null);
-  const passwordRef = useRef<TextInput>(null);
-  const confirmRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInputInstance>(null);
+  const phoneRef = useRef<TextInputInstance>(null);
+  const passwordRef = useRef<TextInputInstance>(null);
+  const confirmRef = useRef<TextInputInstance>(null);
 
   const {
     control,
@@ -147,12 +147,12 @@ export default function RegisterScreen() {
             autoComplete="new-password"
             textContentType="newPassword"
             returnKeyType="go"
-            onSubmitEditing={onSubmit}
+            onSubmitEditing={() => void onSubmit()}
           />
         )}
       />
 
-      <Button label="Tạo tài khoản" loadingLabel="Đang tạo phiên…" loading={isSubmitting} onPress={onSubmit} />
+      <Button label="Tạo tài khoản" loadingLabel="Đang tạo phiên…" loading={isSubmitting} onPress={() => void onSubmit()} />
       <GoogleSignInButton />
     </AuthScreen>
   );

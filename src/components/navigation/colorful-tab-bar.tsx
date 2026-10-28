@@ -2,19 +2,11 @@ import { Bell, BookOpenCheck, House, Layers, UserRound, Users } from 'lucide-rea
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
+import type { BottomTabBarProps } from 'expo-router/build/react-navigation/bottom-tabs/types';
 
 import { Text } from '@/src/components/ui/text';
 import { useUnread } from '@/src/features/community/use-unread';
 import { colors, spacing, touchTarget } from '@/src/theme';
-
-export type ColorfulTabBarProps = {
-  state: { index: number; routes: { key: string; name: string; params?: object }[] };
-  descriptors: Record<string, { options: { title?: string; tabBarAccessibilityLabel?: string } }>;
-  navigation: {
-    emit: (event: { type: string; target?: string; canPreventDefault?: boolean }) => { defaultPrevented: boolean };
-    navigate: (name: string, params?: object) => void;
-  };
-};
 
 const tabs = {
   index: { label: 'Hôm nay', Icon: House },
@@ -25,7 +17,7 @@ const tabs = {
   account: { label: 'Hồ sơ', Icon: UserRound },
 };
 
-export function ColorfulTabBar({ state, navigation }: ColorfulTabBarProps) {
+export function ColorfulTabBar({ state, emitter, navigateToTab }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const unread = useUnread();
   const queryClient = useQueryClient();
@@ -50,12 +42,12 @@ export function ColorfulTabBar({ state, navigation }: ColorfulTabBarProps) {
           const hasUnread = route.name === 'notifications' && unreadCount > 0;
 
           const onPress = () => {
-            const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+            const event = emitter.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
             if (event.defaultPrevented) return;
 
             void queryClient.invalidateQueries({ queryKey: ['community', 'unread'] });
             if (route.name === 'notifications') void queryClient.invalidateQueries({ queryKey: ['community', 'notifications'] });
-            if (!focused) navigation.navigate(route.name, route.params);
+            if (!focused) navigateToTab(route.key);
           };
 
           return (
@@ -65,7 +57,7 @@ export function ColorfulTabBar({ state, navigation }: ColorfulTabBarProps) {
               accessibilityState={{ selected: focused }}
               accessibilityLabel={`${label}${hasUnread ? `, ${unreadCount} chưa đọc` : ''}`}
               onPress={onPress}
-              onLongPress={() => navigation.emit({ type: 'tabLongPress', target: route.key })}
+              onLongPress={() => emitter.emit({ type: 'tabLongPress', target: route.key })}
               style={{
                 flex: 1,
                 minHeight: touchTarget + 12,

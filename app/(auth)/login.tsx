@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { TextInput, View } from 'react-native';
+import { TextInput, View, type TextInputInstance } from 'react-native';
 
 import { Button } from '@/src/components/ui/button';
 import { FormAlert } from '@/src/components/ui/form-alert';
@@ -16,7 +16,7 @@ import { loginSchema, type LoginInput } from '@/src/features/auth/schemas';
 export default function LoginScreen() {
   const { signIn } = useAuth();
   const [formError, setFormError] = useState<string | null>(null);
-  const passwordRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInputInstance>(null);
 
   const {
     control,
@@ -81,7 +81,7 @@ export default function LoginScreen() {
             autoComplete="current-password"
             textContentType="password"
             returnKeyType="go"
-            onSubmitEditing={onSubmit}
+            onSubmitEditing={() => void onSubmit()}
           />
         )}
       />
@@ -90,7 +90,7 @@ export default function LoginScreen() {
         <AuthLink label="Quên mật khẩu?" href="/forgot-password" replace={false} />
       </View>
 
-      <Button label="Đăng nhập" loadingLabel="Đang vào học…" loading={isSubmitting} onPress={onSubmit} />
+      <Button label="Đăng nhập" loadingLabel="Đang vào học…" loading={isSubmitting} onPress={() => void onSubmit()} />
       <GoogleSignInButton />
     </AuthScreen>
   );

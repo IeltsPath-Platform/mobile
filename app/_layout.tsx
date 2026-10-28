@@ -10,7 +10,8 @@ import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
-import { Image, View } from "react-native";
+import { AppState, Image, View } from "react-native";
+import { focusManager } from "@tanstack/react-query";
 import "react-native-reanimated";
 import "../global.css";
 
@@ -67,6 +68,14 @@ export default function RootLayout() {
     return () => clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    focusManager.setFocused(AppState.currentState === "active");
+    const subscription = AppState.addEventListener("change", (state) => {
+      focusManager.setFocused(state === "active");
+    });
+    return () => subscription.remove();
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <AppThemeProvider>
@@ -114,7 +123,6 @@ function RootNavigator() {
     <>
       <StatusBar style={enterApp ? "dark" : "light"} />
       <Stack
-        initialRouteName={enterApp ? "(tabs)" : "welcome"}
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: colors.canvas },

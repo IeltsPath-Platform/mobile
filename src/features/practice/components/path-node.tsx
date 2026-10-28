@@ -1,6 +1,6 @@
 import { Check, Lock } from 'lucide-react-native';
 import { useEffect } from 'react';
-import { Pressable, View } from 'react-native';
+import { Pressable, View, type ViewInstance } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -22,7 +22,7 @@ type PathNodeButtonProps = {
   align: NodeAlign;
   showConnector?: boolean;
   onPress?: () => void;
-  ringRef?: (ref: View | null) => void;
+  ringRef?: (ref: ViewInstance | null) => void;
 };
 
 const ALIGN = {

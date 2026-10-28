@@ -2,7 +2,7 @@ import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-quer
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Bookmark, CheckCircle2, Flag, Heart, Lightbulb, MessageCircle, MoreHorizontal, Send, ThumbsUp } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Modal, Pressable, RefreshControl, ScrollView, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Modal, Pressable, RefreshControl, ScrollView, TextInput, View, type ScrollViewInstance } from 'react-native';
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
 import { Text } from '@/src/components/ui/text';
@@ -19,7 +19,7 @@ const backgroundColors: Record<string, string> = { VIOLET: '#5b21b6', CRIMSON: '
 
 export default function PostDetailScreen() {
   const { postId, commentId: rawCommentId } = useLocalSearchParams<{ postId: string; commentId?: string | string[] }>(); const commentId = Array.isArray(rawCommentId) ? rawCommentId[0] : rawCommentId; const router = useRouter(); const qc = useQueryClient(); const user = useCurrentUser();
-  const commentsScroll = useRef<ScrollView>(null);
+  const commentsScroll = useRef<ScrollViewInstance>(null);
   const post = useQuery({ queryKey: ['community', 'detail', postId], queryFn: () => communityApi.post(postId), enabled: Boolean(postId) });
   const comments = useInfiniteQuery({ queryKey: ['community', 'comments', postId], queryFn: ({ pageParam }) => communityApi.comments(postId, pageParam), initialPageParam: 0, getNextPageParam: (last) => last.last ? undefined : last.page + 1, enabled: Boolean(postId) });
   const commentRows = comments.data?.pages.flatMap((page) => page.content) ?? [];

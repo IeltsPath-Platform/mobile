@@ -61,12 +61,12 @@ export default function ForgotPasswordScreen() {
             autoComplete="email"
             textContentType="emailAddress"
             returnKeyType="send"
-            onSubmitEditing={onSubmit}
+            onSubmitEditing={() => void onSubmit()}
           />
         )}
       />
 
-      <Button label="Gửi mã đặt lại" loadingLabel="Đang gửi…" loading={isSubmitting} onPress={onSubmit} />
+      <Button label="Gửi mã đặt lại" loadingLabel="Đang gửi…" loading={isSubmitting} onPress={() => void onSubmit()} />
       {sentMessage ? (
         <Button variant="secondary" label="Tôi đã có mã" onPress={() => router.push('/reset-password')} />
       ) : null}

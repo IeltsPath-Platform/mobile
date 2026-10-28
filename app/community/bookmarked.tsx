@@ -23,9 +23,9 @@ export default function BookmarkedScreen() {
   const empty = query.isPending ? <View className="py-12"><ActivityIndicator color={colors.accent} /></View> : query.isError ? <Card className="rounded-3xl border-b-0 bg-surface p-5"><Text>Không tải được bài viết đã lưu.</Text><View className="mt-3"><Button label="Thử lại" onPress={refresh} /></View></Card> : <Card className="items-center rounded-3xl border-b-0 bg-surface p-7"><Bookmark size={26} color={colors.accent} /><Text weight="bold" className="mt-3 text-center">Bạn chưa lưu bài viết nào</Text><Text className="mt-2 text-center text-sm text-muted">Lưu bài viết hay để xem lại sau.</Text></Card>;
   return <View className="flex-1 bg-canvas"><View className="border-b border-line bg-surface px-4 pb-3 pt-4"><Pressable onPress={() => router.back()} className="min-h-10 justify-center"><Text weight="semibold" className="text-accent">‹  Cộng đồng</Text></Pressable><Text weight="black" className="mt-1 text-2xl">Bài viết đã lưu</Text></View>
     <FlatList
-      className="flex-1" contentContainerClassName="grow px-4 pb-10 pt-4" data={posts} keyExtractor={(post) => post.id} ListEmptyComponent={empty}
+      className="flex-1" contentContainerClassName="grow px-4 pb-10 pt-4" data={posts} keyExtractor={(post) => post.id} ListEmptyComponent={empty ?? undefined}
       renderItem={({ item: post }) => <SavedPost post={post} onOpen={() => router.push(`/community/${post.id}` as never)} onRemove={() => void remove(post.id)} />}
-      ListFooterComponent={query.isFetchingNextPage ? <ActivityIndicator className="py-4" color={colors.accent} /> : null}
+      ListFooterComponent={query.isFetchingNextPage ? <ActivityIndicator className="py-4" color={colors.accent} /> : undefined}
       onEndReached={() => { if (query.hasNextPage && !query.isFetchingNextPage) void query.fetchNextPage(); }} onEndReachedThreshold={0.4}
       initialNumToRender={8} maxToRenderPerBatch={6} windowSize={7}
       refreshControl={<RefreshControl refreshing={query.isRefetching && !query.isFetchingNextPage} onRefresh={refresh} tintColor={colors.accent} />}

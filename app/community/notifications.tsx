@@ -130,11 +130,11 @@ export default function NotificationsScreen() {
       keyExtractor={(item) => item.id}
       renderItem={({ item }) => <NotificationRow item={item} onOpen={openNotification} />}
       ListHeaderComponent={header}
-      ListEmptyComponent={empty}
+      ListEmptyComponent={empty ?? undefined}
       ListFooterComponent={notifications.length > 0 ? <>
         {list.isFetchingNextPage ? <ActivityIndicator className="py-4" color={colors.accent} /> : null}
         {list.isFetchNextPageError ? <Pressable onPress={() => void list.fetchNextPage()} className="min-h-11 items-center justify-center"><Text weight="bold" className="text-accent">Thử tải lại</Text></Pressable> : null}
-      </> : null}
+      </> : undefined}
       onEndReached={() => { if (list.hasNextPage && !list.isFetchingNextPage) void list.fetchNextPage(); }}
       onEndReachedThreshold={0.5}
       initialNumToRender={10}

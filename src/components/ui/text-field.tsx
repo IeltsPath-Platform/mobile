@@ -1,5 +1,5 @@
 import { forwardRef, useState } from 'react';
-import { Pressable, TextInput, View, type TextInputProps } from 'react-native';
+import { Pressable, TextInput, View, type TextInputInstance, type TextInputProps } from 'react-native';
 import { Eye, EyeOff } from 'lucide-react-native';
 
 import { useTheme } from '@/src/theme/app-theme';
@@ -14,7 +14,7 @@ type TextFieldProps = TextInputProps & {
   secureToggle?: boolean;
 };
 
-export const TextField = forwardRef<TextInput, TextFieldProps>(function TextField(
+export const TextField = forwardRef<TextInputInstance, TextFieldProps>(function TextField(
   { label, error, hint, secureToggle = false, secureTextEntry, onFocus, onBlur, ...props },
   ref,
 ) {

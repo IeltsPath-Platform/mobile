@@ -12,6 +12,7 @@ import {
   ScrollView,
   TextInput,
   View,
+  type ScrollViewInstance,
 } from 'react-native';
 import { ChevronDown, ImagePlus, SlidersHorizontal, X } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -83,7 +84,7 @@ export default function ComposerScreen() {
   const [picking, setPicking] = useState(false);
   const [uploadingUris, setUploadingUris] = useState<string[]>([]);
   const [error, setError] = useState('');
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const hydrated = useRef(false);
   const dirty = useRef(false);
 

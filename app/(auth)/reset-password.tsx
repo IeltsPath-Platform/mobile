@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { TextInput } from 'react-native';
+import { type TextInputInstance } from 'react-native';
 
 import { Button } from '@/src/components/ui/button';
 import { FormAlert } from '@/src/components/ui/form-alert';
@@ -17,8 +17,8 @@ export default function ResetPasswordScreen() {
   const params = useLocalSearchParams<{ token?: string }>();
   const [formError, setFormError] = useState<string | null>(null);
   const [doneMessage, setDoneMessage] = useState<string | null>(null);
-  const passwordRef = useRef<TextInput>(null);
-  const confirmRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInputInstance>(null);
+  const confirmRef = useRef<TextInputInstance>(null);
 
   const {
     control,
@@ -108,7 +108,7 @@ export default function ResetPasswordScreen() {
             autoComplete="new-password"
             textContentType="newPassword"
             returnKeyType="go"
-            onSubmitEditing={onSubmit}
+            onSubmitEditing={() => void onSubmit()}
           />
         )}
       />
@@ -116,7 +116,7 @@ export default function ResetPasswordScreen() {
       {doneMessage ? (
         <Button label="Đăng nhập với mật khẩu mới" onPress={() => router.replace('/login')} />
       ) : (
-        <Button label="Đặt lại mật khẩu" loadingLabel="Đang cập nhật…" loading={isSubmitting} onPress={onSubmit} />
+        <Button label="Đặt lại mật khẩu" loadingLabel="Đang cập nhật…" loading={isSubmitting} onPress={() => void onSubmit()} />
       )}
     </AuthScreen>
   );

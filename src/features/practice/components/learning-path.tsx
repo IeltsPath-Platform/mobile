@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { View, type ViewInstance } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 
 import { Text } from '@/src/components/ui/text';
@@ -34,8 +34,8 @@ export function LearningPath({
   onMascotArrived,
   quietUnitId = null,
 }: LearningPathProps) {
-  const mapRef = useRef<View>(null);
-  const ringRefs = useRef<Record<string, View | null>>({});
+  const mapRef = useRef<ViewInstance>(null);
+  const ringRefs = useRef<Record<string, ViewInstance | null>>({});
   const [points, setPoints] = useState<PointMap>({});
   const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
 
