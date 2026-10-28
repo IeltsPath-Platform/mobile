@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, ArrowRight, Flame, Gamepad2, Rocket, Users, UserRound } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Switch, TextInput, View } from 'react-native';
@@ -17,12 +17,13 @@ const routeForMatch = (gameType: string, matchId: string) => gameType === 'ROCKE
 
 export default function GameCatalogScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ gameType?: string; playerMode?: string }>();
   const auth = useAuth();
   const enabled = auth.authEnabled && auth.status === 'authenticated';
   const catalog = useQuery({ queryKey: ['games', 'catalog'], queryFn: gameApi.catalog, enabled, staleTime: 0, refetchOnMount: 'always', retry: 1 });
   const active = useQuery({ queryKey: ['games', 'active'], queryFn: gameApi.activeGame, enabled, staleTime: 10_000, retry: 1 });
-  const [gameType, setGameType] = useState<GameType>('WORDLY');
-  const [mode, setMode] = useState<PlayerMode>('SOLO');
+  const [gameType, setGameType] = useState<GameType>(params.gameType === 'ROCKET' ? 'ROCKET' : 'WORDLY');
+  const [mode, setMode] = useState<PlayerMode>(params.playerMode === 'MULTIPLAYER' ? 'MULTIPLAYER' : 'SOLO');
   const [playMode, setPlayMode] = useState<PlayMode>('FINITE');
   const [lives, setLives] = useState(5);
   const [timeEnabled, setTimeEnabled] = useState(true);

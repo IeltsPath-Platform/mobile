@@ -1,4 +1,4 @@
-import { Bell, House, Layers, UserRound, Users } from 'lucide-react-native';
+import { Bell, BookOpenCheck, House, Layers, UserRound, Users } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
@@ -18,6 +18,7 @@ export type ColorfulTabBarProps = {
 
 const tabs = {
   index: { label: 'Hôm nay', Icon: House },
+  flashcards: { label: 'Thẻ từ', Icon: BookOpenCheck },
   practice: { label: 'Luyện', Icon: Layers },
   community: { label: 'Cộng đồng', Icon: Users },
   notifications: { label: 'Thông báo', Icon: Bell },
@@ -53,9 +54,7 @@ export function ColorfulTabBar({ state, navigation }: ColorfulTabBarProps) {
             if (event.defaultPrevented) return;
 
             void queryClient.invalidateQueries({ queryKey: ['community', 'unread'] });
-            if (route.name === 'notifications') {
-              void queryClient.invalidateQueries({ queryKey: ['community', 'notifications'] });
-            }
+            if (route.name === 'notifications') void queryClient.invalidateQueries({ queryKey: ['community', 'notifications'] });
             if (!focused) navigation.navigate(route.name, route.params);
           };
 

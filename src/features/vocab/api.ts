@@ -45,7 +45,7 @@ const params = (values: Record<string, string | number | undefined>) => {
 
 export const vocabApi = {
   search: (query: string, signal?: AbortSignal) => apiRequest<VocabularyItem[]>(`/api/content/vocabulary/search${params({ query })}`, { auth: true, signal }),
-  listDecks: (page = 0, size = 50) => apiRequest<PageResponse<FlashcardDeck>>(`${decksPath}${params({ page, size })}`, { auth: true }),
+  listDecks: (page = 0, size = 50, status: LibraryStatus = 'ACTIVE') => apiRequest<PageResponse<FlashcardDeck>>(`${decksPath}${params({ page, size, status })}`, { auth: true }),
   getDeck: (deckId: string) => apiRequest<FlashcardDeck>(`${decksPath}/${encodeURIComponent(deckId)}`, { auth: true }),
   createDeck: (draft: DeckDraft) => apiRequest<FlashcardDeck>(decksPath, { method: 'POST', body: draft, auth: true }),
   updateDeck: (deckId: string, draft: DeckDraft, status: LibraryStatus = 'ACTIVE') => apiRequest<FlashcardDeck>(`${decksPath}/${encodeURIComponent(deckId)}`, { method: 'PUT', body: { ...draft, status }, auth: true }),
@@ -53,11 +53,11 @@ export const vocabApi = {
   listDeckItems: (deckId: string, page = 0, size = 50) => apiRequest<PageResponse<DeckItem>>(`${decksPath}/${encodeURIComponent(deckId)}/items${params({ page, size })}`, { auth: true }),
   addDeckItem: (deckId: string, flashcardId: string, sortOrder?: number) => apiRequest<void>(`${decksPath}/${encodeURIComponent(deckId)}/items`, { method: 'POST', body: { flashcardId, sortOrder }, auth: true }),
   removeDeckItem: (deckId: string, flashcardId: string) => apiRequest<void>(`${decksPath}/${encodeURIComponent(deckId)}/items/${encodeURIComponent(flashcardId)}`, { method: 'DELETE', auth: true }),
-  listCards: (page = 0, size = 50) => apiRequest<PageResponse<Flashcard>>(`${cardsPath}${params({ page, size })}`, { auth: true }),
+  listCards: (page = 0, size = 50, status: LibraryStatus = 'ACTIVE') => apiRequest<PageResponse<Flashcard>>(`${cardsPath}${params({ page, size, status })}`, { auth: true }),
   dueCards: (deckId?: string, page = 0, limit = 20) => apiRequest<PageResponse<Flashcard>>(`${cardsPath}/due${params({ deckId, page, limit })}`, { auth: true }),
   getCard: (cardId: string) => apiRequest<Flashcard>(`${cardsPath}/${encodeURIComponent(cardId)}`, { auth: true }),
   createCard: (draft: FlashcardDraft) => apiRequest<Flashcard>(cardsPath, { method: 'POST', body: draft, auth: true }),
-  updateCard: (card: Pick<Flashcard, 'id' | 'sourceType' | 'vocabularySenseId' | 'sourceReferenceId' | 'highlightedText'>, draft: FlashcardContentDraft) => apiRequest<Flashcard>(`${cardsPath}/${encodeURIComponent(card.id)}`, { method: 'PUT', body: { sourceType: card.sourceType, vocabularySenseId: card.vocabularySenseId, sourceReferenceId: card.sourceReferenceId, highlightedText: card.highlightedText, status: 'ACTIVE', ...draft }, auth: true }),
+  updateCard: (card: Pick<Flashcard, 'id' | 'sourceType' | 'vocabularySenseId' | 'sourceReferenceId' | 'highlightedText'>, draft: FlashcardContentDraft, status: LibraryStatus = 'ACTIVE') => apiRequest<Flashcard>(`${cardsPath}/${encodeURIComponent(card.id)}`, { method: 'PUT', body: { sourceType: card.sourceType, vocabularySenseId: card.vocabularySenseId, sourceReferenceId: card.sourceReferenceId, highlightedText: card.highlightedText, status, ...draft }, auth: true }),
   deleteCard: (cardId: string) => apiRequest<void>(`${cardsPath}/${encodeURIComponent(cardId)}`, { method: 'DELETE', auth: true }),
   reviewCard: (cardId: string, correct: boolean, requestId: string) => apiRequest<Flashcard>(`${cardsPath}/${encodeURIComponent(cardId)}/reviews`, { method: 'POST', body: { correct, requestId }, auth: true }),
   uploadImage: (file: { uri: string; name: string; type: string }) => {
