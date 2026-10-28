@@ -35,6 +35,7 @@ import { Card } from '@/src/components/ui/card';
 import { FormAlert } from '@/src/components/ui/form-alert';
 import { Text } from '@/src/components/ui/text';
 import { useAuth, useCurrentUser } from '@/src/features/auth/auth-provider';
+import { useUnread } from '@/src/features/community/use-unread';
 import {
   clearAppSettingsStorage,
   type FontSizeOption,
@@ -89,6 +90,7 @@ export default function AccountScreen() {
   const { data: user, error, isPending, isRefetching, refetch } = useCurrentUser();
   const { settings, update, setDailyXpGoal } = useAppSettings();
   const queryClient = useQueryClient();
+  const unread = useUnread();
   const [signingOut, setSigningOut] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [planId, setPlanId] = useState<PlanId>('basic');
@@ -201,9 +203,28 @@ export default function AccountScreen() {
           />
         ) : undefined
       }>
-      <View className="mb-1">
-        <Text weight="black" className="text-2xl">Hồ sơ</Text>
-        <Text className="mt-1 text-sm text-muted">Thông tin cá nhân và cài đặt</Text>
+      <View className="mb-1 flex-row items-center justify-between">
+        <View>
+          <Text weight="black" className="text-2xl">Hồ sơ</Text>
+          <Text className="mt-1 text-sm text-muted">Thông tin cá nhân và cài đặt</Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Thông báo${(unread.data?.count ?? 0) > 0 ? `, ${unread.data?.count} chưa đọc` : ''}`}
+          onPress={() => {
+            void queryClient.invalidateQueries({ queryKey: ['community', 'notifications'] });
+            void queryClient.invalidateQueries({ queryKey: ['community', 'unread'] });
+            router.push('/community/notifications' as never);
+          }}
+          className="h-12 w-12 items-center justify-center rounded-2xl border border-line bg-surface"
+        >
+          <Bell size={21} color={colors.accent} />
+          {(unread.data?.count ?? 0) > 0 ? (
+            <View className="absolute right-1 top-1 min-w-4 items-center rounded-full px-1" style={{ backgroundColor: colors.danger }}>
+              <Text weight="bold" className="text-[9px] text-white">{unread.data!.count > 99 ? '99+' : unread.data!.count}</Text>
+            </View>
+          ) : null}
+        </Pressable>
       </View>
 
       {/* Header user */}

@@ -1,11 +1,9 @@
-import { Bell, BookOpenCheck, House, Layers, UserRound, Users } from 'lucide-react-native';
+import { BookOpenCheck, House, Layers, UserRound, Users } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useQueryClient } from '@tanstack/react-query';
 import type { BottomTabBarProps } from 'expo-router/build/react-navigation/bottom-tabs/types';
 
 import { Text } from '@/src/components/ui/text';
-import { useUnread } from '@/src/features/community/use-unread';
 import { colors, spacing, touchTarget } from '@/src/theme';
 
 const tabs = {
@@ -13,16 +11,11 @@ const tabs = {
   flashcards: { label: 'Thẻ từ', Icon: BookOpenCheck },
   practice: { label: 'Luyện', Icon: Layers },
   community: { label: 'Cộng đồng', Icon: Users },
-  notifications: { label: 'Thông báo', Icon: Bell },
   account: { label: 'Hồ sơ', Icon: UserRound },
 };
 
 export function ColorfulTabBar({ state, emitter, navigateToTab }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const unread = useUnread();
-  const queryClient = useQueryClient();
-  const unreadCount = unread.data?.count ?? 0;
-
   return (
     <View
       style={{
@@ -39,14 +32,10 @@ export function ColorfulTabBar({ state, emitter, navigateToTab }: BottomTabBarPr
         .map((route) => {
           const { label, Icon } = tabs[route.name as keyof typeof tabs];
           const focused = state.routes[state.index]?.key === route.key;
-          const hasUnread = route.name === 'notifications' && unreadCount > 0;
-
           const onPress = () => {
             const event = emitter.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
             if (event.defaultPrevented) return;
 
-            void queryClient.invalidateQueries({ queryKey: ['community', 'unread'] });
-            if (route.name === 'notifications') void queryClient.invalidateQueries({ queryKey: ['community', 'notifications'] });
             if (!focused) navigateToTab(route.key);
           };
 
@@ -55,7 +44,7 @@ export function ColorfulTabBar({ state, emitter, navigateToTab }: BottomTabBarPr
               key={route.key}
               accessibilityRole="tab"
               accessibilityState={{ selected: focused }}
-              accessibilityLabel={`${label}${hasUnread ? `, ${unreadCount} chưa đọc` : ''}`}
+              accessibilityLabel={label}
               onPress={onPress}
               onLongPress={() => emitter.emit({ type: 'tabLongPress', target: route.key })}
               style={{
@@ -75,22 +64,6 @@ export function ColorfulTabBar({ state, emitter, navigateToTab }: BottomTabBarPr
                   backgroundColor: focused ? colors.accentSoft : 'transparent',
                 }}>
                 <Icon size={21} color={focused ? colors.accentDeep : colors.muted} strokeWidth={focused ? 2.3 : 1.8} />
-                {hasUnread ? (
-                  <View
-                    style={{
-                      position: 'absolute',
-                      right: 5,
-                      top: 0,
-                      minWidth: 17,
-                      paddingHorizontal: 4,
-                      borderRadius: 10,
-                      backgroundColor: colors.danger,
-                    }}>
-                    <Text weight="bold" style={{ color: '#fff', fontSize: 9, textAlign: 'center' }}>
-                      {unreadCount > 99 ? '99+' : unreadCount}
-                    </Text>
-                  </View>
-                ) : null}
               </View>
               <Text
                 weight={focused ? 'bold' : 'medium'}

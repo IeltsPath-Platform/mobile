@@ -11,7 +11,7 @@ export default function TabLayout() {
     <Tabs.Screen name="flashcards" options={{ title: 'Flashcards' }} />
     <Tabs.Screen name="practice" options={{ title: 'Luyện' }} />
     <Tabs.Screen name="community" options={{ title: 'Cộng đồng' }} />
-    <Tabs.Screen name="notifications" options={{ title: 'Thông báo' }} />
+    <Tabs.Screen name="notifications" options={{ href: null }} />
     <Tabs.Screen name="account" options={{ title: 'Hồ sơ' }} />
     <Tabs.Screen name="profile" options={{ href: null }} />
   </Tabs>;
