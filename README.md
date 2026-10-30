@@ -21,7 +21,7 @@ Copy `.env.example` to `.env` (npm install does this when `.env` is missing).
 
 - `EXPO_PUBLIC_API_BASE_URL`: optional API origin. Leave unset for LAN auto-detection. Use `http://10.0.2.2:8080` for an Android emulator or `http://localhost:8080` for the iOS Simulator.
 - `EXPO_PUBLIC_API_PORT`: optional gateway port, default `8080`.
-- `MOBILE_LAN_HOST`: optional PC Wi-Fi/Ethernet IPv4 address when the computer has multiple network adapters.
+- `MOBILE_LAN_HOST`: optional override for the PC's Wi-Fi/Ethernet IPv4 address. The startup script automatically prefers Wi-Fi, then Ethernet, and skips common virtual adapters; set this only if automatic selection picks the wrong network.
 - `EXPO_PUBLIC_AUTH_ENABLED`: backend authentication toggle, default `true`.
 - `EXPO_PUBLIC_USE_MOCK_LEARNING`: learning-path mock toggle, default `false`.
 

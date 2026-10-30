@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
-import { Bookmark, CheckCircle2, ChevronDown, Heart, Image as ImageIcon, Lightbulb, MessageCircle, MoreHorizontal, Search, ThumbsUp, Users } from 'lucide-react-native';
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { Bookmark, CheckCircle2, Heart, Image as ImageIcon, Lightbulb, MessageCircle, MoreHorizontal, Search, ThumbsUp, Users } from 'lucide-react-native';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, ScrollView, TextInput, View } from 'react-native';
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
@@ -11,6 +11,7 @@ import { useAuth, useCurrentUser } from '@/src/features/auth/auth-provider';
 import { communityApi, type CommunityPost, type PostCategory, type ReactionType } from '@/src/features/community/api';
 import { communityCategoryColor } from '@/src/features/community/community-colors';
 import { CommunityAvatar, CommunityImage } from '@/src/features/community/components/community-image';
+import { CommunityReactionControl } from '@/src/features/community/components/community-reaction-control';
 import { colors } from '@/src/theme';
 
 const categories: { key?: PostCategory; label: string }[] = [
@@ -39,8 +40,8 @@ function reportPost(post: CommunityPost, run: (fn: () => Promise<unknown>) => Pr
   ]);
 }
 const CommunityCard = memo(function CommunityCard({ post, userId, onOpen }: { post: CommunityPost; userId?: string; onOpen: (id: string) => void }) {
-  const router = useRouter(); const qc = useQueryClient(); const own = userId === post.authorId; const [showReactions, setShowReactions] = useState(false); const [actionBusy, setActionBusy] = useState(false);
-  const selected = post.myReaction as ReactionType | null | undefined; const selectedMeta = selected ? reactionMeta[selected] : undefined;
+  const router = useRouter(); const qc = useQueryClient(); const own = userId === post.authorId; const [actionBusy, setActionBusy] = useState(false);
+  const selected = post.myReaction as ReactionType | null | undefined;
   const run = async (op: () => Promise<unknown>, keys: readonly (readonly unknown[])[] = [feedKey]) => {
     if (actionBusy) return;
     setActionBusy(true);
@@ -48,7 +49,7 @@ const CommunityCard = memo(function CommunityCard({ post, userId, onOpen }: { po
     catch (e) { Alert.alert('Không thể cập nhật', e instanceof Error ? e.message : 'Vui lòng thử lại.'); }
     finally { setActionBusy(false); }
   };
-  const selectReaction = (type: ReactionType) => { setShowReactions(false); void run(() => selected === type ? communityApi.removeReaction(post.id, type) : communityApi.react(post.id, type)); };
+  const selectReaction = (type: ReactionType) => { void run(() => selected === type ? communityApi.removeReaction(post.id, type) : communityApi.react(post.id, type)); };
   const total = Object.values(post.reactionCounts ?? {}).reduce((sum, count) => sum + count, 0);
   const report = () => reportPost(post, run);
   const ownerMenu = () => Alert.alert(own ? 'Quản lý bài viết' : 'Tuỳ chọn bài viết', undefined, [
@@ -79,9 +80,8 @@ const CommunityCard = memo(function CommunityCard({ post, userId, onOpen }: { po
     </Pressable>
     {total > 0 ? <View className="flex-row items-center px-4 pb-2 pt-3"><View className="mr-2 flex-row">{(Object.entries(post.reactionCounts ?? {}) as [ReactionType, number][]).filter(([, count]) => count > 0).slice(0, 3).map(([type]) => { const MetaIcon = reactionMeta[type]?.icon ?? ThumbsUp; return <View key={type} className="-ml-1 h-5 w-5 items-center justify-center rounded-full border border-white bg-surface"><MetaIcon size={14} color={reactionMeta[type]?.color ?? colors.accent} fill={type === 'LOVE' ? reactionMeta[type].color : 'transparent'} /></View>; })}</View><Text className="text-xs text-muted">{total}</Text><Text className="ml-auto text-xs text-muted">{post.commentCount} bình luận</Text></View> : <View className="h-px bg-slate-100 mx-4" />}
     <View className="mx-4 border-t border-line" />
-    {showReactions ? <View className="flex-row justify-around px-2 pt-2">{(Object.keys(reactionMeta) as ReactionType[]).map((type) => { const item = reactionMeta[type]; const Icon = item.icon; return <Pressable key={type} disabled={actionBusy} onPress={() => selectReaction(type)} className="items-center rounded-xl px-2 py-2" accessibilityLabel={item.label}><Icon size={20} color={item.color} /><Text className="mt-1 text-[10px]" style={{ color: item.color }}>{item.label}</Text></Pressable>; })}</View> : null}
     <View className="flex-row items-center justify-around px-1 py-1">
-      <View className="flex-1 flex-row items-center"><Pressable disabled={actionBusy} onPress={() => selected ? selectReaction(selected) : selectReaction('LIKE')} onLongPress={() => setShowReactions(true)} delayLongPress={350} className="min-h-11 flex-1 flex-row items-center justify-center gap-2 rounded-lg" accessibilityRole="button" accessibilityLabel="Thả cảm xúc"><ThumbsUp size={18} color={selectedMeta?.color ?? colors.muted} fill={selected === 'LIKE' ? colors.accent : 'transparent'} /><Text weight="semibold" className="text-xs" style={{ color: selectedMeta?.color ?? colors.muted }}>{selectedMeta?.label ?? 'Thích'}</Text></Pressable><Pressable disabled={actionBusy} onPress={() => setShowReactions((open) => !open)} className="h-11 w-9 items-center justify-center rounded-lg" accessibilityRole="button" accessibilityLabel="Chọn cảm xúc khác" accessibilityState={{ expanded: showReactions }}><ChevronDown size={15} color={colors.muted} /></Pressable></View>
+      <CommunityReactionControl selected={selected} disabled={actionBusy} onSelect={selectReaction} />
       <Pressable onPress={() => onOpen(post.id)} className="min-h-11 flex-1 flex-row items-center justify-center gap-2 rounded-lg"><MessageCircle size={18} color={colors.muted} /><Text weight="semibold" className="text-xs text-muted">Bình luận</Text></Pressable>
       <Pressable onPress={() => void run(() => communityApi.bookmark(post.id, post.bookmarkedByMe), [feedKey, ['community', 'bookmarks'], ['community', 'detail', post.id]])} disabled={actionBusy} className="min-h-11 flex-1 flex-row items-center justify-center gap-2 rounded-lg"><Bookmark size={18} color={post.bookmarkedByMe ? colors.accent : colors.muted} fill={post.bookmarkedByMe ? colors.accent : 'transparent'} /><Text weight="semibold" className="text-xs" style={{ color: post.bookmarkedByMe ? colors.accent : colors.muted }}>{post.bookmarkedByMe ? 'Đã lưu' : 'Lưu'}</Text></Pressable>
     </View>
@@ -93,6 +93,12 @@ export default function CommunityScreen() {
   const [category, setCategory] = useState<PostCategory | undefined>(); const [search, setSearch] = useState(''); const [q, setQ] = useState('');
   useEffect(() => { const id = setTimeout(() => setQ(search.trim().slice(0, 120)), 350); return () => clearTimeout(id); }, [search]);
   const feed = useInfiniteQuery({ queryKey: [...feedKey, scope, category, q], enabled: authEnabled && status === 'authenticated', staleTime: 0, initialPageParam: undefined as string | undefined, queryFn: ({ pageParam }) => communityApi.feed(pageParam, scope, category, q), getNextPageParam: (last) => last.hasNext ? last.nextCursor ?? undefined : undefined });
+  const hasFocusedFeed = useRef(false);
+  useFocusEffect(useCallback(() => {
+    if (status !== 'authenticated') return;
+    if (hasFocusedFeed.current) void feed.refetch();
+    hasFocusedFeed.current = true;
+  }, [feed.refetch, status]));
   const posts = useMemo(() => {
     const seen = new Set<string>();
     return (feed.data?.pages.flatMap((page) => page.content) ?? []).filter((post) => {

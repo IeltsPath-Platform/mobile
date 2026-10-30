@@ -4,14 +4,18 @@ import { pathToFileURL } from 'node:url';
 
 export function selectLanHost(interfaces = os.networkInterfaces(), requested = process.env.MOBILE_LAN_HOST) {
   const candidates = Object.entries(interfaces).flatMap(([name, entries]) =>
-    (entries ?? []).filter((entry) => entry.family === 'IPv4' && !entry.internal)
+    (entries ?? []).filter((entry) => entry.family === 'IPv4' && !entry.internal && !entry.address.startsWith('169.254.'))
       .map((entry) => ({ name, host: entry.address })));
   if (requested) {
     if (!candidates.some((item) => item.host === requested)) throw new Error('MOBILE_LAN_HOST must be an IPv4 address assigned to this machine.');
     return requested;
   }
-  const physical = candidates.filter(({ name }) => !/virtual|vethernet|wsl|docker|vpn|tun|tap|loopback|bluetooth|vmware|vbox/i.test(name));
-  if (physical.length !== 1) throw new Error(`Found ${physical.length} possible LAN addresses. Set MOBILE_LAN_HOST to your Wi-Fi/Ethernet IPv4 address.`);
+  const physical = candidates.filter(({ name }) =>
+    !/virtual|vethernet|wsl|docker|vpn|tun|tap|loopback|bluetooth|vmware|vbox|wi.?fi direct|local area connection\*/i.test(name));
+  if (!physical.length) throw new Error('No usable Wi-Fi/Ethernet IPv4 address found. Connect to a network or set MOBILE_LAN_HOST.');
+  const rank = ({ name }) => /wi.?fi|wireless|wlan/i.test(name) ? 3 : /ethernet|en\d+/i.test(name) ? 2 : 1;
+  physical.sort((a, b) => rank(b) - rank(a) || a.name.localeCompare(b.name) || a.host.localeCompare(b.host));
+  if (physical.length > 1) console.warn(`Multiple network adapters found; using ${physical[0].name} (${physical[0].host}). Set MOBILE_LAN_HOST to override.`);
   return physical[0].host;
 }
 

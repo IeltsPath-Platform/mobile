@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Bookmark, CheckCircle2, Flag, Heart, Lightbulb, MessageCircle, MoreHorizontal, Send, ThumbsUp } from 'lucide-react-native';
+import { ArrowLeft, Bookmark, Flag, MessageCircle, MoreHorizontal, Send } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Modal, Pressable, RefreshControl, ScrollView, TextInput, View, type ScrollViewInstance } from 'react-native';
 import { Button } from '@/src/components/ui/button';
@@ -9,12 +9,9 @@ import { Text } from '@/src/components/ui/text';
 import { useCurrentUser } from '@/src/features/auth/auth-provider';
 import { communityApi, insertMention, parseMentionMarkup, type Comment, type CommunityPost, type ReactionType } from '@/src/features/community/api';
 import { CommunityAvatar, CommunityImage } from '@/src/features/community/components/community-image';
+import { CommunityReactionControl } from '@/src/features/community/components/community-reaction-control';
 import { colors } from '@/src/theme';
 
-const reactions: { type: ReactionType; label: string; Icon: typeof ThumbsUp; color: string }[] = [
-  { type: 'LIKE', label: 'Thích', Icon: ThumbsUp, color: '#1877f2' }, { type: 'LOVE', label: 'Yêu thích', Icon: Heart, color: '#e41e3f' },
-  { type: 'HELPFUL', label: 'Hữu ích', Icon: Lightbulb, color: '#d97706' }, { type: 'ACCURATE', label: 'Chính xác', Icon: CheckCircle2, color: '#059669' },
-];
 const backgroundColors: Record<string, string> = { VIOLET: '#5b21b6', CRIMSON: '#9f1239', MIDNIGHT: '#0f172a', SUNSET: '#9a3412', OCEAN: '#075985', FOREST: '#065f46', ROSE: '#86198f', AURORA: '#115e59' };
 
 export default function PostDetailScreen() {
@@ -75,7 +72,7 @@ export default function PostDetailScreen() {
         {item.imageUrls?.map((url, index) => <CommunityImage key={url} uri={url} label={`Ảnh ${index + 1} trong bài viết`} className="mb-1 h-64 w-full" />)}
         {item.videoUrl ? <Pressable onPress={() => void Linking.openURL(item.videoUrl!).catch(() => Alert.alert('Không mở được video'))} className="mx-4 mb-3 min-h-11 flex-row items-center justify-center rounded-xl" style={{ backgroundColor: colors.accentSoft }}><Text weight="bold" className="text-sm text-accent">Mở video đính kèm ↗</Text></Pressable> : null}
         <View className="mx-4 border-t border-line" />
-        <View className="flex-row items-center justify-around px-2 py-1">{reactions.map(({ type, label, Icon, color }) => <Pressable key={type} onPress={() => void react(item, type)} className="min-h-11 flex-1 flex-row items-center justify-center gap-1"><Icon size={18} color={item.myReaction === type ? color : colors.muted} fill={type === 'LOVE' && item.myReaction === type ? color : 'transparent'} /><Text className="text-[10px]" style={{ color: item.myReaction === type ? color : colors.muted }}>{label}</Text></Pressable>)}<Pressable onPress={() => void toggleBookmark(item)} disabled={bookmarkBusy} className="h-11 w-10 items-center justify-center"><Bookmark size={18} color={item.bookmarkedByMe ? colors.accent : colors.muted} fill={item.bookmarkedByMe ? colors.accent : 'transparent'} /></Pressable>{!own ? <Pressable onPress={() => report('POST', item.id)} className="h-11 w-10 items-center justify-center"><Flag size={17} color={colors.muted} /></Pressable> : null}</View>
+        <View className="flex-row items-center px-2 py-1"><CommunityReactionControl selected={item.myReaction as ReactionType | null | undefined} onSelect={(type) => void react(item, type)} /><Pressable onPress={() => void toggleBookmark(item)} disabled={bookmarkBusy} className="h-11 w-11 items-center justify-center" accessibilityRole="button" accessibilityLabel={item.bookmarkedByMe ? 'Bỏ lưu bài viết' : 'Lưu bài viết'}><Bookmark size={18} color={item.bookmarkedByMe ? colors.accent : colors.muted} fill={item.bookmarkedByMe ? colors.accent : 'transparent'} /></Pressable>{!own ? <Pressable onPress={() => report('POST', item.id)} className="h-11 w-11 items-center justify-center" accessibilityRole="button" accessibilityLabel="Báo cáo bài viết"><Flag size={17} color={colors.muted} /></Pressable> : null}</View>
       </View>
       <View className="mb-2 mt-6 flex-row items-center justify-between"><Text weight="bold" className="text-lg">Bình luận</Text><Text className="text-sm text-muted">{item.commentCount}</Text></View>
       {comments.isPending ? <ActivityIndicator color={colors.accent} className="py-8" /> : comments.isError ? <View className="py-4"><Button label="Tải lại bình luận" onPress={() => void comments.refetch()} /></View> : commentRows.length ? commentRows.map((comment) => renderComment(comment)) : <Text className="py-6 text-center text-sm text-muted">Chưa có bình luận. Hãy bắt đầu cuộc trò chuyện.</Text>}
