@@ -1,220 +1,86 @@
-import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
-import { router, useFocusEffect, type Href } from 'expo-router';
-import { ChevronRight, UserRound } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { router } from 'expo-router';
+import { BookOpen, CircleUserRound, Flame, Play, Sparkles } from 'lucide-react-native';
+import { useMemo } from 'react';
+import { ActivityIndicator, Image, ImageBackground, Pressable, ScrollView, View } from 'react-native';
 
+import { Button } from '@/src/components/ui/button';
 import { Text } from '@/src/components/ui/text';
-import { learningApi } from '@/src/features/learning';
-import type { TopicLessonsDto } from '@/src/features/learning/types';
-import { LearningPath } from '@/src/features/practice/components/learning-path';
-import { LessonSheet } from '@/src/features/practice/components/lesson-sheet';
-import { ProgressSummary } from '@/src/features/progress/progress-summary';
 import { useCurrentUser } from '@/src/features/auth/auth-provider';
-import {
-  clonePathUnits,
-  completePathNode,
-  findCurrentNode,
-  flattenNodes,
-  mapLessonsToPathUnits,
-  type PathNode,
-  type PathUnit,
-} from '@/src/features/practice/path';
-import { SESSION_DONE_KEY, type SessionDone } from '@/src/features/session/completion';
-import { USE_MOCK_LEARNING } from '@/src/lib/env';
+import { useProgress } from '@/src/features/progress/progress-summary';
+import { useStreak } from '@/src/features/progress/use-streak';
+import { vocabApi } from '@/src/features/vocab/api';
+import { topicCover } from '@/src/features/vocab/topic-artwork';
 import { colors } from '@/src/theme';
+
+const owl = require('@/assets/images/owl/hero-cheer.webp');
+const TOPIC_TINTS = ['#20aaf2', '#ff9951', '#23b88e', '#a175ee', '#e8ad2c'];
 
 export default function HomeScreen() {
   const user = useCurrentUser();
-  const httpMode = !USE_MOCK_LEARNING;
   const queryClient = useQueryClient();
-  const [mockUnits, setMockUnits] = useState(() => clonePathUnits());
-  const [selected, setSelected] = useState<PathNode | null>(null);
-  const [mascotNodeId, setMascotNodeId] = useState<string | null>(
-    () => findCurrentNode(clonePathUnits())?.id ?? null,
-  );
-  const [travelToNodeId, setTravelToNodeId] = useState<string | null>(null);
-  const [pendingUnlock, setPendingUnlock] = useState<string | null>(null);
+  const progress = useProgress();
+  const streak = useStreak();
+  const topicsQuery = useQuery({ queryKey: ['vocab', 'topics'], queryFn: ({ signal }) => vocabApi.listTopics(signal), staleTime: 5 * 60_000 });
+  const topics = useMemo(() => [...(topicsQuery.data ?? [])].sort((a, b) => a.sortOrder - b.sortOrder), [topicsQuery.data]);
 
-  const topicsQuery = useQuery({
-    queryKey: ['learning', 'topics'],
-    queryFn: () => learningApi.listTopics(),
-    enabled: httpMode,
-  });
-
-  const topicIds = useMemo(
-    () => (httpMode ? (topicsQuery.data ?? []).filter((topic) => topic.status !== 'LOCKED').map((topic) => topic.topicId) : []),
-    [httpMode, topicsQuery.data],
-  );
-
-  const lessonQueries = useQueries({
-    queries: topicIds.map((topicId) => ({
-      queryKey: ['learning', 'topic', topicId, 'lessons'],
-      queryFn: () => learningApi.getTopicLessons(topicId),
-    })),
-  });
-
-  const lessonSignature = lessonQueries
-    .map((query) => (query.data ? query.data.lessons.map((lesson) => `${lesson.lessonId}:${lesson.status}`).join(',') : query.status))
-    .join('|');
-
-  const mapped = useMemo(() => {
-    const loaded = lessonQueries
-      .map((query) => query.data)
-      .filter((dto): dto is TopicLessonsDto => Boolean(dto));
-    const byTopic = Object.fromEntries(loaded.map((dto) => [dto.topicId, dto.lessons]));
-    return mapLessonsToPathUnits(topicsQuery.data ?? [], byTopic);
-    // lessonQueries identity changes every render; signature captures payload.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [topicsQuery.data, lessonSignature]);
-
-  const lessonsPending = topicIds.length > 0 && lessonQueries.some((query) => query.isPending);
-  const lessonsFailed = lessonQueries.some((query) => query.isError);
-  const waiting = httpMode && (topicsQuery.isPending || (topicsQuery.isSuccess && lessonsPending));
-  const failed = httpMode && (topicsQuery.isError || lessonsFailed);
-  const usingMockPath = !httpMode || failed || (topicsQuery.isSuccess && !waiting && mapped.length === 0);
-  const units: PathUnit[] = usingMockPath ? mockUnits : mapped;
-
-  const usingMockRef = useRef(usingMockPath);
-  usingMockRef.current = usingMockPath;
-  const mockUnitsRef = useRef(mockUnits);
-  mockUnitsRef.current = mockUnits;
-  const travelRef = useRef(travelToNodeId);
-  travelRef.current = travelToNodeId;
-
-  const current = useMemo(() => findCurrentNode(units), [units]);
-  const activeUnit = useMemo(() => {
-    if (current) return units.find((unit) => unit.nodes.some((node) => node.id === current.id)) ?? units[0] ?? null;
-    return units[0] ?? null;
-  }, [units, current]);
-
-  useEffect(() => {
-    if (travelToNodeId || pendingUnlock) return;
-    setMascotNodeId((id) => id ?? findCurrentNode(units)?.id ?? null);
-  }, [units, travelToNodeId, pendingUnlock]);
-
-  useEffect(() => {
-    if (!pendingUnlock || usingMockPath) return;
-    const next = findCurrentNode(units);
-    if (!next) {
-      setPendingUnlock(null);
-      return;
-    }
-    if (next.id === pendingUnlock) return;
-    const from = pendingUnlock;
-    setPendingUnlock(null);
-    setMascotNodeId(from);
-    const timer = setTimeout(() => setTravelToNodeId(next.id), 120);
-    return () => clearTimeout(timer);
-  }, [pendingUnlock, units, usingMockPath]);
-
-  useFocusEffect(
-    useCallback(() => {
-      const payload = queryClient.getQueryData<SessionDone>(SESSION_DONE_KEY);
-      if (!payload?.lessonCompleted) return;
-      queryClient.removeQueries({ queryKey: SESSION_DONE_KEY, exact: true });
-      if (travelRef.current) return;
-      queryClient.setQueryData<number>(['progress', 'sessionXp'], (xp) => (xp ?? 0) + payload.xp);
-      setSelected(null);
-
-      if (usingMockRef.current) {
-        const { units: nextUnits, nextNodeId } = completePathNode(mockUnitsRef.current, payload.nodeId);
-        setMockUnits(nextUnits);
-        setMascotNodeId(payload.nodeId);
-        if (nextNodeId) setTimeout(() => setTravelToNodeId(nextNodeId), 120);
-        return;
-      }
-
-      setMascotNodeId(payload.nodeId);
-      setPendingUnlock(payload.nodeId);
-      void queryClient.invalidateQueries({ queryKey: ['learning'] });
-    }, [queryClient]),
-  );
-
-  const startLesson = (nodeId: string) => {
-    const node = flattenNodes(units).find((item) => item.id === nodeId);
-    router.push({
-      pathname: '/learn/session/[lessonId]',
-      params: { lessonId: nodeId, xp: String(node?.xp ?? 20) },
-    } as unknown as Href);
-  };
-
-  const onMascotArrived = useCallback(() => {
-    setTravelToNodeId((target) => {
-      if (target) setMascotNodeId(target);
-      return null;
-    });
-  }, []);
+  const openTopic = (topicId: string) => router.push({ pathname: '/vocabulary/topics/[topicId]', params: { topicId } });
 
   return (
     <View className="flex-1 bg-canvas">
-      <ScrollView contentContainerClassName="px-5 pb-8 pt-4" showsVerticalScrollIndicator={false}>
-        <View className="mb-1 flex-row items-center justify-between">
-          <View className="flex-1 pr-4">
-            <Text weight="semibold" className="text-sm text-muted">HÔM NAY</Text>
-            <Text weight="black" className="mt-1 text-2xl leading-8">Chào {user.data?.fullName?.split(' ')[0] ?? 'bạn'} 👋</Text>
-            <Text className="mt-1 text-sm text-muted">Mình cùng tiến thêm một bước nhé.</Text>
-          </View>
-          <Pressable accessibilityRole="button" accessibilityLabel="Mở hồ sơ" onPress={() => router.push('/(tabs)/account' as never)} className="h-12 w-12 items-center justify-center rounded-2xl border border-line bg-surface">
-            {user.data?.fullName ? <Text weight="extrabold" className="text-lg text-accent">{user.data.fullName.trim().charAt(0).toUpperCase()}</Text> : <UserRound size={21} color={colors.accentDeep} />}
-          </Pressable>
+      <ScrollView contentContainerClassName="px-5 pb-10 pt-3" showsVerticalScrollIndicator={false}>
+        <View className="mb-3 flex-row items-center justify-between">
+          <View className="h-10 w-10 items-center justify-center rounded-2xl bg-accent-soft"><BookOpen size={20} color={colors.accentDeep} /></View>
+          <View className="items-center"><Text weight="black" className="text-sm text-accent-deep">IELTSPath</Text><Text weight="bold" className="text-[9px] uppercase tracking-[1.8px] text-muted">Học cùng cú</Text></View>
+          <Pressable accessibilityRole="button" accessibilityLabel="Mở hồ sơ" onPress={() => router.push('/(tabs)/account' as never)} className="h-10 w-10 items-center justify-center rounded-2xl border border-line bg-surface"><CircleUserRound size={20} color={colors.accentDeep} /></Pressable>
         </View>
-        <ProgressSummary compact />
 
-        {waiting ? (
-          <View className="mt-10 items-center">
-            <ActivityIndicator color={colors.accent} />
-          </View>
-        ) : null}
+        <View className="mb-4 flex-row gap-2">
+          <View className="min-h-10 flex-1 flex-row items-center justify-center gap-2 rounded-full border border-line bg-surface px-3"><Flame size={16} color="#ff864b" /><Text weight="black" className="text-sm">{streak.currentDays ?? '—'}</Text><Text className="text-xs text-muted">ngày</Text></View>
+          <View className="min-h-10 flex-1 flex-row items-center justify-center gap-2 rounded-full border border-line bg-surface px-3"><Sparkles size={15} color="#e6ad2f" /><Text weight="black" className="text-sm">{progress.data?.totalXp ?? '—'}</Text><Text className="text-xs text-muted">XP</Text></View>
+        </View>
 
-        {!waiting && activeUnit ? (
-          <View className="mb-5 mt-1 rounded-3xl border border-line bg-surface px-4 py-4">
-            <View className="flex-row items-center justify-between gap-3">
-              <View className="flex-1">
-                <Text weight="bold" className="text-xs uppercase tracking-wide text-muted">
-                  {activeUnit.label}
-                </Text>
-                <Text weight="black" className="mt-1 text-xl leading-7">
-                  {activeUnit.title}
-                </Text>
+        <View className="mb-4 flex-row items-center justify-between">
+          <View className="flex-1 pr-2"><Text weight="black" className="text-[23px] leading-7">Hôm nay học gì?</Text><Text className="mt-1 text-sm text-muted">Chọn chủ đề, rồi chọn một bài học.</Text></View>
+          <Image source={owl} resizeMode="contain" accessibilityLabel="Cú IELTSPath cổ vũ bạn" className="h-[54px] w-[52px]" />
+        </View>
+
+        <View className="mb-3 flex-row items-end justify-between">
+          <View><Text weight="black" className="text-lg">Chủ đề từ vựng</Text><Text className="mt-0.5 text-xs text-muted">{topicsQuery.data ? `${topics.length} chủ đề` : 'Ảnh và bài học theo từng chủ đề'}</Text></View>
+          <Pressable accessibilityRole="button" accessibilityLabel="Mở luyện tập" onPress={() => router.push('/(tabs)/practice' as never)} className="h-10 w-10 items-center justify-center rounded-full" style={{ backgroundColor: '#ff9650' }}><Play size={16} color="#17120e" fill="#17120e" /></Pressable>
+        </View>
+
+        {topicsQuery.isPending ? <View className="items-center py-12"><ActivityIndicator color={colors.accent} /><Text className="mt-3 text-sm text-muted">Đang tải chủ đề…</Text></View> : null}
+        {topicsQuery.isError ? <View className="rounded-3xl border border-line bg-surface p-5"><Text weight="bold">Chưa tải được chủ đề</Text><Text className="mt-2 text-sm leading-5 text-muted">Kiểm tra kết nối máy chủ rồi thử lại.</Text><Button className="mt-4" variant="secondary" label="Thử lại" onPress={() => void queryClient.invalidateQueries({ queryKey: ['vocab', 'topics'] })} /></View> : null}
+        {topicsQuery.isSuccess && !topics.length ? <View className="rounded-3xl border border-line bg-surface p-5"><Text weight="bold">Chưa có chủ đề từ vựng</Text><Text className="mt-2 text-sm text-muted">Các chủ đề sẽ hiện ở đây sau khi được xuất bản.</Text></View> : null}
+
+        <View className="flex-row flex-wrap justify-between gap-y-3">
+          {topics.map((topic, index) => {
+            const tint = TOPIC_TINTS[index % TOPIC_TINTS.length];
+            const cover = topicCover(topic);
+            return <Pressable key={topic.id} accessibilityRole="button" accessibilityLabel={`Mở chủ đề ${topic.nameVi || topic.name}`} onPress={() => openTopic(topic.id)} className="w-[48.5%] overflow-hidden rounded-[22px] border border-line bg-surface active:opacity-80">
+              <View className="h-[116px] overflow-hidden" style={{ backgroundColor: `${tint}20` }}>
+                {cover ? <ImageBackground source={{ uri: cover }} resizeMode="cover" className="h-full w-full">
+                  <View className="absolute inset-0 bg-black/20" />
+                  <View className="absolute bottom-2 right-2 h-8 w-8 items-center justify-center rounded-full bg-black/35"><Play size={13} color="#fff" fill="#fff" /></View>
+                </ImageBackground> : <View className="h-full items-center justify-center" style={{ backgroundColor: `${tint}20` }}>
+                  <Image source={owl} resizeMode="contain" className="h-[76px] w-[76px]" />
+                  <View className="absolute bottom-2 right-2 h-8 w-8 items-center justify-center rounded-full bg-surface"><Play size={13} color={tint} fill={tint} /></View>
+                </View>}
               </View>
-              <View className="rounded-full bg-accent-soft px-3 py-1.5">
-                <Text weight="extrabold" className="text-xs text-accent-deep">
-                  {Math.round(activeUnit.progress * 100)}%
-                </Text>
+              <View className="px-3 pb-3 pt-2.5">
+                <Text weight="black" className="text-sm leading-5" numberOfLines={2}>{topic.nameVi || topic.name}</Text>
+                <Text className="mt-1 text-[11px] text-muted">{topic.wordCount} từ vựng</Text>
               </View>
-            </View>
-            <View className="mt-4 h-2 overflow-hidden rounded-full bg-canvas">
-              <View
-                className="h-full rounded-full bg-accent"
-                style={{ width: `${Math.max(0, Math.min(100, Math.round(activeUnit.progress * 100)))}%` }}
-              />
-            </View>
-            <View className="mt-2 flex-row items-center justify-between">
-              <Text className="text-xs text-muted">Tiếp tục lộ trình của bạn</Text>
-              <ChevronRight size={15} color={colors.muted} />
-            </View>
-          </View>
-        ) : null}
+            </Pressable>;
+          })}
+        </View>
 
-        {!waiting ? (
-          <View>
-          <View className="mb-2 flex-row items-end justify-between">
-            <View><Text weight="black" className="text-xl">Lộ trình học</Text><Text className="mt-1 text-sm text-muted">Học đều mỗi ngày, vững vàng từng bước.</Text></View>
-          </View>
-          <LearningPath
-            units={units}
-            onSelectNode={setSelected}
-            mascotNodeId={mascotNodeId}
-            travelToNodeId={travelToNodeId}
-            onMascotArrived={onMascotArrived}
-            quietUnitId={activeUnit?.id ?? null}
-          />
-          </View>
-        ) : null}
+        <Pressable accessibilityRole="button" onPress={() => router.push('/(tabs)/flashcards' as never)} className="mt-5 min-h-[60px] flex-row items-center gap-3 rounded-3xl border border-line bg-surface px-4">
+          <View className="h-9 w-9 items-center justify-center rounded-xl" style={{ backgroundColor: '#ff965030' }}><BookOpen size={19} color="#ff9650" /></View>
+          <View className="flex-1"><Text weight="bold">Ôn lại từ đã lưu</Text><Text className="mt-0.5 text-xs text-muted">Mở thư viện flashcard của bạn</Text></View>
+        </Pressable>
       </ScrollView>
-
-      <LessonSheet node={selected} visible={selected != null} onClose={() => setSelected(null)} onStart={startLesson} />
     </View>
   );
 }

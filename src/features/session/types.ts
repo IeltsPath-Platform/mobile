@@ -20,11 +20,9 @@ export type SessionBlock = {
 };
 
 export type SessionSource = {
-  mode: 'api' | 'local';
   title: string;
   lessonId: string;
   blocks: SessionBlock[];
-  key?: Record<string, { correct: string; explanation: string }>;
 };
 
 export type RunnerStatus = 'loading' | 'error' | 'empty' | 'answering' | 'feedback' | 'summary';

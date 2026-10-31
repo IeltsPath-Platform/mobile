@@ -3,11 +3,7 @@ import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { isLearningApiError, learningApi } from '@/src/features/learning';
 import type { LearningApiError } from '@/src/features/learning/api-error';
 import type { ReviewRefDto } from '@/src/features/learning/types';
-import { USE_MOCK_LEARNING } from '@/src/lib/env';
-
 import { sessionFromLesson } from './from-lesson';
-import { answersMatch } from './question-kind';
-import { localSessionSource } from './mock-questions';
 import type { Graded, RunnerState, SessionBlock, SessionSource } from './types';
 
 function newRequestId() {
@@ -45,7 +41,6 @@ type Action =
   | { type: 'failed'; message: string; reviews: ReviewRefDto[] }
   | { type: 'empty'; title: string }
   | { type: 'draft'; value: string }
-  | { type: 'local-feedback'; answer: string; graded: Graded }
   | { type: 'save-advance'; answer: string }
   | { type: 'submitting'; answer: string }
   | { type: 'submitted'; graded: Record<string, Graded>; blockPassed: boolean; lessonCompleted: boolean }
@@ -68,20 +63,6 @@ function reducer(state: RunnerState, action: Action): RunnerState {
     case 'draft':
       if (state.status !== 'answering') return state;
       return { ...state, draft: action.value };
-    case 'local-feedback': {
-      if (!block) return state;
-      const question = block.questions[state.index];
-      return {
-        ...state,
-        status: 'feedback',
-        draft: action.answer,
-        answers: { ...state.answers, [question.id]: action.answer },
-        graded: { ...state.graded, [question.id]: action.graded },
-        feedback: action.graded,
-        submitting: false,
-        message: null,
-      };
-    }
     case 'save-advance': {
       if (!block) return state;
       const question = block.questions[state.index];
@@ -128,23 +109,13 @@ function reducer(state: RunnerState, action: Action): RunnerState {
       const next = state.index + 1;
       if (next < block.questions.length) {
         const question = block.questions[next];
-        if (state.source.mode === 'api') {
-          return {
-            ...state,
-            index: next,
-            status: 'feedback',
-            feedback: state.graded[question.id] ?? null,
-            draft: state.answers[question.id] ?? '',
-          };
-        }
-        return { ...state, index: next, status: 'answering', draft: '', feedback: null };
-      }
-
-      if (state.source.mode === 'local') {
-        const correct = Object.values(state.graded).filter((row) => row.correct).length;
-        const total = block.questions.length;
-        const passed = total > 0 && correct / total >= 0.7;
-        return { ...state, status: 'summary', blockPassed: passed, lessonCompleted: passed, feedback: null };
+        return {
+          ...state,
+          index: next,
+          status: 'feedback',
+          feedback: state.graded[question.id] ?? null,
+          draft: state.answers[question.id] ?? '',
+        };
       }
 
       if (!state.blockPassed) {
@@ -231,7 +202,6 @@ export function useSessionRunner(lessonId: string) {
         dispatch({
           type: 'loaded',
           source: {
-            mode: 'api',
             title: lesson.title,
             lessonId: lesson.lessonId,
             blocks: built.blocks,
@@ -239,10 +209,6 @@ export function useSessionRunner(lessonId: string) {
         });
       } catch (error) {
         if (cancelled) return;
-        if (USE_MOCK_LEARNING && isLearningApiError(error) && (error.status === 404 || error.code === 'NOT_FOUND')) {
-          dispatch({ type: 'loaded', source: localSessionSource(lessonId) });
-          return;
-        }
         dispatch({
           type: 'failed',
           message: isLearningApiError(error) ? friendly(error) : 'Không tải được bài.',
@@ -269,22 +235,6 @@ export function useSessionRunner(lessonId: string) {
     if (!question) return;
     const answer = current.draft.trim();
     if (!answer) return;
-
-    if (current.source.mode === 'local') {
-      busyRef.current = true;
-      const expected = current.source.key?.[question.id];
-      const correct = expected ? answersMatch(answer, expected.correct) : false;
-      dispatch({
-        type: 'local-feedback',
-        answer,
-        graded: {
-          correct,
-          correctAnswer: expected?.correct,
-          explanation: expected?.explanation,
-        },
-      });
-      return;
-    }
 
     const isLast = current.index >= block.questions.length - 1;
     if (!isLast) {
@@ -338,7 +288,7 @@ export function useSessionRunner(lessonId: string) {
     const block = currentBlock(current.source, current.blockIndex);
     const atEnd = Boolean(block && current.index + 1 >= block.questions.length);
     const more = Boolean(current.source && current.blockIndex < current.source.blocks.length - 1);
-    if (atEnd && current.blockPassed && more && current.source?.mode === 'api') {
+    if (atEnd && current.blockPassed && more) {
       requestIdRef.current = newRequestId();
     }
     dispatch({ type: 'continue' });

@@ -37,13 +37,6 @@ export default function TopicDetailScreen() {
     queryFn: () => learningApi.getPendingReviews(),
   });
 
-  const completeL2 = useMutation({
-    mutationFn: () => learningApi.completeLesson('20000000-0000-4000-8000-000000000102'),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['learning'] });
-    },
-  });
-
   const assignTest = useMutation({
     mutationFn: () => learningApi.createTestAssignment(topicId!),
     onSuccess: async () => {
@@ -80,11 +73,18 @@ export default function TopicDetailScreen() {
   }
 
   const data = lessonsQuery.data!;
-  const pending = pendingQuery.data ?? [];
+  const pending = pendingQuery.data;
 
   return (
     <ScrollView className="flex-1 bg-canvas" contentContainerClassName="gap-3 px-5 pb-12 pt-4">
-      {pending.length > 0 ? (
+      {pendingQuery.isError ? (
+        <Card>
+          <FormAlert tone="error" message="Không tải được danh sách bài ôn." />
+          <View className="mt-3">
+            <Button label="Thử lại" variant="secondary" onPress={() => void pendingQuery.refetch()} />
+          </View>
+        </Card>
+      ) : pending?.length ? (
         <Card>
           <Text weight="extrabold" className="text-accent-deep">
             Có bài ôn đang chờ
@@ -121,16 +121,6 @@ export default function TopicDetailScreen() {
         );
       })}
 
-      {data.lessons.some((l) => l.code === 'L2' && l.status === 'AVAILABLE') ? (
-        <View className="mb-1">
-          <Button
-            label="Hoàn thành L2 (không có exercise — mock)"
-            loading={completeL2.isPending}
-            variant="secondary"
-            onPress={() => completeL2.mutate()}
-          />
-        </View>
-      ) : null}
       <Card>
         <Text weight="extrabold">Đề cuối chủ đề</Text>
         <Text className="mt-1 text-sm text-muted">{testLabel(data.testStatus)}</Text>
@@ -144,7 +134,7 @@ export default function TopicDetailScreen() {
         ) : null}
         {assignTest.isSuccess ? (
           <Text className="mt-2 text-sm text-success">
-            Đã gán package (mock). Assessment attempt HTTP sẽ nối sau.
+            Đề cuối đã được cấp. Chức năng làm đề chưa được hỗ trợ trên ứng dụng.
           </Text>
         ) : null}
         <View className="mt-3">

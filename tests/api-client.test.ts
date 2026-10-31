@@ -6,7 +6,11 @@ vi.mock('../src/lib/token-storage', () => ({
 }));
 import { apiRequest } from '../src/lib/api-client';
 
-beforeEach(() => { state.tokens = { accessToken: 'old', refreshToken: 'refresh-old' }; vi.unstubAllGlobals(); });
+beforeEach(() => {
+  state.tokens = { accessToken: 'old', refreshToken: 'refresh-old' };
+  vi.unstubAllGlobals();
+  vi.stubGlobal('__DEV__', false);
+});
 const json = (status: number, data: unknown) => new Response(JSON.stringify(data), { status });
 describe('refresh token contract', () => {
   it('shares a rotating refresh across concurrent 401s and sends token in body', async () => {

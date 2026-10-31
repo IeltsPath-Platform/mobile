@@ -25,7 +25,3 @@ export function questionKind(question: SessionQuestion): QuestionKind {
   if (isTfngOptions(question.options)) return 'tfng';
   return 'choice';
 }
-
-export function answersMatch(given: string, expected: string): boolean {
-  return given.trim().toLowerCase() === expected.trim().toLowerCase();
-}

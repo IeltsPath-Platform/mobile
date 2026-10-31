@@ -45,15 +45,7 @@ export function createHttpLearningApi(): LearningApi {
       }),
     completeLesson: (lessonId) =>
       learningRequest<LessonCompletionDto>(`/lessons/${lessonId}/complete`, { method: 'POST', body: {} }),
-    getPendingReviews: async () => {
-      // Contract focuses on REVIEW_REQUIRED payloads; optional list may 404 — return [].
-      try {
-        return await learningRequest<ReviewRefDto[]>('/reviews/pending');
-      } catch (error) {
-        if (error instanceof LearningApiError && (error.status === 404 || error.code === 'NOT_FOUND')) return [];
-        throw error;
-      }
-    },
+    getPendingReviews: () => learningRequest<ReviewRefDto[]>('/reviews/pending'),
     getReview: (reviewId) => learningRequest<ReviewDetailDto>(`/reviews/${reviewId}`),
     submitReview: (reviewId, request: ReviewSubmissionRequest) =>
       learningRequest<ReviewSubmissionResultDto>(`/reviews/${reviewId}/submissions`, {

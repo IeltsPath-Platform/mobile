@@ -9,6 +9,7 @@ import { Card } from '@/src/components/ui/card';
 import { Text } from '@/src/components/ui/text';
 import { useAuth } from '@/src/features/auth/auth-provider';
 import { gameApi } from '@/src/features/games/api';
+import { gameErrorMessage } from '@/src/features/games/errors';
 import { isGameAvailable, type PlayerMode, type PlayMode } from '@/src/features/games/types';
 import { colors } from '@/src/theme';
 
@@ -53,13 +54,21 @@ export default function GameCatalogScreen() {
       if (mode === 'MULTIPLAYER') return { room, match: null };
       await gameApi.ready(room.id, true);
       try { return { room, match: await gameApi.start(room.id) }; }
-      catch (reason) { const latest = await gameApi.getRoom(room.id); if (latest.status === 'IN_MATCH' && latest.activeMatchId) return { room: latest, match: await gameApi.getMatch(latest.activeMatchId) }; throw reason; }
+      catch (reason) {
+        try {
+          const latest = await gameApi.getRoom(room.id);
+          if (latest.status === 'IN_MATCH' && latest.activeMatchId) return { room: latest, match: await gameApi.getMatch(latest.activeMatchId) };
+        } catch {
+          // Preserve the start error; the follow-up room lookup is only recovery for a lost response.
+        }
+        throw reason;
+      }
     },
     onSuccess: ({ room, match }) => {
       void active.refetch();
       router.push(match ? routeForMatch(room.gameType === 'ROCKET' ? 'ROCKET' : 'WORDLY', match.matchId) : `/games/rooms/${room.id}` as never);
     },
-    onError: (reason) => { setError(reason instanceof Error ? reason.message : 'Không tạo được phòng.'); void active.refetch(); },
+    onError: (reason) => { setError(gameErrorMessage(reason)); void active.refetch(); },
   });
   const join = useMutation({
     mutationFn: () => { const normalized = code.trim().toUpperCase(); if (!/^[A-Z0-9]{6}$/.test(normalized)) throw new Error('Mã phòng cần đúng 6 chữ hoặc số.'); return gameApi.join(normalized); },

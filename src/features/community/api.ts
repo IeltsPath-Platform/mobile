@@ -1,4 +1,5 @@
 import { apiRequest, ApiError } from '@/src/lib/api-client';
+import { imageUploadForm } from '@/src/lib/image-upload-form';
 
 export type PostCategory = 'GENERAL' | 'QUESTION' | 'DISCUSSION' | 'WRITING_SHARING' | 'SPEAKING_PARTNER' | 'RESOURCE_TIPS';
 export type PostBackground = 'VIOLET' | 'CRIMSON' | 'MIDNIGHT' | 'SUNSET' | 'OCEAN' | 'FOREST' | 'ROSE' | 'AURORA';
@@ -86,13 +87,12 @@ export const communityApi = {
   preferences: () => apiRequest<NotificationPreference[]>('/api/notifications/preferences', { auth: true }),
   updatePreference: (eventType: string, enabled: boolean) => apiRequest<NotificationPreference>(`/api/notifications/preferences/${encodeURIComponent(eventType)}`, { method: 'PUT', body: { enabled }, auth: true }),
   uploadImage: async (uri: string, name: string, type: string) => {
-    const data = new FormData();
-    data.append('file', { uri, name, type } as unknown as Blob);
+    const data = await imageUploadForm({ uri, name, type });
     try {
       return await apiRequest<{ url: string }>('/api/community/media/images', { method: 'POST', body: data, auth: true });
     } catch (error) {
       if (error instanceof ApiError && error.status === 503) {
-        throw new Error('Kho lưu trữ ảnh trên backend chưa được cấu hình. Tạm thời hãy thêm ảnh bằng đường dẫn HTTPS.');
+        throw new Error('Dịch vụ lưu ảnh đang tạm thời không phản hồi. Hãy thử lại sau ít phút.');
       }
       throw error;
     }

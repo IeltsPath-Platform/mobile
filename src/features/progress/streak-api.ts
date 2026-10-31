@@ -9,5 +9,5 @@ export type StreakResponse = {
 };
 
 export const streakApi = {
-  get: () => apiRequest<StreakResponse>('/api/learning-support/streak', { auth: true }),
+  get: () => apiRequest<StreakResponse>('/api/learning/me/streak', { auth: true }),
 };

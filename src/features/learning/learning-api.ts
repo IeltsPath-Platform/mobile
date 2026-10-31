@@ -12,10 +12,7 @@ import type {
   TopicSummaryDto,
 } from './types';
 
-/**
- * Learner learning-path API — paths under `/api/learning/**`.
- * Assessment attempt methods are optional for Reading MVP mock UI.
- */
+/** Learner learning-path API — paths under `/api/learning/**`. */
 export interface LearningApi {
   listTopics(): Promise<TopicSummaryDto[]>;
   getTopicLessons(topicId: string): Promise<TopicLessonsDto>;
@@ -30,8 +27,4 @@ export interface LearningApi {
   getReview(reviewId: string): Promise<ReviewDetailDto>;
   submitReview(reviewId: string, request: ReviewSubmissionRequest): Promise<ReviewSubmissionResultDto>;
   createTestAssignment(topicId: string): Promise<TestAssignmentDto>;
-}
-
-export interface MockLearningControls {
-  reset(): void;
 }

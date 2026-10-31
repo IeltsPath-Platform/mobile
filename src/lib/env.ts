@@ -17,6 +17,3 @@ export const REQUEST_TIMEOUT_MS = 15_000;
 
 // Login is required unless this is exactly "false" (local UI work without the gateway).
 export const AUTH_ENABLED = process.env.EXPO_PUBLIC_AUTH_ENABLED !== 'false';
-
-/** Learning path: mock by default; set false to use Gateway `/api/learning/**`. */
-export const USE_MOCK_LEARNING = process.env.EXPO_PUBLIC_USE_MOCK_LEARNING !== 'false';

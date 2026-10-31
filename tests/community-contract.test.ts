@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-vi.mock('../src/lib/api-client', () => ({ apiRequest: vi.fn(), ApiError: class ApiError extends Error { status = 503; } }));
+vi.mock('@/src/lib/api-client', () => ({ apiRequest: vi.fn(), ApiError: class ApiError extends Error { status = 503; } }));
+vi.mock('@/src/lib/image-upload-form', () => ({ imageUploadForm: vi.fn() }));
 import { insertMention, notificationHasNext, parseMentionMarkup, parseOffsetPage } from '../src/features/community/api';
 
 describe('community mobile contracts', () => {

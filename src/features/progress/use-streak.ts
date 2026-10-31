@@ -4,7 +4,7 @@ import { useAuth } from '@/src/features/auth/auth-provider';
 
 import { streakApi } from './streak-api';
 
-/** Missing or failed live data stays unavailable, never replaced with demo values. */
+/** Missing or failed live data remains unavailable. */
 export function useStreak() {
   const { authEnabled, status } = useAuth();
   const enabled = authEnabled && status === 'authenticated';
@@ -19,12 +19,9 @@ export function useStreak() {
 
   const currentDays = enabled && query.data ? query.data.currentDays : null;
   const longestDays = enabled && query.data ? query.data.longestDays : null;
-  const isMock = false;
-
   return {
     currentDays,
     longestDays,
-    isMock,
     isPending: enabled && query.isPending,
     isRefetching: query.isRefetching,
     refetch: query.refetch,

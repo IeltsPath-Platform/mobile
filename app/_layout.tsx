@@ -136,6 +136,8 @@ function RootNavigator() {
         <Stack.Protected guard={enterApp}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="progress" />
+          <Stack.Screen name="profile/edit" options={{ headerShown: false }} />
+          <Stack.Screen name="profile/change-password" options={{ headerShown: false }} />
           <Stack.Screen name="games" />
           <Stack.Screen name="learn" options={{ headerShown: false }} />
           <Stack.Screen name="flashcards" options={{ headerShown: false }} />

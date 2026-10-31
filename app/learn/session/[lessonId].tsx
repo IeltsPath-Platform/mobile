@@ -17,8 +17,7 @@ import { useSessionRunner } from '@/src/features/session/use-session-runner';
 import { colors } from '@/src/theme';
 
 export default function SessionScreen() {
-  const { lessonId, xp: xpParam } = useLocalSearchParams<{ lessonId: string; xp?: string }>();
-  const xp = Number(xpParam) > 0 ? Number(xpParam) : 20;
+  const { lessonId } = useLocalSearchParams<{ lessonId: string }>();
   const queryClient = useQueryClient();
   const runner = useSessionRunner(lessonId ?? '');
   const [passageOpen, setPassageOpen] = useState(false);
@@ -27,17 +26,15 @@ export default function SessionScreen() {
     if (runner.status === 'summary' && runner.lessonCompleted && lessonId) {
       queryClient.setQueryData(SESSION_DONE_KEY, {
         nodeId: lessonId,
-        xp,
         lessonCompleted: true,
       });
     }
-  }, [runner.status, runner.lessonCompleted, lessonId, xp, queryClient]);
+  }, [runner.status, runner.lessonCompleted, lessonId, queryClient]);
 
   const finish = () => {
     if (runner.lessonCompleted && lessonId) {
       queryClient.setQueryData(SESSION_DONE_KEY, {
         nodeId: lessonId,
-        xp,
         lessonCompleted: true,
       });
     }
@@ -105,7 +102,6 @@ export default function SessionScreen() {
         </Text>
         <Text className="mt-2 text-base text-muted">
           {runner.correctCount}/{runner.globalTotal} câu đúng
-          {passed ? ` · +${xp} XP` : ''}
         </Text>
         <Text className="mt-3 text-sm leading-6 text-muted">
           {passed
@@ -149,7 +145,7 @@ export default function SessionScreen() {
   const locked = runner.status === 'feedback';
   const isLast = runner.index >= runner.blockTotal - 1;
   const moreBlocks = Boolean(runner.source && runner.blockIndex < runner.source.blocks.length - 1);
-  const checkLabel = runner.source?.mode === 'api' ? (isLast ? 'Nộp bài' : 'Tiếp') : 'Kiểm tra';
+  const checkLabel = isLast ? 'Nộp bài' : 'Tiếp';
   const continueLabel = !isLast ? 'Tiếp tục' : runner.blockPassed && moreBlocks ? 'Phần tiếp' : 'Xem kết quả';
 
   return (

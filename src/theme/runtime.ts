@@ -18,17 +18,17 @@ export const lightColors: AppColors = {
 };
 
 export const darkColors: AppColors = {
-  canvas: '#0e1424',
-  surface: '#172033',
-  surfaceTint: '#1c2a4a',
+  canvas: '#050607',
+  surface: '#121518',
+  surfaceTint: '#1b2025',
   ink: '#f3f5fb',
-  muted: '#a3adc2',
-  line: '#2c3854',
-  edge: '#243049',
-  accent: '#718de5',
-  accentDeep: '#b9c9ff',
-  accentSoft: '#202d4a',
-  accentEdge: '#0a1f6e',
+  muted: '#a1a8b0',
+  line: '#292f35',
+  edge: '#22282e',
+  accent: '#1eabf2',
+  accentDeep: '#55c1ff',
+  accentSoft: '#102d3d',
+  accentEdge: '#084363',
   accentWarm: '#ff7624',
   xp: '#ff7624',
   xpDeep: '#ffad79',
@@ -44,11 +44,11 @@ export const darkColors: AppColors = {
     speaking: { foreground: '#82d6f5', background: '#1d3a4a', border: '#326177' },
     resources: { foreground: '#ffca76', background: '#49391f', border: '#70582e' },
   },
-  heroStart: '#061c64',
-  heroEnd: '#1647d6',
+  heroStart: '#062235',
+  heroEnd: '#087fbc',
   skill: lightTokens.skill,
-  warmSoft: '#3a2418',
-  listeningSoft: '#1a2748',
+  warmSoft: '#332319',
+  listeningSoft: '#172832',
 };
 
 const COLOR_VARS = [

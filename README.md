@@ -4,26 +4,31 @@ React Native app with Expo Router. Backend and frontend live in sibling folders.
 
 ## Start the mobile app
 
-Run these commands from `D:\DOAN\mobile`:
-
 ```powershell
-npm install
-npm run android
+# From the repository root, with Docker Desktop running:
+cd backend
+.\scripts\start-dev.ps1
+
+# Start Expo Go from the mobile project:
+cd ..\mobile
+npm ci
+npm start
 ```
 
-`npm run android` starts the LAN gateway bridge and Expo in one process. Start Docker Compose in `D:\DOAN\backend` separately. The app connects to the API Gateway on port 8080 by default. `npm run backend:check` inspects gateway health and Docker service status without changing or restarting services.
+The backend script creates a git-ignored local `.env` with fresh development secrets when needed, then builds and starts the Compose stack. It never overwrites an existing `.env` or removes database volumes. Wait until services are healthy before opening the app. Scan the Expo QR code with Expo Go on a phone connected to the same Wi-Fi as the computer. The mobile startup script chooses the computer's LAN address and starts a bridge to the API Gateway on port 8080.
+
+`npm run backend:check` inspects gateway health and Docker service status without changing or restarting services.
 
 For an iPhone on the same Wi-Fi, run `npm run ios` on Windows and scan the Expo QR with Expo Go. The iOS Simulator requires macOS. For a remote Metro tunnel, set `EXPO_PUBLIC_API_BASE_URL` to an HTTPS API origin, then run `npm run start:remote`.
 
 ## API connection settings
 
-Copy `.env.example` to `.env` (npm install does this when `.env` is missing).
+`npm ci` creates `.env` from `.env.example` when `.env` is missing. Same-Wi-Fi Expo Go use normally needs no API URL edit.
 
 - `EXPO_PUBLIC_API_BASE_URL`: optional API origin. Leave unset for LAN auto-detection. Use `http://10.0.2.2:8080` for an Android emulator or `http://localhost:8080` for the iOS Simulator.
 - `EXPO_PUBLIC_API_PORT`: optional gateway port, default `8080`.
 - `MOBILE_LAN_HOST`: optional override for the PC's Wi-Fi/Ethernet IPv4 address. The startup script automatically prefers Wi-Fi, then Ethernet, and skips common virtual adapters; set this only if automatic selection picks the wrong network.
 - `EXPO_PUBLIC_AUTH_ENABLED`: backend authentication toggle, default `true`.
-- `EXPO_PUBLIC_USE_MOCK_LEARNING`: learning-path mock toggle, default `false`.
 
 A physical phone and PC must share Wi-Fi. The bridge binds the selected PC LAN address and forwards HTTP uploads and WebSocket traffic to the local backend. Do not use Expo's tunnel host as the API host.
 

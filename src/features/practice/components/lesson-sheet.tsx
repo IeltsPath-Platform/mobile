@@ -1,4 +1,4 @@
-import { Check, Lock, X, Zap } from 'lucide-react-native';
+import { Check, Lock, X } from 'lucide-react-native';
 import { Modal, Pressable, View } from 'react-native';
 
 import { Button } from '@/src/components/ui/button';
@@ -41,12 +41,6 @@ export function LessonSheet({ node, visible, onClose, onStart }: LessonSheetProp
                 {node.title}
               </Text>
               <Text className="mt-1 text-base leading-6 text-muted">{node.subtitle}</Text>
-              <View className="mt-2 flex-row items-center gap-1.5">
-                <Zap size={16} color={colors.xpDeep} fill={colors.xp} />
-                <Text weight="extrabold" className="text-sm text-accent-deep">
-                  +{node.xp} XP
-                </Text>
-              </View>
             </View>
             <Pressable
               accessibilityRole="button"

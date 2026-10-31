@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+﻿import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Copy, Crown, LogOut, Rocket, Users, Wifi, WifiOff } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
@@ -9,6 +9,7 @@ import { Card } from '@/src/components/ui/card';
 import { Text } from '@/src/components/ui/text';
 import { useCurrentUser } from '@/src/features/auth/auth-provider';
 import { gameApi } from '@/src/features/games/api';
+import { gameErrorMessage } from '@/src/features/games/errors';
 import { useGameSocket } from '@/src/features/games/use-game-socket';
 import type { GameEvent, GameRoom, RoomSettings } from '@/src/features/games/types';
 import { colors } from '@/src/theme';
@@ -35,7 +36,7 @@ export default function GameRoomScreen() {
   const settings = room?.settings;
 
   const ready = useMutation({ mutationFn: () => gameApi.ready(roomId, member?.status !== 'READY'), onSuccess: (next) => { qc.setQueryData(['games', 'room', roomId], next); setError(''); }, onError: (reason) => setError(reason instanceof Error ? reason.message : 'Không cập nhật được trạng thái.') });
-  const start = useMutation({ mutationFn: () => gameApi.start(roomId), onSuccess: (match) => { if (room) router.replace(matchRoute(room, match.matchId)); }, onError: async (reason) => { const latest = await gameApi.getRoom(roomId).catch(() => null); if (latest) qc.setQueryData(['games', 'room', roomId], latest); setError(reason instanceof Error ? reason.message : 'Không bắt đầu được ván chơi.'); } });
+  const start = useMutation({ mutationFn: () => gameApi.start(roomId), onSuccess: (match) => { if (room) router.replace(matchRoute(room, match.matchId)); }, onError: async (reason) => { const latest = await gameApi.getRoom(roomId).catch(() => null); if (latest) qc.setQueryData(['games', 'room', roomId], latest); setError(gameErrorMessage(reason)); } });
   const leave = useMutation({ mutationFn: async () => room?.activeMatchId && room.status === 'IN_MATCH' ? gameApi.leaveMatch(room.activeMatchId) : gameApi.leaveRoom(roomId), onSuccess: async () => { await qc.invalidateQueries({ queryKey: ['games'] }); router.replace('/games' as never); }, onError: (reason) => setError(reason instanceof Error ? reason.message : 'Không rời được phòng.') });
   const update = useMutation({
     mutationFn: (body: { initialLives: number; wordLimit?: number | null; timeEnabled?: boolean; questionCount?: number | null; secondsPerQuestion?: number | null }) => gameApi.settings(roomId, body),

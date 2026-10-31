@@ -149,7 +149,7 @@ export default function ComposerScreen() {
         mediaTypes: ['images'],
         allowsMultipleSelection: true,
         selectionLimit: available,
-        quality: 0.85,
+        quality: 0.72,
         preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
       });
       if (result.canceled) return;
@@ -343,6 +343,7 @@ export default function ComposerScreen() {
                 <Text weight="bold" className="text-sm">Thêm vào bài viết</Text>
                 <Text className="text-xs text-muted">{images.length}/{MAX_IMAGE_COUNT} ảnh</Text>
               </View>
+              {images.some((image) => !image.url) ? <Text className="mt-1 text-xs leading-5 text-muted">Ảnh sẽ tải lên khi bạn nhấn Đăng bài.</Text> : null}
               <View className="mt-2 flex-row items-center gap-2">
                 <Pressable onPress={() => void pickImages()} disabled={busy || picking || images.length >= MAX_IMAGE_COUNT} className="h-12 w-12 items-center justify-center rounded-xl bg-success-soft" accessibilityRole="button" accessibilityLabel="Thêm ảnh">
                   {picking ? <ActivityIndicator color={colors.success} /> : <ImagePlus size={22} color={colors.success} />}
