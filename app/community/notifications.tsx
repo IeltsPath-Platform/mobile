@@ -99,9 +99,9 @@ export default function NotificationsScreen() {
   const header = (
     <View className="border-b border-line bg-surface px-4 pb-4 pt-3">
       <View className="flex-row items-center justify-between">
-        <Pressable onPress={() => router.back()} className="h-11 w-11 items-center justify-center rounded-full bg-slate-50" accessibilityLabel="Quay lại"><ChevronLeft size={21} color={colors.ink} /></Pressable>
+        <Pressable onPress={() => router.back()} className="h-11 w-11 items-center justify-center rounded-full bg-canvas" accessibilityLabel="Quay lại"><ChevronLeft size={21} color={colors.ink} /></Pressable>
         <Text weight="black" className="text-lg">Thông báo</Text>
-        <Pressable onPress={() => router.push('/community/notification-preferences' as never)} className="h-11 w-11 items-center justify-center rounded-full bg-slate-50" accessibilityLabel="Tuỳ chọn thông báo"><Settings size={19} color={colors.ink} /></Pressable>
+        <Pressable onPress={() => router.push('/community/notification-preferences' as never)} className="h-11 w-11 items-center justify-center rounded-full bg-canvas" accessibilityLabel="Tuỳ chọn thông báo"><Settings size={19} color={colors.ink} /></Pressable>
       </View>
       <View className="mt-4 flex-row items-center justify-between">
         <View><Text weight="bold" className="text-2xl">Hoạt động</Text><Text className="mt-1 text-sm text-muted">{unread.data?.count ?? 0} thông báo chưa đọc</Text></View>

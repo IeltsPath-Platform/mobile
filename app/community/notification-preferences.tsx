@@ -33,7 +33,7 @@ export default function NotificationPreferencesScreen() {
 
   return <View className="flex-1 bg-canvas">
     <View className="border-b border-line bg-surface px-4 pb-5 pt-3">
-      <Pressable onPress={() => router.back()} className="h-11 w-11 items-center justify-center rounded-full bg-slate-50" accessibilityLabel="Quay lại">
+      <Pressable onPress={() => router.back()} className="h-11 w-11 items-center justify-center rounded-full bg-canvas" accessibilityLabel="Quay lại">
         <ChevronLeft size={21} color={colors.ink} />
       </Pressable>
       <View className="mt-4 flex-row items-center">

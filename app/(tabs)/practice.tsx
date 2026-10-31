@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { BookOpen, ChevronRight, CircleHelp, Flame, Gamepad2, Rocket, Search, Sparkles, Users, Zap } from 'lucide-react-native';
-import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, TextInput, View, type ScrollViewInstance } from 'react-native';
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
 import { Text } from '@/src/components/ui/text';
@@ -26,6 +26,8 @@ function availability(status: string) {
 const matchRoute = (type: string, id: string) => type === 'ROCKET' ? `/games/rocket/${id}` as never : `/games/matches/${id}` as never;
 
 export default function PracticeScreen() {
+  const scrollRef = useRef<ScrollViewInstance>(null);
+  useFocusEffect(useCallback(() => () => scrollRef.current?.scrollTo({ y: 0, animated: false }), []));
   const { authEnabled, status } = useAuth(); const canFetch = authEnabled && status === 'authenticated'; const [query, setQuery] = useState('');
   const catalog = useQuery({ queryKey: ['games', 'catalog'], queryFn: gameApi.catalog, enabled: canFetch, staleTime: 60_000, retry: 1 });
   const active = useQuery({ queryKey: ['games', 'active'], queryFn: gameApi.activeGame, enabled: canFetch, staleTime: 10_000, retry: 1 });
@@ -33,9 +35,9 @@ export default function PracticeScreen() {
   const games: GameCatalog['games'] = catalog.data?.games.filter((item) => item.gameType === 'WORDLY' || item.gameType === 'ROCKET') ?? [];
   const activeRoute = active.data?.matchId ? matchRoute(active.data.gameType, active.data.matchId) : active.data ? `/games/rooms/${active.data.roomId}` as never : null;
   const openGame = (gameType: GameType, playerMode: 'SOLO' | 'MULTIPLAYER') => router.push({ pathname: '/games', params: { gameType, playerMode } } as never);
-  return <ScrollView className="flex-1 bg-canvas" contentContainerClassName="px-5 pb-28 pt-5" keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-    <View className="mb-5 flex-row items-center justify-between"><View><Text className="text-xs uppercase tracking-widest text-accent" weight="bold">GÓC HỌC TẬP</Text><Text className="mt-1 text-3xl" weight="black">Luyện tập</Text><Text className="mt-1 text-sm text-muted">Chọn cách học hợp với bạn hôm nay.</Text></View><View className="h-14 w-14 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.warmSoft }}><Zap size={24} color={colors.accentWarm}/></View></View>
-    <View className="mb-3 flex-row items-end justify-between"><View><Text className="text-xl" weight="black">Trò chơi từ vựng</Text><Text className="mt-1 text-sm text-muted">Chơi một mình hoặc rủ bạn cùng vào phòng.</Text></View><View className="h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: colors.accentSoft }}><Gamepad2 size={20} color={colors.accent}/></View></View>
+  return <ScrollView ref={scrollRef} className="flex-1 bg-canvas" contentContainerClassName="px-5 pb-28 pt-5" keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+    <View className="mb-4 flex-row items-center justify-between"><Text className="text-3xl" weight="black">Luyện tập</Text><View className="h-12 w-12 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.warmSoft }}><Zap size={22} color={colors.accentWarm}/></View></View>
+    <View className="mb-3 mt-1 flex-row items-center gap-2"><View className="h-8 w-8 items-center justify-center rounded-xl" style={{ backgroundColor: colors.accentSoft }}><Gamepad2 size={17} color={colors.accent}/></View><Text className="text-sm tracking-[1.5px] text-accent" weight="black">GAME</Text><View className="h-px flex-1 bg-line" /></View>
     {!canFetch ? <Card className="mb-4 border-b-0 bg-surface p-5"><Text weight="bold">Đăng nhập để chơi</Text><Text className="mt-2 text-sm leading-5 text-muted">Trạng thái game, phòng chơi và kết quả được đồng bộ với tài khoản của bạn.</Text><Button className="mt-4" label="Đăng nhập" onPress={() => router.push('/(auth)/login' as never)}/></Card> : null}
     {canFetch && active.data && activeRoute ? <Pressable onPress={() => router.push(activeRoute)} className="mb-4"><Card className="overflow-hidden border-0 p-4" style={{ backgroundColor: colors.accentSoft }}><View className="flex-row items-center"><View className="h-11 w-11 items-center justify-center rounded-2xl bg-surface"><Gamepad2 size={21} color={colors.accent}/></View><View className="ml-3 flex-1"><Text className="text-xs uppercase tracking-wider text-accent" weight="bold">ĐANG CHƠI</Text><Text className="mt-1 text-base" weight="black">{active.data.gameType === 'ROCKET' ? 'Rocket' : 'Wordly'}{active.data.roomStatus === 'WAITING' ? ` · Phòng ${active.data.roomCode}` : ''}</Text><Text className="mt-1 text-xs text-muted">Chạm để quay lại ván của bạn</Text></View><ChevronRight size={20} color={colors.accent}/></View></Card></Pressable> : null}
     {canFetch && catalog.isPending ? <View className="items-center py-8"><ActivityIndicator color={colors.accent}/><Text className="mt-2 text-sm text-muted">Đang tải trò chơi…</Text></View> : null}

@@ -47,6 +47,7 @@ type RequestOptions = {
   body?: unknown;
   auth?: boolean;
   signal?: AbortSignal;
+  timeoutMs?: number;
 };
 
 type TokenPair = { accessToken: string; refreshToken: string };
@@ -70,7 +71,7 @@ async function send(path: string, options: RequestOptions, accessToken?: string)
 
   const controller = new AbortController();
   let timedOut = false;
-  const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, REQUEST_TIMEOUT_MS);
+  const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, options.timeoutMs ?? REQUEST_TIMEOUT_MS);
   const abort = () => controller.abort();
   options.signal?.addEventListener('abort', abort, { once: true });
   if (options.signal?.aborted) controller.abort();

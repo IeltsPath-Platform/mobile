@@ -21,6 +21,7 @@ import { Text } from '@/src/components/ui/text';
 import { useCurrentUser } from '@/src/features/auth/auth-provider';
 import { communityApi, type PostBackground, type PostCategory } from '@/src/features/community/api';
 import { communityCategoryColor } from '@/src/features/community/community-colors';
+import { postBackgroundColor } from '@/src/features/community/post-background';
 import { CommunityAvatar, CommunityImage } from '@/src/features/community/components/community-image';
 import { colors } from '@/src/theme';
 
@@ -35,15 +36,15 @@ const CATEGORIES: { key: PostCategory; label: string }[] = [
   { key: 'RESOURCE_TIPS', label: 'Tài nguyên & mẹo' },
 ];
 
-const BACKGROUNDS: { key: PostBackground; label: string; color: string }[] = [
-  { key: 'VIOLET', label: 'Tím', color: '#5b21b6' },
-  { key: 'CRIMSON', label: 'Đỏ', color: '#9f1239' },
-  { key: 'MIDNIGHT', label: 'Đêm', color: '#0f172a' },
-  { key: 'SUNSET', label: 'Hoàng hôn', color: '#9a3412' },
-  { key: 'OCEAN', label: 'Đại dương', color: '#075985' },
-  { key: 'FOREST', label: 'Rừng', color: '#065f46' },
-  { key: 'ROSE', label: 'Hồng', color: '#86198f' },
-  { key: 'AURORA', label: 'Cực quang', color: '#115e59' },
+const BACKGROUNDS: { key: PostBackground; label: string }[] = [
+  { key: 'VIOLET', label: 'Tím' },
+  { key: 'CRIMSON', label: 'Đỏ' },
+  { key: 'MIDNIGHT', label: 'Đêm' },
+  { key: 'SUNSET', label: 'Hoàng hôn' },
+  { key: 'OCEAN', label: 'Đại dương' },
+  { key: 'FOREST', label: 'Rừng' },
+  { key: 'ROSE', label: 'Hồng' },
+  { key: 'AURORA', label: 'Cực quang' },
 ];
 
 const MAX_IMAGE_COUNT = 4;
@@ -284,13 +285,16 @@ export default function ComposerScreen() {
   return (
     <SafeAreaView className="flex-1 bg-canvas" edges={['top', 'bottom']}>
       <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View className="flex-row items-center justify-between border-b border-line bg-surface px-4 py-2">
-          <Pressable onPress={close} disabled={busy} className="min-h-11 min-w-16 justify-center" accessibilityRole="button" accessibilityLabel="Đóng trình soạn bài">
-            <Text weight="semibold" className="text-base text-muted">Hủy</Text>
+        <View className="flex-row items-center justify-between border-b border-line bg-surface px-4 py-2.5">
+          <Pressable onPress={close} disabled={busy} className="h-11 min-w-16 justify-center" accessibilityRole="button" accessibilityLabel="Đóng trình soạn bài">
+            <Text weight="semibold" className="text-sm text-muted">Hủy</Text>
           </Pressable>
-          <Text weight="black" className="text-lg">{id ? 'Sửa bài viết' : 'Tạo bài viết'}</Text>
-          <Pressable onPress={() => void submit()} disabled={busy || picking || !body.trim() || (Boolean(id) && (existing.isLoading || existing.isError))} className={`min-h-10 min-w-16 items-center justify-center rounded-full px-4 ${busy || picking || !body.trim() ? 'bg-accent/40' : 'bg-accent'}`} accessibilityRole="button" accessibilityState={{ disabled: busy || picking || !body.trim(), busy }}>
-            <Text weight="bold" className="text-sm text-white">{busy ? 'Đang đăng…' : id ? 'Lưu' : 'Đăng'}</Text>
+          <View className="items-center">
+            <Text weight="black" className="text-base">{id ? 'Chỉnh sửa bài' : 'Bài viết mới'}</Text>
+            <Text className="text-[10px] text-muted">Chia sẻ cùng IELTSPath</Text>
+          </View>
+          <Pressable onPress={() => void submit()} disabled={busy || picking || !body.trim() || (Boolean(id) && (existing.isLoading || existing.isError))} className={`min-h-10 min-w-[72px] items-center justify-center rounded-full px-4 ${busy || picking || !body.trim() ? 'bg-accent/40' : 'bg-accent'}`} accessibilityRole="button" accessibilityState={{ disabled: busy || picking || !body.trim(), busy }}>
+            <Text weight="bold" className="text-sm text-white">{busy ? 'Đang đăng…' : id ? 'Lưu bài' : 'Đăng'}</Text>
           </Pressable>
         </View>
 
@@ -324,7 +328,7 @@ export default function ComposerScreen() {
               placeholderTextColor={colors.muted}
               multiline
               textAlignVertical="top"
-              className="min-h-48 rounded-2xl bg-surface px-1 py-3 text-base leading-6 text-ink"
+              className="min-h-[168px] rounded-[26px] border border-line bg-surface px-4 py-4 text-base leading-7 text-ink"
               maxLength={MAX_BODY_LENGTH}
               accessibilityLabel="Nội dung bài viết"
             />
@@ -332,13 +336,13 @@ export default function ComposerScreen() {
 
             {images.length ? <View className="mb-4 mt-2 flex-row flex-wrap gap-2">
               {images.map((image, index) => <View key={`${image.uri}-${index}`} className="relative">
-                <CommunityImage uri={image.uri} label={`Ảnh đính kèm ${index + 1}`} className="h-24 w-24 rounded-xl" />
-                {uploadingUris.includes(image.uri) ? <View className="absolute inset-0 items-center justify-center rounded-xl bg-black/40"><ActivityIndicator color="white" /></View> : null}
+                <CommunityImage uri={image.uri} label={`Ảnh đính kèm ${index + 1}`} className="h-28 w-28 rounded-2xl" />
+                {uploadingUris.includes(image.uri) ? <View className="absolute inset-0 items-center justify-center rounded-2xl bg-black/40"><ActivityIndicator color="white" /></View> : null}
                 <Pressable disabled={busy} onPress={() => { markDirty(); setImages((current) => current.filter((_, itemIndex) => itemIndex !== index)); }} className="absolute right-1 top-1 h-8 w-8 items-center justify-center rounded-full bg-surface/95" accessibilityRole="button" accessibilityLabel={`Xóa ảnh ${index + 1}`}><X size={18} color={colors.ink} /></Pressable>
               </View>)}
             </View> : null}
 
-            <View className="mt-3 rounded-2xl border border-line bg-surface p-3">
+            <View className="mt-3 rounded-[26px] border border-line bg-surface p-4">
               <View className="flex-row items-center justify-between">
                 <Text weight="bold" className="text-sm">Thêm vào bài viết</Text>
                 <Text className="text-xs text-muted">{images.length}/{MAX_IMAGE_COUNT} ảnh</Text>
@@ -366,9 +370,9 @@ export default function ComposerScreen() {
                   <View className="flex-row items-center justify-between"><Text weight="bold" className="text-sm">Nền bài viết</Text><Text className="text-xs text-muted">Chỉ dùng cho bài chữ ngắn</Text></View>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-2" contentContainerClassName="gap-3 pb-1">
                     <Pressable onPress={() => { markDirty(); setBackground(undefined); }} className="items-center" accessibilityRole="button" accessibilityState={{ selected: !background }}><View className="h-10 w-10 items-center justify-center rounded-full border border-line bg-surface"><Text>×</Text></View><Text className="mt-1 text-[10px] text-muted">Trắng</Text></Pressable>
-                    {BACKGROUNDS.map((item) => <Pressable key={item.key} onPress={() => { markDirty(); if (canUseBackground) setBackground(background === item.key ? undefined : item.key); else setError('Nền màu chỉ dùng cho bài chữ tối đa 280 ký tự.'); }} className="items-center" accessibilityRole="button" accessibilityState={{ selected: background === item.key }}><View className="h-10 w-10 rounded-full border-2" style={{ backgroundColor: item.color, borderColor: background === item.key ? colors.accent : 'white' }} /><Text className="mt-1 text-[10px] text-muted">{item.label}</Text></Pressable>)}
+                    {BACKGROUNDS.map((item) => <Pressable key={item.key} onPress={() => { markDirty(); if (canUseBackground) setBackground(background === item.key ? undefined : item.key); else setError('Nền màu chỉ dùng cho bài chữ tối đa 280 ký tự.'); }} className="items-center" accessibilityRole="button" accessibilityState={{ selected: background === item.key }}><View className="h-10 w-10 rounded-full border-2" style={{ backgroundColor: postBackgroundColor(item.key), borderColor: background === item.key ? colors.accent : colors.line }} /><Text className="mt-1 text-[10px] text-muted">{item.label}</Text></Pressable>)}
                   </ScrollView>
-                  {background ? <View className="mt-2 rounded-xl p-4" style={{ backgroundColor: BACKGROUNDS.find((item) => item.key === background)?.color }}><Text className="text-center text-white">{body.trim() || 'Bài viết của bạn'}</Text></View> : null}
+                  {background ? <View className="mt-2 rounded-xl p-4" style={{ backgroundColor: postBackgroundColor(background) }}><Text className="text-center text-white">{body.trim() || 'Bài viết của bạn'}</Text></View> : null}
                 </View>
               </View> : null}
             </View>

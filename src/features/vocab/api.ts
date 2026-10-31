@@ -18,6 +18,7 @@ export type VocabularySet = {
   topicId: string | null; topicName: string | null; topicNameVi: string | null; coverKey: string | null;
   coverUrl: string | null; sortOrder: number; status: LibraryStatus; topicCount: number | null; wordCount: number | null;
 };
+export type VocabularyAchievement = { code: string; achieved: boolean; progress: number; target: number };
 export type VocabularyCatalogWord = {
   id: string; lemma: string; ipa: string | null; pronunciationAudioReference: string | null;
   senses: Array<Pick<VocabularySense, 'id' | 'partOfSpeech' | 'englishDefinition' | 'vietnameseMeaning' | 'exampleSentence'>>;
@@ -61,6 +62,7 @@ const params = (values: Record<string, string | number | undefined>) => {
 export const vocabApi = {
   search: (query: string, signal?: AbortSignal) => apiRequest<VocabularyItem[]>(`/api/content/vocabulary/search${params({ query })}`, { auth: true, signal }),
   listTopics: (signal?: AbortSignal) => apiRequest<VocabularyTopic[]>(`${contentVocabularyPath}/topics`, { auth: false, signal }),
+  achievements: (timezone = 'Asia/Ho_Chi_Minh') => apiRequest<{ items: VocabularyAchievement[] }>(`/api/learning-support/flashcards/notebook/achievements${params({ timezone })}`, { auth: true }),
   listTopicWords: (topicId: string, page = 0, size = 30, signal?: AbortSignal) =>
     apiRequest<PageResponse<VocabularyCatalogWord>>(`${contentVocabularyPath}${params({ topicId, page, size })}`, { auth: false, signal }),
   listSets: (kind: 'BAND' | 'TOPIC' | undefined = 'TOPIC', page = 0, size = 50, signal?: AbortSignal) =>
