@@ -4,6 +4,16 @@ const { apiRequestMock } = vi.hoisted(() => ({ apiRequestMock: vi.fn() }));
 
 vi.mock('@/src/lib/api-client', () => ({ apiRequest: apiRequestMock }));
 vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
+vi.mock('expo-image-manipulator', () => ({
+  manipulateAsync: vi.fn(async (uri: string) => ({ uri: `${uri}.normalized` })),
+  SaveFormat: { JPEG: 'jpeg' },
+}));
+vi.mock('expo-file-system', () => ({
+  File: class {
+    constructor(readonly uri: string) {}
+    async bytes() { return new Uint8Array([74, 80, 69, 71]); }
+  },
+}));
 
 import { profileApi } from '@/src/features/profile/api';
 
@@ -56,9 +66,11 @@ describe('profileApi', () => {
     expect(options.auth).toBe(true);
     expect(options.body).toBeInstanceOf(FormDataStub);
     expect(options.body.fields).toHaveLength(1);
-    expect(options.body.fields[0]).toEqual(['file', {
-      uri: 'file:///avatar.png', name: 'avatar.png', type: 'image/png',
-    }]);
+    const [field, part] = options.body.fields[0] as [string, { name: string; type: string; bytes: () => Promise<Uint8Array> }];
+    expect(field).toBe('file');
+    expect(part.name).toBe('avatar.jpg');
+    expect(part.type).toBe('image/jpeg');
+    expect(await part.bytes()).toEqual(new Uint8Array([74, 80, 69, 71]));
 
     await profileApi.deleteAvatar();
     expect(apiRequestMock).toHaveBeenNthCalledWith(2, '/api/users/me/avatar', { method: 'DELETE', auth: true });

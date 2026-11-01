@@ -54,6 +54,7 @@ type TokenPair = { accessToken: string; refreshToken: string };
 
 const NETWORK_ERROR_MESSAGE = 'Không kết nối được máy chủ. Kiểm tra mạng hoặc địa chỉ API.';
 const FALLBACK_ERROR_MESSAGE = 'Có lỗi xảy ra, vui lòng thử lại.';
+const MULTIPART_TIMEOUT_MS = 60_000;
 
 let sessionExpiredListener: (() => void) | null = null;
 let refreshInFlight: Promise<SessionTokens | null> | null = null;
@@ -71,7 +72,8 @@ async function send(path: string, options: RequestOptions, accessToken?: string)
 
   const controller = new AbortController();
   let timedOut = false;
-  const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, options.timeoutMs ?? REQUEST_TIMEOUT_MS);
+  const timeoutMs = options.timeoutMs ?? (multipart ? MULTIPART_TIMEOUT_MS : REQUEST_TIMEOUT_MS);
+  const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
   const abort = () => controller.abort();
   options.signal?.addEventListener('abort', abort, { once: true });
   if (options.signal?.aborted) controller.abort();

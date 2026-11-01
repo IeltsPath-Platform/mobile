@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Bookmark, CheckCircle2, Heart, Image as ImageIcon, Lightbulb, MessageCircle, MoreHorizontal, Search, ThumbsUp, Users } from 'lucide-react-native';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -13,6 +13,7 @@ import { communityCategoryColor } from '@/src/features/community/community-color
 import { CommunityPostContent } from '@/src/features/community/components/community-post-content';
 import { CommunityAvatar, CommunityImage } from '@/src/features/community/components/community-image';
 import { CommunityReactionControl } from '@/src/features/community/components/community-reaction-control';
+import { profileApi, profileQueryKeys } from '@/src/features/profile/api';
 import { colors } from '@/src/theme';
 
 const categories: { key?: PostCategory; label: string }[] = [
@@ -73,10 +74,10 @@ const CommunityCard = memo(function CommunityCard({ post, userId, onOpen }: { po
     </View>
     <Pressable onPress={() => onOpen(post.id)}>
       <CommunityPostContent title={post.title} body={post.body} background={post.background} imageCount={post.imageUrls?.length ?? 0} numberOfLines={5} />
-      {post.imageUrls?.length ? <Pressable onPress={() => onOpen(post.id)}><View className="flex-row flex-wrap gap-[2px]">
-        {post.imageUrls.slice(0, 4).map((url, index) => <View key={`${url}-${index}`} className={post.imageUrls.length === 1 ? 'w-full' : 'w-[49.7%]'}><CommunityImage uri={url} label={`Ảnh ${index + 1} trong bài viết`} className={`w-full ${post.imageUrls.length === 1 ? 'h-72' : 'h-40'}`} /></View>)}
-      </View></Pressable> : null}
     </Pressable>
+    {post.imageUrls?.length ? <View className="flex-row flex-wrap gap-[2px]">
+      {post.imageUrls.slice(0, 4).map((url, index) => <View key={`${url}-${index}`} className={post.imageUrls.length === 1 ? 'w-full' : 'w-[49.7%]'}><CommunityImage preview uri={url} label={`Ảnh ${index + 1} trong bài viết`} className={`w-full ${post.imageUrls.length === 1 ? 'h-72' : 'h-40'}`} /></View>)}
+    </View> : null}
     {total > 0 ? <View className="flex-row items-center px-4 pb-2 pt-3"><View className="mr-2 flex-row">{(Object.entries(post.reactionCounts ?? {}) as [ReactionType, number][]).filter(([, count]) => count > 0).slice(0, 3).map(([type]) => { const MetaIcon = reactionMeta[type]?.icon ?? ThumbsUp; return <View key={type} className="-ml-1 h-5 w-5 items-center justify-center rounded-full border border-line bg-surface"><MetaIcon size={14} color={reactionMeta[type]?.color ?? colors.accent} fill={type === 'LOVE' ? reactionMeta[type].color : 'transparent'} /></View>; })}</View><Text className="text-xs text-muted">{total}</Text><Text className="ml-auto text-xs text-muted">{post.commentCount} bình luận</Text></View> : null}
     <View className="mx-4 border-t border-line" />
     <View className="flex-row items-center justify-around bg-canvas/50 px-1 py-1">
@@ -89,6 +90,7 @@ const CommunityCard = memo(function CommunityCard({ post, userId, onOpen }: { po
 
 export default function CommunityScreen() {
   const router = useRouter(); const { authEnabled, status } = useAuth(); const user = useCurrentUser(); const [scope, setScope] = useState<'ALL' | 'FOLLOWING'>('ALL');
+  const learner = useQuery({ queryKey: profileQueryKeys.learner, queryFn: profileApi.getLearnerProfile, enabled: authEnabled && status === 'authenticated', staleTime: 60_000 });
   const [category, setCategory] = useState<PostCategory | undefined>(); const [search, setSearch] = useState(''); const [q, setQ] = useState('');
   useEffect(() => { const id = setTimeout(() => setQ(search.trim().slice(0, 120)), 350); return () => clearTimeout(id); }, [search]);
   const feed = useInfiniteQuery({ queryKey: [...feedKey, scope, category, q], enabled: authEnabled && status === 'authenticated', staleTime: 0, initialPageParam: undefined as string | undefined, queryFn: ({ pageParam }) => communityApi.feed(pageParam, scope, category, q), getNextPageParam: (last) => last.hasNext ? last.nextCursor ?? undefined : undefined });
@@ -116,7 +118,7 @@ export default function CommunityScreen() {
       {status === 'loading' ? <View className="py-10"><ActivityIndicator color={colors.accent} /></View> : status !== 'authenticated' ? <Card className="rounded-3xl border-b-0 bg-surface p-5"><Users size={28} color={colors.accent} /><Text weight="extrabold" className="mt-3 text-lg">Đăng nhập để tham gia cộng đồng</Text><Text className="mt-2 text-sm leading-5 text-muted">Chia sẻ câu hỏi, theo dõi bài viết và trao đổi cùng người học khác.</Text><View className="mt-4"><Button label="Đăng nhập" onPress={() => router.push('/(auth)/login' as never)} /></View></Card> : <>
         <View className="rounded-[26px] border border-line bg-surface p-3.5" style={{ shadowColor: '#1b2a49', shadowOpacity: 0.06, shadowRadius: 14, shadowOffset: { width: 0, height: 5 }, elevation: 2 }}>
           <View className="flex-row items-center">
-            <CommunityAvatar name={user.data?.fullName} size={42} />
+            <CommunityAvatar uri={learner.data?.avatarReference} name={user.data?.fullName} size={42} />
             <Pressable onPress={() => router.push('/community/composer' as never)} className="ml-3 min-h-11 flex-1 justify-center rounded-full bg-canvas px-4" accessibilityRole="button" accessibilityLabel="Tạo bài viết">
               <Text numberOfLines={1} className="text-sm text-muted">{user.data?.fullName ? `${user.data.fullName}, bạn vừa học được gì?` : 'Chia sẻ điều bạn đang học…'}</Text>
             </Pressable>

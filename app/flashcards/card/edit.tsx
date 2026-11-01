@@ -33,8 +33,8 @@ export default function EditCardScreen() {
       if (result.canceled) return;
       const asset = result.assets[0];
       const type = asset.mimeType?.toLowerCase() ?? 'image/jpeg';
-      if (!['image/jpeg', 'image/png', 'image/webp'].includes(type)) { setError('Ảnh cần ở định dạng JPG, PNG hoặc WebP.'); return; }
-      if ((asset.fileSize ?? 0) > 2 * 1024 * 1024) { setError('Ảnh cần nhỏ hơn 2 MB.'); return; }
+      if (!type.startsWith('image/')) { setError('Tệp đã chọn không phải ảnh.'); return; }
+      if ((asset.fileSize ?? 0) > 20 * 1024 * 1024) { setError('Ảnh gốc cần nhỏ hơn 20 MB.'); return; }
       setUploadingImage(true);
       const extension = type === 'image/png' ? 'png' : type === 'image/webp' ? 'webp' : 'jpg';
       const baseName = asset.fileName?.replace(/\.[^.]+$/, '') || `flashcard-${Date.now()}`;

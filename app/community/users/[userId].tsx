@@ -35,7 +35,14 @@ export default function PublicProfileScreen() {
     <FlatList
       className="flex-1" contentContainerClassName="px-4 pb-10 pt-4" data={entries} keyExtractor={(item) => item.id}
       ListHeaderComponent={header} ListEmptyComponent={empty ?? undefined}
-      renderItem={({ item }) => <Card className="mb-3">{'body' in item ? <Pressable onPress={() => router.push(`/community/${item.id}` as never)}><View className="flex-row items-center"><CommunityAvatar uri={p.avatarUrl} name={p.displayName} size={36} /><Text weight="bold" className="ml-2 text-sm">{p.displayName}</Text><Text className="ml-2 text-xs text-muted">{item.category}</Text></View>{item.title ? <Text weight="bold" className="mt-3">{item.title}</Text> : null}<Text numberOfLines={4} className="mt-1 text-sm leading-5">{item.body}</Text>{item.imageUrls?.length ? <CommunityImage uri={item.imageUrls[0]} className="mt-3 h-48 w-full rounded-xl" /> : null}</Pressable> : <Pressable accessibilityRole="button" onPress={() => router.push(`/community/users/${item.id}` as never)} className="min-h-14 flex-row items-center"><CommunityAvatar uri={item.avatarUrl} name={item.displayName} size={42} /><Text weight="bold" className="ml-3 flex-1">{item.displayName}</Text><Text className="text-xs text-accent">Xem hồ sơ ›</Text></Pressable>}</Card>}
+      renderItem={({ item }) => <Card className="mb-3">{'body' in item ? <>
+        <Pressable onPress={() => router.push(`/community/${item.id}` as never)} className="p-4">
+          <View className="flex-row items-center"><CommunityAvatar uri={p.avatarUrl} name={p.displayName} size={36} /><Text weight="bold" className="ml-2 text-sm">{p.displayName}</Text><Text className="ml-2 text-xs text-muted">{item.category}</Text></View>
+          {item.title ? <Text weight="bold" className="mt-3">{item.title}</Text> : null}
+          <Text numberOfLines={4} className="mt-1 text-sm leading-5">{item.body}</Text>
+        </Pressable>
+        {item.imageUrls?.length ? <CommunityImage preview uri={item.imageUrls[0]} className="mx-4 mb-4 h-48 rounded-xl" /> : null}
+      </> : <Pressable accessibilityRole="button" onPress={() => router.push(`/community/users/${item.id}` as never)} className="min-h-14 flex-row items-center"><CommunityAvatar uri={item.avatarUrl} name={item.displayName} size={42} /><Text weight="bold" className="ml-3 flex-1">{item.displayName}</Text><Text className="text-xs text-accent">Xem hồ sơ ›</Text></Pressable>}</Card>}
       ListFooterComponent={list.isFetchingNextPage ? <ActivityIndicator className="py-4" color={colors.accent} /> : list.hasNextPage ? <Button label="Tải thêm" disabled={list.isFetchingNextPage} onPress={() => void list.fetchNextPage()} /> : undefined}
       onEndReached={() => { if (list.hasNextPage && !list.isFetchingNextPage) void list.fetchNextPage(); }} onEndReachedThreshold={0.4}
       initialNumToRender={8} maxToRenderPerBatch={6} windowSize={7}

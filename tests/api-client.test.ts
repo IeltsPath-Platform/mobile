@@ -13,6 +13,18 @@ beforeEach(() => {
 });
 const json = (status: number, data: unknown) => new Response(JSON.stringify(data), { status });
 describe('refresh token contract', () => {
+  it('allows multipart uploads longer than the regular API timeout', async () => {
+    const fetchMock = vi.fn(async (_url: string, options: RequestInit) => {
+      await new Promise((resolve) => setTimeout(resolve, 140));
+      return json(201, { url: 'https://storage.test/image.jpg' });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(apiRequest('/upload', { method: 'POST', body: new FormData(), auth: true }))
+      .resolves.toEqual({ url: 'https://storage.test/image.jpg' });
+    expect(fetchMock.mock.calls[0][1].signal?.aborted).toBe(false);
+  });
+
   it('shares a rotating refresh across concurrent 401s and sends token in body', async () => {
     let refreshCount = 0;
     vi.stubGlobal('fetch', vi.fn(async (url: string, options: RequestInit) => {

@@ -26,8 +26,8 @@ export default function EditDeckScreen() {
       if (result.canceled) return;
       const file = result.assets[0];
       const type = file.mimeType?.toLowerCase() ?? 'image/jpeg';
-      if (!['image/jpeg', 'image/png', 'image/webp'].includes(type)) { setError('Ảnh cần ở định dạng JPG, PNG hoặc WebP.'); return; }
-      if ((file.fileSize ?? 0) > 2 * 1024 * 1024) { setError('Ảnh cần nhỏ hơn 2 MB.'); return; }
+      if (!type.startsWith('image/')) { setError('Tệp đã chọn không phải ảnh.'); return; }
+      if ((file.fileSize ?? 0) > 20 * 1024 * 1024) { setError('Ảnh gốc cần nhỏ hơn 20 MB.'); return; }
       setUploadingCover(true);
       const extension = type === 'image/png' ? 'png' : type === 'image/webp' ? 'webp' : 'jpg';
       const baseName = file.fileName?.replace(/\.[^.]+$/, '') || `deck-cover-${Date.now()}`;

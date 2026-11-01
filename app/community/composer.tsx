@@ -48,9 +48,8 @@ const BACKGROUNDS: { key: PostBackground; label: string }[] = [
 ];
 
 const MAX_IMAGE_COUNT = 4;
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const MAX_SOURCE_IMAGE_SIZE = 20 * 1024 * 1024;
 const MAX_BODY_LENGTH = 5_000;
-const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const ALLOWED_IMAGE_HOSTS = ['images.unsplash.com', 'i.imgur.com', 'supabase.co'];
 const ALLOWED_VIDEO_HOSTS = ['youtube.com', 'www.youtube.com', 'youtu.be', 'loom.com', 'www.loom.com', 'drive.google.com'];
 const FEED_QUERY_KEY = ['community', 'feed'] as const;
@@ -158,13 +157,13 @@ export default function ComposerScreen() {
       const accepted: PickedImage[] = [];
       const rejected: string[] = [];
       for (const asset of result.assets) {
-        const type = asset.mimeType ?? 'image/jpeg';
+        const type = asset.mimeType?.toLowerCase() ?? 'image/jpeg';
         const size = asset.fileSize ?? 0;
         const name = asset.fileName ?? `community-${Date.now()}-${accepted.length}.${type.split('/')[1] ?? 'jpg'}`;
-        if (!ALLOWED_IMAGE_TYPES.has(type)) {
-          rejected.push(`${name}: chỉ hỗ trợ JPG, PNG, WebP hoặc GIF.`);
-        } else if (size > MAX_IMAGE_SIZE) {
-          rejected.push(`${name}: dung lượng tối đa là 5 MB.`);
+        if (!type.startsWith('image/')) {
+          rejected.push(`${name}: tệp đã chọn không phải ảnh.`);
+        } else if (size > MAX_SOURCE_IMAGE_SIZE) {
+          rejected.push(`${name}: ảnh gốc cần nhỏ hơn 20 MB.`);
         } else {
           accepted.push({ uri: asset.uri, name, type, size });
         }

@@ -15,7 +15,7 @@ import { useCurrentUser } from '@/src/features/auth/auth-provider';
 import { profileApi, profileQueryKeys } from '@/src/features/profile/api';
 import { colors, fonts } from '@/src/theme';
 
-const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
+const MAX_SOURCE_AVATAR_BYTES = 20 * 1024 * 1024;
 
 export default function EditProfileScreen() {
   const queryClient = useQueryClient();
@@ -118,13 +118,13 @@ export default function EditProfileScreen() {
       if (result.canceled) return;
 
       const image = result.assets[0];
-      if (image.fileSize && image.fileSize > MAX_AVATAR_BYTES) {
-        setAvatarError('Ảnh đại diện cần nhỏ hơn 2 MB.');
+      if (image.fileSize && image.fileSize > MAX_SOURCE_AVATAR_BYTES) {
+        setAvatarError('Ảnh gốc cần nhỏ hơn 20 MB.');
         return;
       }
       const type = image.mimeType?.toLowerCase() ?? 'image/jpeg';
-      if (!['image/jpeg', 'image/png', 'image/webp'].includes(type)) {
-        setAvatarError('Chỉ hỗ trợ ảnh JPEG, PNG hoặc WebP.');
+      if (!type.startsWith('image/')) {
+        setAvatarError('Tệp đã chọn không phải ảnh.');
         return;
       }
       const profile = await profileApi.uploadAvatar({

@@ -4,6 +4,16 @@ const { apiRequestMock } = vi.hoisted(() => ({ apiRequestMock: vi.fn() }));
 
 vi.mock('@/src/lib/api-client', () => ({ apiRequest: apiRequestMock }));
 vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
+vi.mock('expo-image-manipulator', () => ({
+  manipulateAsync: vi.fn(async (uri: string) => ({ uri: `${uri}.normalized` })),
+  SaveFormat: { JPEG: 'jpeg' },
+}));
+vi.mock('expo-file-system', () => ({
+  File: class {
+    constructor(readonly uri: string) {}
+    async bytes() { return new Uint8Array([74, 80, 69, 71]); }
+  },
+}));
 
 import { normalizeDeckList, vocabApi, type FlashcardDeck } from '@/src/features/vocab/api';
 
@@ -44,7 +54,11 @@ describe('vocabulary topic catalog API', () => {
     expect(path).toBe('/api/learning-support/flashcards/images');
     expect(options).toMatchObject({ method: 'POST', auth: true });
     expect(options.body).toBeInstanceOf(FormDataStub);
-    expect(options.body.fields).toEqual([['file', { uri: 'file:///photo.jpg', name: 'photo.jpg', type: 'image/jpeg' }]]);
+    const [field, part] = options.body.fields[0] as [string, { name: string; type: string; bytes: () => Promise<Uint8Array> }];
+    expect(field).toBe('file');
+    expect(part.name).toBe('photo.jpg');
+    expect(part.type).toBe('image/jpeg');
+    expect(await part.bytes()).toEqual(new Uint8Array([74, 80, 69, 71]));
   });
 
   it('normalizes legacy paged deck cache entries before list consumers reduce or map them', () => {
