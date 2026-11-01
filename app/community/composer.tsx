@@ -93,6 +93,12 @@ export default function ComposerScreen() {
     queryFn: () => communityApi.post(id!),
     enabled: Boolean(id),
   });
+  const ownProfile = useQuery({
+    queryKey: ['community', 'profile', currentUser.data?.id],
+    queryFn: () => communityApi.profile(currentUser.data!.id),
+    enabled: Boolean(currentUser.data?.id),
+    staleTime: 60_000,
+  });
 
   useEffect(() => {
     if (!existing.data || hydrated.current || dirty.current) return;
@@ -309,7 +315,7 @@ export default function ComposerScreen() {
 
           {(!id || existing.data) && !existing.isError ? <>
             <View className="mb-4 flex-row items-center">
-              <CommunityAvatar name={currentUser.data?.fullName} size={44} />
+              <CommunityAvatar uri={ownProfile.data?.avatarUrl} name={ownProfile.data?.displayName ?? currentUser.data?.fullName} size={44} />
               <View className="ml-3 flex-1">
                 <Text weight="bold" className="text-sm">{currentUser.data?.fullName ?? 'Bạn'}</Text>
                 <Pressable onPress={() => setShowCategories(true)} disabled={busy} className="mt-1 min-h-8 flex-row items-center self-start rounded-full border px-3" style={{ backgroundColor: communityCategoryColor(category).background, borderColor: communityCategoryColor(category).border }} accessibilityRole="button" accessibilityLabel={`Chủ đề: ${CATEGORIES.find((item) => item.key === category)?.label}. Chạm để đổi`}>

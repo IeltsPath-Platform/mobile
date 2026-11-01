@@ -32,6 +32,14 @@ export default function EditProfileScreen() {
   const [formError, setFormError] = useState('');
   const [avatarError, setAvatarError] = useState('');
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const refreshCommunityAvatar = () => {
+    if (!user.data?.id) return Promise.resolve();
+    return Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['community', 'profile', user.data.id] }),
+      queryClient.invalidateQueries({ queryKey: ['community', 'feed'] }),
+      queryClient.invalidateQueries({ queryKey: ['community', 'profile-list'] }),
+    ]);
+  };
 
   useEffect(() => {
     if (user.data) {
@@ -55,6 +63,7 @@ export default function EditProfileScreen() {
     onSuccess: async (profile) => {
       queryClient.setQueryData(profileQueryKeys.learner, profile);
       setAvatarError('');
+      await refreshCommunityAvatar();
     },
     onError: (error: Error) => setAvatarError(error.message),
   });
@@ -134,6 +143,7 @@ export default function EditProfileScreen() {
       });
       queryClient.setQueryData(profileQueryKeys.learner, profile);
       await queryClient.invalidateQueries({ queryKey: profileQueryKeys.learner });
+      await refreshCommunityAvatar();
     } catch (error) {
       setAvatarError(error instanceof Error ? error.message : 'Không tải được ảnh đại diện.');
     } finally {

@@ -8,7 +8,7 @@ export function ProfileSummaryCard({ name, email, joined, band, streak, xp, onEd
   return (
     <View className="mb-5 overflow-hidden rounded-[26px] border border-line bg-surface">
       <View className="items-center px-4 pb-4 pt-4" style={{ backgroundColor: colors.surfaceTint }}>
-        <View className="flex-row items-center gap-2"><Text weight="black" className="text-xl" numberOfLines={1}>{name}</Text><Pressable accessibilityRole="button" accessibilityLabel={'Ch\u1ec9nh s\u1eeda h\u1ed3 s\u01a1'} onPress={onEdit} className="h-8 w-8 items-center justify-center rounded-full bg-canvas"><Camera size={15} color={colors.accentDeep} /></Pressable></View>
+        <View className="flex-row items-center gap-2"><Pressable accessibilityRole="button" accessibilityLabel="Chỉnh sửa hồ sơ" onPress={onEdit} hitSlop={6}><Text weight="black" className="text-xl" numberOfLines={1}>{name}</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={'Ch\u1ec9nh s\u1eeda h\u1ed3 s\u01a1'} onPress={onEdit} className="h-8 w-8 items-center justify-center rounded-full bg-canvas"><Camera size={15} color={colors.accentDeep} /></Pressable></View>
         <Text className="mt-1 text-xs text-muted">{'Th\u00e0nh vi\u00ean t\u1eeb '}{joined}{' \u00b7 '}{email}</Text>
       </View>
       <View className="flex-row items-stretch px-2 py-4">

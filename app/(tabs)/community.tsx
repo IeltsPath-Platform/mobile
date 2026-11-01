@@ -13,7 +13,6 @@ import { communityCategoryColor } from '@/src/features/community/community-color
 import { CommunityPostContent } from '@/src/features/community/components/community-post-content';
 import { CommunityAvatar, CommunityImage } from '@/src/features/community/components/community-image';
 import { CommunityReactionControl } from '@/src/features/community/components/community-reaction-control';
-import { profileApi, profileQueryKeys } from '@/src/features/profile/api';
 import { colors } from '@/src/theme';
 
 const categories: { key?: PostCategory; label: string }[] = [
@@ -90,7 +89,7 @@ const CommunityCard = memo(function CommunityCard({ post, userId, onOpen }: { po
 
 export default function CommunityScreen() {
   const router = useRouter(); const { authEnabled, status } = useAuth(); const user = useCurrentUser(); const [scope, setScope] = useState<'ALL' | 'FOLLOWING'>('ALL');
-  const learner = useQuery({ queryKey: profileQueryKeys.learner, queryFn: profileApi.getLearnerProfile, enabled: authEnabled && status === 'authenticated', staleTime: 60_000 });
+  const ownProfile = useQuery({ queryKey: ['community', 'profile', user.data?.id], queryFn: () => communityApi.profile(user.data!.id), enabled: authEnabled && status === 'authenticated' && Boolean(user.data?.id), staleTime: 60_000 });
   const [category, setCategory] = useState<PostCategory | undefined>(); const [search, setSearch] = useState(''); const [q, setQ] = useState('');
   useEffect(() => { const id = setTimeout(() => setQ(search.trim().slice(0, 120)), 350); return () => clearTimeout(id); }, [search]);
   const feed = useInfiniteQuery({ queryKey: [...feedKey, scope, category, q], enabled: authEnabled && status === 'authenticated', staleTime: 0, initialPageParam: undefined as string | undefined, queryFn: ({ pageParam }) => communityApi.feed(pageParam, scope, category, q), getNextPageParam: (last) => last.hasNext ? last.nextCursor ?? undefined : undefined });
@@ -118,7 +117,9 @@ export default function CommunityScreen() {
       {status === 'loading' ? <View className="py-10"><ActivityIndicator color={colors.accent} /></View> : status !== 'authenticated' ? <Card className="rounded-3xl border-b-0 bg-surface p-5"><Users size={28} color={colors.accent} /><Text weight="extrabold" className="mt-3 text-lg">Đăng nhập để tham gia cộng đồng</Text><Text className="mt-2 text-sm leading-5 text-muted">Chia sẻ câu hỏi, theo dõi bài viết và trao đổi cùng người học khác.</Text><View className="mt-4"><Button label="Đăng nhập" onPress={() => router.push('/(auth)/login' as never)} /></View></Card> : <>
         <View className="rounded-[26px] border border-line bg-surface p-3.5" style={{ shadowColor: '#1b2a49', shadowOpacity: 0.06, shadowRadius: 14, shadowOffset: { width: 0, height: 5 }, elevation: 2 }}>
           <View className="flex-row items-center">
-            <CommunityAvatar uri={learner.data?.avatarReference} name={user.data?.fullName} size={42} />
+            <Pressable onPress={() => user.data?.id && router.push(`/community/users/${user.data.id}` as never)} accessibilityRole="button" accessibilityLabel="Mở hồ sơ cộng đồng của tôi" hitSlop={6}>
+              <CommunityAvatar uri={ownProfile.data?.avatarUrl} name={ownProfile.data?.displayName ?? user.data?.fullName} size={42} />
+            </Pressable>
             <Pressable onPress={() => router.push('/community/composer' as never)} className="ml-3 min-h-11 flex-1 justify-center rounded-full bg-canvas px-4" accessibilityRole="button" accessibilityLabel="Tạo bài viết">
               <Text numberOfLines={1} className="text-sm text-muted">{user.data?.fullName ? `${user.data.fullName}, bạn vừa học được gì?` : 'Chia sẻ điều bạn đang học…'}</Text>
             </Pressable>
