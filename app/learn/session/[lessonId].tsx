@@ -5,6 +5,8 @@ import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 
 import { Button } from '@/src/components/ui/button';
 import { FormAlert } from '@/src/components/ui/form-alert';
+import { BackHeader } from '@/src/components/navigation/back-header';
+import { AnswerFeedback } from '@/src/features/session/components/answer-feedback';
 import { Text } from '@/src/components/ui/text';
 import { ChoiceButtons } from '@/src/features/session/components/choice-buttons';
 import { FillInput } from '@/src/features/session/components/fill-input';
@@ -43,15 +45,20 @@ export default function SessionScreen() {
 
   if (!lessonId || runner.status === 'loading') {
     return (
-      <View className="flex-1 items-center justify-center bg-canvas">
-        <ActivityIndicator color={colors.accent} />
+      <View className="flex-1 bg-canvas">
+        <BackHeader title="Bài học" />
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator color={colors.accent} />
+        </View>
       </View>
     );
   }
 
   if (runner.status === 'error') {
     return (
-      <View className="flex-1 bg-canvas px-5 pt-6">
+      <View className="flex-1 bg-canvas">
+        <BackHeader title="Bài học" />
+        <View className="px-5 pt-6">
         <FormAlert tone="error" message={runner.message ?? 'Không tải được bài.'} />
         {runner.reviews[0] ? (
           <View className="mt-4">
@@ -66,8 +73,6 @@ export default function SessionScreen() {
             />
           </View>
         ) : null}
-        <View className="mt-3">
-          <Button variant="secondary" label="Về Hôm nay" onPress={() => router.back()} />
         </View>
       </View>
     );
@@ -75,7 +80,9 @@ export default function SessionScreen() {
 
   if (runner.status === 'empty') {
     return (
-      <View className="flex-1 bg-canvas px-5 pt-6">
+      <View className="flex-1 bg-canvas">
+        <BackHeader title={runner.emptyTitle ?? 'Bài học'} />
+        <View className="px-5 pt-6">
         <Text weight="black" className="text-2xl">
           {runner.emptyTitle ?? 'Bài học'}
         </Text>
@@ -87,7 +94,7 @@ export default function SessionScreen() {
             label="Mở bài đọc"
             onPress={() => router.push({ pathname: '/learn/lesson/[lessonId]', params: { lessonId } })}
           />
-          <Button variant="secondary" label="Về Hôm nay" onPress={() => router.back()} />
+        </View>
         </View>
       </View>
     );
@@ -96,7 +103,9 @@ export default function SessionScreen() {
   if (runner.status === 'summary') {
     const passed = runner.lessonCompleted;
     return (
-      <View className="flex-1 bg-canvas px-5 pt-8">
+      <View className="flex-1 bg-canvas">
+        <BackHeader title="Kết quả học tập" />
+        <View className="px-5 pt-8">
         <Text weight="black" className="text-3xl">
           {passed ? 'Xong phần này' : runner.blockPassed ? 'Còn phần khác' : 'Chưa đạt'}
         </Text>
@@ -128,6 +137,7 @@ export default function SessionScreen() {
             </>
           ) : null}
         </View>
+        </View>
       </View>
     );
   }
@@ -135,8 +145,11 @@ export default function SessionScreen() {
   const question = runner.question;
   if (!question) {
     return (
-      <View className="flex-1 items-center justify-center bg-canvas px-5">
-        <Text className="text-center text-muted">Không có câu hỏi.</Text>
+      <View className="flex-1 bg-canvas">
+        <BackHeader title="Bài học" />
+        <View className="flex-1 items-center justify-center px-5">
+          <Text className="text-center text-muted">Không có câu hỏi.</Text>
+        </View>
       </View>
     );
   }
@@ -194,19 +207,15 @@ export default function SessionScreen() {
         </View>
 
         {runner.feedback ? (
-          <View
-            className="mt-4 rounded-2xl px-4 py-3"
-            style={{ backgroundColor: runner.feedback.correct ? colors.successSoft : colors.dangerSoft }}>
-            <Text weight="extrabold" className="text-base" style={{ color: runner.feedback.correct ? colors.success : colors.danger }}>
-              {runner.feedback.correct ? 'Đúng' : 'Chưa đúng'}
-            </Text>
-            {!runner.feedback.correct && runner.feedback.correctAnswer ? (
-              <Text className="mt-1 text-sm text-ink">Đáp án: {runner.feedback.correctAnswer}</Text>
-            ) : null}
-            {runner.feedback.explanation ? (
-              <Text className="mt-1 text-sm leading-5 text-ink">{runner.feedback.explanation}</Text>
-            ) : null}
-          </View>
+          <AnswerFeedback
+            key={`${runner.globalIndex}-${runner.feedback.correct}`}
+            correct={runner.feedback.correct}
+            title={runner.feedback.correct ? 'Chính xác! Làm tốt lắm.' : 'Chưa đúng, mình thử lại nhé.'}
+            detail={[
+              !runner.feedback.correct && runner.feedback.correctAnswer ? `Đáp án: ${runner.feedback.correctAnswer}` : null,
+              runner.feedback.explanation,
+            ].filter(Boolean).join('\n') || null}
+          />
         ) : null}
 
         {runner.message ? (

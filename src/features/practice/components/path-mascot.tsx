@@ -4,6 +4,7 @@ import Animated, {
   Easing,
   runOnJS,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withRepeat,
   withSequence,
@@ -33,6 +34,7 @@ const OFFSET_X = 40;
 const OFFSET_Y = 48;
 
 export function PathMascot({ at, travelTo = null, onArrived, size = 80 }: PathMascotProps) {
+  const reduceMotion = useReducedMotion();
   const x = useSharedValue(0);
   const y = useSharedValue(0);
   const bob = useSharedValue(0);
@@ -65,6 +67,10 @@ export function PathMascot({ at, travelTo = null, onArrived, size = 80 }: PathMa
   useEffect(() => () => stopRunCycle(), []);
 
   useEffect(() => {
+    if (reduceMotion) {
+      bob.value = 0;
+      return;
+    }
     bob.value = withRepeat(
       withSequence(
         withTiming(-3, { duration: 420, easing: Easing.inOut(Easing.ease) }),
@@ -73,7 +79,7 @@ export function PathMascot({ at, travelTo = null, onArrived, size = 80 }: PathMa
       -1,
       false,
     );
-  }, [bob]);
+  }, [bob, reduceMotion]);
 
   useEffect(() => {
     if (!at || traveling.current) return;
@@ -106,6 +112,14 @@ export function PathMascot({ at, travelTo = null, onArrived, size = 80 }: PathMa
     x.value = fromX;
     y.value = fromY;
 
+    if (reduceMotion) {
+      x.value = toX;
+      y.value = toY;
+      traveling.current = false;
+      onArrivedRef.current?.();
+      return;
+    }
+
     hop.value = withRepeat(
       withSequence(
         withTiming(-8, { duration: 120, easing: Easing.out(Easing.quad) }),
@@ -128,7 +142,7 @@ export function PathMascot({ at, travelTo = null, onArrived, size = 80 }: PathMa
       hop.value = 0;
       runOnJS(finishTravel)(!!finished);
     });
-  }, [travelTo?.x, travelTo?.y, at?.x, at?.y, size, x, y, hop, facing]);
+  }, [travelTo?.x, travelTo?.y, at?.x, at?.y, size, x, y, hop, facing, reduceMotion]);
 
   const style = useAnimatedStyle(() => ({
     opacity: ready.value,

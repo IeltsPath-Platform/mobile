@@ -3,6 +3,7 @@ import { Image, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-n
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/src/components/ui/text';
+import { BackHeader } from '@/src/components/navigation/back-header';
 
 type AuthScreenProps = {
   title: string;
@@ -14,6 +15,7 @@ type AuthScreenProps = {
 export function AuthScreen({ title, description, children, footer }: AuthScreenProps) {
   return (
     <SafeAreaView className="flex-1 bg-canvas" edges={['top', 'bottom']}>
+      <BackHeader fallbackHref="/welcome" />
       <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           contentContainerClassName="grow px-5 pb-8 pt-6"

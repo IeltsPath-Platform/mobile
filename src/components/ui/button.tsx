@@ -1,5 +1,6 @@
 import { ActivityIndicator, Pressable, View, type PressableProps } from 'react-native';
 import type { ReactNode } from 'react';
+import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSpring } from 'react-native-reanimated';
 
 import { colors } from '@/src/theme';
 
@@ -35,6 +36,8 @@ const variantStyles: Record<ButtonVariant, { container: string; text: string }> 
   },
 };
 
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
 function spinnerColor(variant: ButtonVariant) {
   if (variant === 'secondary') return colors.ink;
   if (variant === 'ghost') return colors.accentDeep;
@@ -54,23 +57,35 @@ export function Button({
 }: ButtonProps) {
   const style = variantStyles[variant];
   const isDisabled = disabled || loading;
+  const { style: customStyle, onPressIn, onPressOut, ...pressableProps } = props;
+  const reduceMotion = useReducedMotion();
+  const scale = useSharedValue(1);
+  const pressStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
   return (
-    <Pressable
+    <AnimatedPressable
       accessibilityRole="button"
       accessibilityState={{ disabled: isDisabled, busy: loading }}
       accessibilityLabel={loading && loadingLabel ? loadingLabel : label}
       disabled={isDisabled}
-      className={`min-h-12 flex-row items-center justify-center gap-2 rounded-2xl px-5 active:translate-y-0.5 active:opacity-90 ${style.container} ${isDisabled ? 'opacity-60' : ''} ${className ?? ''}`}
-      style={variant === 'primary' ? primaryShadow : undefined}
-      {...props}>
+      onPressIn={(event) => {
+        if (!isDisabled && !reduceMotion) scale.value = withSpring(0.975, { damping: 16, stiffness: 260 });
+        onPressIn?.(event);
+      }}
+      onPressOut={(event) => {
+        scale.value = reduceMotion ? 1 : withSpring(1, { damping: 14, stiffness: 220 });
+        onPressOut?.(event);
+      }}
+      className={`min-h-12 flex-row items-center justify-center gap-2 rounded-2xl px-5 ${style.container} ${isDisabled ? 'opacity-60' : ''} ${className ?? ''}`}
+      style={[variant === 'primary' ? primaryShadow : undefined, customStyle, pressStyle]}
+      {...pressableProps}>
       {loading ? <ActivityIndicator size="small" color={spinnerColor(variant)} /> : icon}
       <View>
         <Text weight="bold" className={`text-base ${style.text}`}>
           {loading && loadingLabel ? loadingLabel : label}
         </Text>
       </View>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 

@@ -5,6 +5,7 @@ import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
 import { FormAlert } from '@/src/components/ui/form-alert';
+import { BackHeader } from '@/src/components/navigation/back-header';
 import { Text } from '@/src/components/ui/text';
 import { isLearningApiError, learningApi } from '@/src/features/learning';
 import type { LessonStatus, TestStatus } from '@/src/features/learning/types';
@@ -46,8 +47,11 @@ export default function TopicDetailScreen() {
 
   if (lessonsQuery.isPending) {
     return (
-      <View className="flex-1 items-center justify-center bg-canvas">
-        <ActivityIndicator color={colors.accent} />
+      <View className="flex-1 bg-canvas">
+        <BackHeader title="Lộ trình học" />
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator color={colors.accent} />
+        </View>
       </View>
     );
   }
@@ -56,7 +60,9 @@ export default function TopicDetailScreen() {
     const err = lessonsQuery.error;
     const reviews = isLearningApiError(err) ? err.reviews : [];
     return (
-      <ScrollView className="flex-1 bg-canvas" contentContainerClassName="px-5 py-6">
+      <View className="flex-1 bg-canvas">
+        <BackHeader title="Lộ trình học" />
+        <ScrollView contentContainerClassName="px-5 py-6">
         <FormAlert tone="error" message={isLearningApiError(err) ? err.message : 'Không tải được chủ đề.'} />
         {reviews[0] ? (
           <View className="mt-4">
@@ -68,7 +74,8 @@ export default function TopicDetailScreen() {
             />
           </View>
         ) : null}
-      </ScrollView>
+        </ScrollView>
+      </View>
     );
   }
 
@@ -76,7 +83,9 @@ export default function TopicDetailScreen() {
   const pending = pendingQuery.data;
 
   return (
-    <ScrollView className="flex-1 bg-canvas" contentContainerClassName="gap-3 px-5 pb-12 pt-4">
+    <View className="flex-1 bg-canvas">
+    <BackHeader title="Lộ trình học" subtitle="Chủ đề bài học" />
+    <ScrollView contentContainerClassName="gap-3 px-5 pb-12 pt-4">
       {pendingQuery.isError ? (
         <Card>
           <FormAlert tone="error" message="Không tải được danh sách bài ôn." />
@@ -147,5 +156,6 @@ export default function TopicDetailScreen() {
         </View>
       </Card>
     </ScrollView>
+    </View>
   );
 }

@@ -4,6 +4,7 @@ import { Pressable, View, type ViewInstance } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withRepeat,
   withSequence,
@@ -43,10 +44,11 @@ export function PathNodeButton({
   const done = node.status === 'done';
   const fill = locked ? colors.line : node.color;
   const edge = locked ? colors.edge : darken(node.color);
+  const reduceMotion = useReducedMotion();
   const pulse = useSharedValue(1);
 
   useEffect(() => {
-    if (!current) {
+    if (!current || reduceMotion) {
       pulse.value = 1;
       return;
     }
@@ -58,7 +60,7 @@ export function PathNodeButton({
       -1,
       false,
     );
-  }, [current, pulse]);
+  }, [current, pulse, reduceMotion]);
 
   const ringStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulse.value }],

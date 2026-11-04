@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { ArrowLeft } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -57,12 +58,22 @@ export default function OnboardingScreen() {
   return (
     <SafeAreaView className="flex-1 bg-canvas" edges={['top', 'bottom']}>
       <View className="px-5 pt-3">
-        <View className="h-2 overflow-hidden rounded-full bg-line">
-          <View className="h-full rounded-full bg-accent" style={{ width: `${((step + 1) / STEPS.length) * 100}%` }} />
+        <View className="flex-row items-center gap-3">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Quay lại"
+            hitSlop={6}
+            onPress={() => step > 0 ? setStep((value) => value - 1) : router.back()}
+            className="h-11 w-11 items-center justify-center rounded-2xl bg-surface">
+            <ArrowLeft size={20} color={colors.ink} />
+          </Pressable>
+          <View className="flex-1">
+            <View className="h-2 overflow-hidden rounded-full bg-line">
+              <View className="h-full rounded-full bg-accent" style={{ width: `${((step + 1) / STEPS.length) * 100}%` }} />
+            </View>
+            <Text className="mt-2 text-xs text-muted">{step + 1}/{STEPS.length}</Text>
+          </View>
         </View>
-        <Text className="mt-2 text-xs text-muted">
-          {step + 1}/{STEPS.length}
-        </Text>
       </View>
 
       <ScrollView contentContainerClassName="grow px-5 pb-6 pt-8" showsVerticalScrollIndicator={false}>
@@ -94,23 +105,12 @@ export default function OnboardingScreen() {
       </ScrollView>
 
       <View className="flex-row gap-3 px-5 pb-4">
-        {step > 0 ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Quay lại"
-            onPress={() => setStep((value) => value - 1)}
-            className="h-14 flex-1 items-center justify-center rounded-2xl border border-line bg-surface">
-            <Text weight="extrabold" className="text-base">
-              Quay lại
-            </Text>
-          </Pressable>
-        ) : null}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={last ? 'Xong' : 'Tiếp tục'}
           disabled={!selected || saving}
           onPress={() => void next()}
-          className="h-14 flex-[2] items-center justify-center rounded-2xl bg-accent"
+          className="h-14 flex-1 items-center justify-center rounded-2xl bg-accent"
           style={{ opacity: selected && !saving ? 1 : 0.45 }}>
           <Text weight="extrabold" className="text-base text-white">
             {last ? 'Xong' : 'Tiếp tục'}

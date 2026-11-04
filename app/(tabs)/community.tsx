@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Bookmark, CheckCircle2, Heart, Image as ImageIcon, Lightbulb, MessageCircle, MoreHorizontal, Search, ThumbsUp, Users } from 'lucide-react-native';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, ScrollView, TextInput, View, type FlatList as FlatListInstance } from 'react-native';
@@ -10,6 +10,7 @@ import { Text } from '@/src/components/ui/text';
 import { useAuth, useCurrentUser } from '@/src/features/auth/auth-provider';
 import { communityApi, type CommunityPost, type PostCategory, type ReactionType } from '@/src/features/community/api';
 import { communityCategoryColor } from '@/src/features/community/community-colors';
+import { applyPostReaction, updateCommunityPostCache } from '@/src/features/community/post-cache';
 import { CommunityPostContent } from '@/src/features/community/components/community-post-content';
 import { CommunityAvatar, CommunityImage } from '@/src/features/community/components/community-image';
 import { CommunityReactionControl } from '@/src/features/community/components/community-reaction-control';
@@ -42,14 +43,27 @@ function reportPost(post: CommunityPost, run: (fn: () => Promise<unknown>) => Pr
 const CommunityCard = memo(function CommunityCard({ post, userId, onOpen }: { post: CommunityPost; userId?: string; onOpen: (id: string) => void }) {
   const router = useRouter(); const qc = useQueryClient(); const own = userId === post.authorId; const [actionBusy, setActionBusy] = useState(false);
   const selected = post.myReaction as ReactionType | null | undefined;
-  const run = async (op: () => Promise<unknown>, keys: readonly (readonly unknown[])[] = [feedKey]) => {
+  const run = async (op: () => Promise<unknown>, keys: readonly (readonly unknown[])[] = []) => {
     if (actionBusy) return;
     setActionBusy(true);
     try { await op(); await Promise.all(keys.map((queryKey) => qc.invalidateQueries({ queryKey }))); }
     catch (e) { Alert.alert('Không thể cập nhật', e instanceof Error ? e.message : 'Vui lòng thử lại.'); }
     finally { setActionBusy(false); }
   };
-  const selectReaction = (type: ReactionType) => { void run(() => selected === type ? communityApi.removeReaction(post.id, type) : communityApi.react(post.id, type)); };
+  const updatePost = async (next: CommunityPost, op: () => Promise<unknown>) => {
+    if (actionBusy) return;
+    setActionBusy(true);
+    updateCommunityPostCache(qc, post.id, () => next);
+    try { await op(); }
+    catch (e) {
+      updateCommunityPostCache(qc, post.id, () => post);
+      Alert.alert('Không thể cập nhật', e instanceof Error ? e.message : 'Vui lòng thử lại.');
+    } finally { setActionBusy(false); }
+  };
+  const selectReaction = (type: ReactionType) => {
+    const next = applyPostReaction(post, type);
+    void updatePost(next, () => selected === type ? communityApi.removeReaction(post.id, type) : communityApi.react(post.id, type));
+  };
   const total = Object.values(post.reactionCounts ?? {}).reduce((sum, count) => sum + count, 0);
   const report = () => reportPost(post, run);
   const ownerMenu = () => Alert.alert(own ? 'Quản lý bài viết' : 'Tuỳ chọn bài viết', undefined, [
@@ -57,7 +71,7 @@ const CommunityCard = memo(function CommunityCard({ post, userId, onOpen }: { po
       { text: 'Sửa bài viết', onPress: () => router.push({ pathname: '/community/composer', params: { id: post.id } } as never) },
       { text: 'Xóa bài viết', style: 'destructive' as const, onPress: () => Alert.alert('Xóa bài viết?', 'Bài viết sẽ bị gỡ khỏi cộng đồng.', [{ text: 'Hủy', style: 'cancel' }, { text: 'Xóa', style: 'destructive', onPress: () => void run(() => communityApi.delete(post.id), [['community', 'feed'], ['community', 'bookmarks'], ['community', 'profile-list']]) }]) },
     ] : [
-      { text: post.followingAuthor ? 'Bỏ theo dõi' : 'Theo dõi', onPress: () => void run(() => communityApi.follow(post.authorId, post.followingAuthor), [['community', 'feed'], ['community', 'detail']]) },
+      { text: post.followingAuthor ? 'Bỏ theo dõi' : 'Theo dõi', onPress: () => void updatePost({ ...post, followingAuthor: !post.followingAuthor }, () => communityApi.follow(post.authorId, post.followingAuthor)) },
       { text: 'Báo cáo bài viết', onPress: report },
     ]),
     { text: 'Đóng', style: 'cancel' },
@@ -77,12 +91,12 @@ const CommunityCard = memo(function CommunityCard({ post, userId, onOpen }: { po
     {post.imageUrls?.length ? <View className="flex-row flex-wrap gap-[2px]">
       {post.imageUrls.slice(0, 4).map((url, index) => <View key={`${url}-${index}`} className={post.imageUrls.length === 1 ? 'w-full' : 'w-[49.7%]'}><CommunityImage preview uri={url} label={`Ảnh ${index + 1} trong bài viết`} className={`w-full ${post.imageUrls.length === 1 ? 'h-72' : 'h-40'}`} /></View>)}
     </View> : null}
-    {total > 0 ? <View className="flex-row items-center px-4 pb-2 pt-3"><View className="mr-2 flex-row">{(Object.entries(post.reactionCounts ?? {}) as [ReactionType, number][]).filter(([, count]) => count > 0).slice(0, 3).map(([type]) => { const MetaIcon = reactionMeta[type]?.icon ?? ThumbsUp; return <View key={type} className="-ml-1 h-5 w-5 items-center justify-center rounded-full border border-line bg-surface"><MetaIcon size={14} color={reactionMeta[type]?.color ?? colors.accent} fill={type === 'LOVE' ? reactionMeta[type].color : 'transparent'} /></View>; })}</View><Text className="text-xs text-muted">{total}</Text><Text className="ml-auto text-xs text-muted">{post.commentCount} bình luận</Text></View> : null}
+    {total > 0 || post.commentCount > 0 ? <Pressable onPress={() => onOpen(post.id)} accessibilityRole="button" accessibilityLabel={`${post.commentCount} bình luận`} className="min-h-11 flex-row items-center px-4 pb-2 pt-3">{total > 0 ? <><View className="mr-2 flex-row">{(Object.entries(post.reactionCounts ?? {}) as [ReactionType, number][]).filter(([, count]) => count > 0).slice(0, 3).map(([type]) => { const MetaIcon = reactionMeta[type]?.icon ?? ThumbsUp; return <View key={type} className="-ml-1 h-5 w-5 items-center justify-center rounded-full border border-line bg-surface"><MetaIcon size={14} color={reactionMeta[type]?.color ?? colors.accent} fill={type === 'LOVE' ? reactionMeta[type].color : 'transparent'} /></View>; })}</View><Text className="text-xs text-muted">{total}</Text></> : <View className="flex-1" />}{post.commentCount > 0 ? <Text className="ml-auto text-xs text-muted">{post.commentCount} bình luận</Text> : null}</Pressable> : null}
     <View className="mx-4 border-t border-line" />
     <View className="flex-row items-center justify-around bg-canvas/50 px-1 py-1">
       <CommunityReactionControl selected={selected} disabled={actionBusy} onSelect={selectReaction} />
       <Pressable onPress={() => onOpen(post.id)} className="min-h-11 flex-1 flex-row items-center justify-center gap-2 rounded-lg"><MessageCircle size={18} color={colors.muted} /><Text weight="semibold" className="text-xs text-muted">Bình luận</Text></Pressable>
-      <Pressable onPress={() => void run(() => communityApi.bookmark(post.id, post.bookmarkedByMe), [feedKey, ['community', 'bookmarks'], ['community', 'detail', post.id]])} disabled={actionBusy} className="min-h-11 flex-1 flex-row items-center justify-center gap-2 rounded-lg"><Bookmark size={18} color={post.bookmarkedByMe ? colors.accent : colors.muted} fill={post.bookmarkedByMe ? colors.accent : 'transparent'} /><Text weight="semibold" className="text-xs" style={{ color: post.bookmarkedByMe ? colors.accent : colors.muted }}>{post.bookmarkedByMe ? 'Đã lưu' : 'Lưu'}</Text></Pressable>
+      <Pressable onPress={() => void updatePost({ ...post, bookmarkedByMe: !post.bookmarkedByMe }, () => communityApi.bookmark(post.id, post.bookmarkedByMe))} disabled={actionBusy} className="min-h-11 flex-1 flex-row items-center justify-center gap-2 rounded-lg"><Bookmark size={18} color={post.bookmarkedByMe ? colors.accent : colors.muted} fill={post.bookmarkedByMe ? colors.accent : 'transparent'} /><Text weight="semibold" className="text-xs" style={{ color: post.bookmarkedByMe ? colors.accent : colors.muted }}>{post.bookmarkedByMe ? 'Đã lưu' : 'Lưu'}</Text></Pressable>
     </View>
   </View>;
 });
@@ -92,16 +106,8 @@ export default function CommunityScreen() {
   const ownProfile = useQuery({ queryKey: ['community', 'profile', user.data?.id], queryFn: () => communityApi.profile(user.data!.id), enabled: authEnabled && status === 'authenticated' && Boolean(user.data?.id), staleTime: 60_000 });
   const [category, setCategory] = useState<PostCategory | undefined>(); const [search, setSearch] = useState(''); const [q, setQ] = useState('');
   useEffect(() => { const id = setTimeout(() => setQ(search.trim().slice(0, 120)), 350); return () => clearTimeout(id); }, [search]);
-  const feed = useInfiniteQuery({ queryKey: [...feedKey, scope, category, q], enabled: authEnabled && status === 'authenticated', staleTime: 0, initialPageParam: undefined as string | undefined, queryFn: ({ pageParam }) => communityApi.feed(pageParam, scope, category, q), getNextPageParam: (last) => last.hasNext ? last.nextCursor ?? undefined : undefined });
+  const feed = useInfiniteQuery({ queryKey: [...feedKey, scope, category, q], enabled: authEnabled && status === 'authenticated', staleTime: 45_000, initialPageParam: undefined as string | undefined, queryFn: ({ pageParam }) => communityApi.feed(pageParam, scope, category, q), getNextPageParam: (last) => last.hasNext ? last.nextCursor ?? undefined : undefined });
   const listRef = useRef<FlatListInstance<CommunityPost>>(null);
-  const hasFocusedFeed = useRef(false);
-  useFocusEffect(useCallback(() => {
-    if (status === 'authenticated') {
-      if (hasFocusedFeed.current) void feed.refetch();
-      hasFocusedFeed.current = true;
-    }
-    return () => listRef.current?.scrollToOffset({ offset: 0, animated: false });
-  }, [feed.refetch, status]));
   const posts = useMemo(() => {
     const seen = new Set<string>();
     return (feed.data?.pages.flatMap((page) => page.content) ?? []).filter((post) => {
