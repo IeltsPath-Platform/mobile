@@ -1,10 +1,15 @@
-import { useRef, useState } from 'react';
-import { View } from 'react-native';
+import { Volume2 } from 'lucide-react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Pressable, View } from 'react-native';
 
 import { Button } from '@/src/components/ui/button';
 import { Text } from '@/src/components/ui/text';
 import { createRequestId } from '@/src/lib/request-id';
 
+import { SoundToggle, useStudyMusic } from '@/src/features/session/components/sound-toggle';
+import { haptics } from '@/src/lib/haptics';
+import { sound } from '@/src/lib/sound';
+import { colors } from '@/src/theme';
 import { FlipCard } from './flip-card';
 import type { SrsRating, StudyCard } from '../types';
 
@@ -26,6 +31,19 @@ export function StudySession({ cards, onReview, hasMoreCards, onLoadMore, onExit
   const requestIds = useRef(new Map<string, string>());
   const retried = useRef(new Set<string>());
   const current = queue[0];
+  const finished = !current && reviewed > 0;
+
+  useStudyMusic(Boolean(current));
+  // Hear each new card's word once as it appears; the speaker button replays it.
+  useEffect(() => {
+    if (current?.front) void sound.speak(current.front);
+    return () => sound.stopSpeaking();
+  }, [current?.id]);
+  useEffect(() => {
+    if (!finished) return;
+    haptics.success();
+    void sound.play('complete');
+  }, [finished]);
 
   const loadMore = async () => {
     if (loadingMore) return;
@@ -69,6 +87,7 @@ export function StudySession({ cards, onReview, hasMoreCards, onLoadMore, onExit
     setError('');
     try {
       await onReview(current.id, rating === 'good', id);
+      if (rating === 'good') void sound.play('match');
       requestIds.current.delete(current.id);
       setReviewed((count) => count + 1);
       setFlipped(false);
@@ -89,9 +108,17 @@ export function StudySession({ cards, onReview, hasMoreCards, onLoadMore, onExit
 
   return (
     <View className="flex-1 px-5 pt-4">
-      <Text weight="bold" className="text-xs uppercase tracking-wide text-muted">
-        Còn {queue.length} thẻ
-      </Text>
+      <View className="flex-row items-center justify-between">
+        <Text weight="bold" className="text-xs uppercase tracking-wide text-muted">
+          Còn {queue.length} thẻ
+        </Text>
+        <View className="flex-row items-center gap-2">
+          <Pressable accessibilityRole="button" accessibilityLabel={`Nghe phát âm ${current.front}`} hitSlop={6} onPress={() => { haptics.tap(); void sound.speak(current.front); }} className="h-11 w-11 items-center justify-center rounded-full active:opacity-70" style={{ backgroundColor: colors.accentSoft }}>
+            <Volume2 size={19} color={colors.accentDeep} />
+          </Pressable>
+          <SoundToggle />
+        </View>
+      </View>
       <View className="mt-4">
         <FlipCard
           key={current.id}
@@ -110,7 +137,7 @@ export function StudySession({ cards, onReview, hasMoreCards, onLoadMore, onExit
             <Button label={reviewing ? 'Đang lưu…' : 'Đã thuộc'} loading={reviewing} disabled={reviewing} onPress={() => void grade('good')} />
           </>
         ) : (
-          <Button label="Lật thẻ" onPress={() => setFlipped(true)} />
+          <Button label="Lật thẻ" onPress={() => { haptics.tap(); void sound.play('tap'); setFlipped(true); }} />
         )}
         <Button variant="ghost" label="Kết thúc" onPress={onExit} />
       </View>

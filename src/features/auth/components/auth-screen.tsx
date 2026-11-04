@@ -14,7 +14,7 @@ type AuthScreenProps = {
 
 export function AuthScreen({ title, description, children, footer }: AuthScreenProps) {
   return (
-    <SafeAreaView className="flex-1 bg-canvas" edges={['top', 'bottom']}>
+    <SafeAreaView className="flex-1 bg-canvas" edges={['bottom']}>
       <BackHeader fallbackHref="/welcome" />
       <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView

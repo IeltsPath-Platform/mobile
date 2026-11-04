@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, View } from 'react-native';
 
+import { BackHeader } from '@/src/components/navigation/back-header';
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
 import { FormAlert } from '@/src/components/ui/form-alert';
@@ -66,8 +67,9 @@ export default function LessonScreen() {
 
   if (lessonQuery.isPending) {
     return (
-      <View className="flex-1 items-center justify-center bg-canvas">
-        <ActivityIndicator color={colors.accent} />
+      <View className="flex-1 bg-canvas">
+        <BackHeader title="Bài học" fallbackHref="/(tabs)/practice" />
+        <View className="flex-1 items-center justify-center"><ActivityIndicator color={colors.accent} /></View>
       </View>
     );
   }
@@ -75,8 +77,11 @@ export default function LessonScreen() {
   if (lessonQuery.error) {
     const err = lessonQuery.error;
     return (
-      <ScrollView className="flex-1 bg-canvas" contentContainerClassName="px-5 py-6">
-        <FormAlert tone="error" message={isLearningApiError(err) ? err.message : 'Không tải bài học.'} />
+      <View className="flex-1 bg-canvas">
+      <BackHeader title="Bài học" fallbackHref="/(tabs)/practice" />
+      <ScrollView className="flex-1" contentContainerClassName="px-5 py-6">
+        <FormAlert tone="error" message={isLearningApiError(err) ? err.message : 'Không tải được bài học.'} />
+        {!isLearningApiError(err) || !err.reviews[0] ? <View className="mt-4"><Button label="Thử lại" variant="secondary" onPress={() => void lessonQuery.refetch()} /></View> : null}
         {isLearningApiError(err) && err.reviews[0] ? (
           <View className="mt-4">
             <Button
@@ -88,6 +93,7 @@ export default function LessonScreen() {
           </View>
         ) : null}
       </ScrollView>
+      </View>
     );
   }
 
@@ -95,8 +101,10 @@ export default function LessonScreen() {
   const hasExercise = Boolean(exerciseBlock);
 
   return (
-    <ScrollView className="flex-1 bg-canvas" contentContainerClassName="gap-3 px-5 pb-16 pt-4">
-      <Text weight="black" className="text-2xl">
+    <View className="flex-1 bg-canvas">
+    <BackHeader title={lesson.code} subtitle={lesson.title} fallbackHref="/(tabs)/practice" />
+    <ScrollView className="flex-1" keyboardShouldPersistTaps="handled" contentContainerClassName="gap-3 px-5 pb-16 pt-4">
+      <Text accessibilityRole="header" weight="black" className="text-2xl">
         {lesson.code}. {lesson.title}
       </Text>
 
@@ -155,15 +163,15 @@ export default function LessonScreen() {
               {submit.data ? (
                 <Text className="mt-3 text-sm text-muted">
                   {submit.data.blockPassed
-                    ? 'Đạt block · lesson hoàn thành.'
-                    : 'Chưa đạt 70% — sửa đáp án và nộp lại.'}
+                    ? 'Chúc mừng! Bạn đã đạt yêu cầu và hoàn thành bài học.'
+                    : 'Chưa đạt 70%. Xem lại đáp án rồi nộp lại nhé.'}
                 </Text>
               ) : null}
               {submit.error ? (
                 <View className="mt-2">
                   <FormAlert
                     tone="error"
-                    message={isLearningApiError(submit.error) ? submit.error.message : 'Nộp bài lỗi.'}
+                    message={isLearningApiError(submit.error) ? submit.error.message : 'Không nộp được bài. Hãy thử lại.'}
                   />
                 </View>
               ) : null}
@@ -179,7 +187,7 @@ export default function LessonScreen() {
                 </View>
               ) : (
                 <Text weight="bold" className="mt-3 text-sm text-success">
-                  Block đã pass
+                  Bạn đã hoàn thành phần bài tập này
                 </Text>
               )}
             </Card>
@@ -190,7 +198,7 @@ export default function LessonScreen() {
 
       {!hasExercise && lesson.status !== 'COMPLETED' ? (
         <Button
-          label="Hoàn thành bài (không có exercise)"
+          label="Hoàn thành bài học"
           loading={complete.isPending}
           onPress={() => complete.mutate()}
         />
@@ -202,5 +210,6 @@ export default function LessonScreen() {
         />
       ) : null}
     </ScrollView>
+    </View>
   );
 }

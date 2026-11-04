@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { ChevronLeft, SlidersHorizontal } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Switch, View } from 'react-native';
+import { BackHeader } from '@/src/components/navigation/back-header';
 import { Text } from '@/src/components/ui/text';
 import { communityApi } from '@/src/features/community/api';
 import { colors } from '@/src/theme';
@@ -32,11 +33,9 @@ export default function NotificationPreferencesScreen() {
   };
 
   return <View className="flex-1 bg-canvas">
-    <View className="border-b border-line bg-surface px-4 pb-5 pt-3">
-      <Pressable onPress={() => router.back()} className="h-11 w-11 items-center justify-center rounded-full bg-canvas" accessibilityLabel="Quay lại">
-        <ChevronLeft size={21} color={colors.ink} />
-      </Pressable>
-      <View className="mt-4 flex-row items-center">
+    <BackHeader title="Tuỳ chọn thông báo" fallbackHref="/(tabs)/community" />
+    <View className="border-b border-line bg-surface px-4 pb-5 pt-4">
+      <View className="flex-row items-center">
         <View className="h-12 w-12 items-center justify-center rounded-2xl bg-accent-soft"><SlidersHorizontal size={22} color={colors.accent} /></View>
         <View className="ml-3 flex-1"><Text weight="black" className="text-xl">Tuỳ chọn thông báo</Text><Text className="mt-1 text-sm text-muted">Chọn hoạt động bạn muốn nhận tin.</Text></View>
       </View>

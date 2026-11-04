@@ -10,6 +10,10 @@ export type AppSettings = {
   notifyStreak: boolean;
   fontSize: FontSizeOption;
   theme: ThemeOption;
+  /** Answer chimes, tap sounds and word pronunciation. */
+  soundEnabled: boolean;
+  /** Calm background loop while studying. */
+  musicEnabled: boolean;
 };
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -18,6 +22,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   notifyStreak: true,
   fontSize: 'M',
   theme: 'light',
+  soundEnabled: true,
+  musicEnabled: true,
 };
 
 const STORAGE_KEY = '@ielts/app-settings/v1';
@@ -54,6 +60,16 @@ async function writeSettings(next: AppSettings): Promise<void> {
   memoryCache = next;
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   notifyListeners();
+}
+
+/** Non-React access (audio helpers) to the latest persisted settings. */
+export function getAppSettings(): Promise<AppSettings> {
+  return readSettings();
+}
+
+export function subscribeAppSettings(listener: () => void) {
+  listeners.add(listener);
+  return () => { listeners.delete(listener); };
 }
 
 export async function clearAppSettingsStorage(): Promise<void> {

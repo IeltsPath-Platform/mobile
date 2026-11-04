@@ -3,6 +3,8 @@ import { Image, View } from 'react-native';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSpring } from 'react-native-reanimated';
 
 import { Text } from '@/src/components/ui/text';
+import { haptics } from '@/src/lib/haptics';
+import { sound } from '@/src/lib/sound';
 import { colors } from '@/src/theme';
 
 type AnswerFeedbackProps = {
@@ -16,6 +18,11 @@ export function AnswerFeedback({ correct, detail, title }: AnswerFeedbackProps) 
   const reduceMotion = useReducedMotion();
   const scale = useSharedValue(reduceMotion ? 1 : 0.78);
   const opacity = useSharedValue(reduceMotion ? 1 : 0.55);
+
+  useEffect(() => {
+    if (correct) { haptics.success(); void sound.play('correct'); }
+    else { haptics.warning(); void sound.play('wrong'); }
+  }, [correct]);
 
   useEffect(() => {
     if (reduceMotion) {

@@ -2,6 +2,7 @@ import { Pressable, View } from 'react-native';
 
 import { Text } from '@/src/components/ui/text';
 import type { QuestionOptionDto } from '@/src/features/learning/types';
+import { haptics } from '@/src/lib/haptics';
 import { colors } from '@/src/theme';
 
 type TfngButtonsProps = {
@@ -23,8 +24,8 @@ export function TfngButtons({ options, value, onChange, disabled }: TfngButtonsP
             accessibilityRole="button"
             accessibilityState={{ selected, disabled }}
             disabled={disabled}
-            onPress={() => onChange(option.optionKey)}
-            className="min-h-14 items-center justify-center rounded-2xl border px-4"
+            onPress={() => { if (!selected) haptics.select(); onChange(option.optionKey); }}
+            className="min-h-14 active:opacity-80 items-center justify-center rounded-2xl border px-4"
             style={{
               borderColor: selected ? colors.accent : colors.line,
               backgroundColor: selected ? colors.accent : colors.surface,

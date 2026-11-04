@@ -1,6 +1,7 @@
 import { Pressable, View } from 'react-native';
 
 import { Text } from '@/src/components/ui/text';
+import { haptics } from '@/src/lib/haptics';
 import { colors } from '@/src/theme';
 
 type WordBankProps = {
@@ -31,7 +32,7 @@ export function WordBank({ words, value, onChange, disabled }: WordBankProps) {
             accessibilityRole="button"
             accessibilityState={{ selected: on, disabled }}
             disabled={disabled}
-            onPress={() => toggle(word)}
+            onPress={() => { haptics.select(); toggle(word); }}
             className="min-h-11 items-center justify-center rounded-full border px-4"
             style={{
               borderColor: on ? colors.accent : colors.line,

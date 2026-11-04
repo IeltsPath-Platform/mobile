@@ -45,6 +45,7 @@ type Action =
   | { type: 'submitting'; answer: string }
   | { type: 'submitted'; graded: Record<string, Graded>; blockPassed: boolean; lessonCompleted: boolean }
   | { type: 'submit-error'; message: string }
+  | { type: 'back' }
   | { type: 'continue' }
   | { type: 'retry' };
 
@@ -102,22 +103,15 @@ function reducer(state: RunnerState, action: Action): RunnerState {
         message: null,
       };
     }
+    case 'back': {
+      if (state.status !== 'answering' || state.submitting || state.index === 0 || !block) return state;
+      const previous = block.questions[state.index - 1];
+      return { ...state, index: state.index - 1, draft: state.answers[previous.id] ?? '', message: null };
+    }
     case 'submit-error':
       return { ...state, submitting: false, message: action.message };
     case 'continue': {
       if (state.status !== 'feedback' || !state.source || !block) return state;
-      const next = state.index + 1;
-      if (next < block.questions.length) {
-        const question = block.questions[next];
-        return {
-          ...state,
-          index: next,
-          status: 'feedback',
-          feedback: state.graded[question.id] ?? null,
-          draft: state.answers[question.id] ?? '',
-        };
-      }
-
       if (!state.blockPassed) {
         return { ...state, status: 'summary', lessonCompleted: false, feedback: null };
       }
@@ -285,13 +279,15 @@ export function useSessionRunner(lessonId: string) {
 
   const continueNext = useCallback(() => {
     const current = stateRef.current;
-    const block = currentBlock(current.source, current.blockIndex);
-    const atEnd = Boolean(block && current.index + 1 >= block.questions.length);
     const more = Boolean(current.source && current.blockIndex < current.source.blocks.length - 1);
-    if (atEnd && current.blockPassed && more) {
+    if (current.blockPassed && more) {
       requestIdRef.current = newRequestId();
     }
     dispatch({ type: 'continue' });
+  }, []);
+
+  const back = useCallback(() => {
+    dispatch({ type: 'back' });
   }, []);
 
   const retry = useCallback(() => {
@@ -318,6 +314,7 @@ export function useSessionRunner(lessonId: string) {
     setDraft,
     check,
     continueNext,
+    back,
     retry,
   };
 }

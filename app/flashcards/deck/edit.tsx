@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { ArrowLeft, ImagePlus, Layers3, X } from 'lucide-react-native';
+import { ImagePlus, Layers3, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, TextInput, View, KeyboardAvoidingView, Platform } from 'react-native';
+import { BackHeader } from '@/src/components/navigation/back-header';
 import { Button } from '@/src/components/ui/button';
 import { FormAlert } from '@/src/components/ui/form-alert';
 import { Text } from '@/src/components/ui/text';
@@ -40,8 +41,8 @@ export default function EditDeckScreen() {
     }
   };
   const loadingDeck = Boolean(deckId && existing.isPending);
-  return <ScrollView className="flex-1 bg-canvas" contentContainerClassName="px-5 pb-12 pt-3" showsVerticalScrollIndicator={false}>
-    <Pressable accessibilityRole="button" accessibilityLabel="Quay lại" onPress={() => router.back()} className="mb-4 h-11 w-11 items-center justify-center rounded-full bg-surface"><ArrowLeft color={colors.ink}/></Pressable>
+  return <View className="flex-1 bg-canvas"><BackHeader title={deckId ? 'Chỉnh sửa bộ thẻ' : 'Tạo bộ thẻ mới'} fallbackHref="/(tabs)/flashcards" /><KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}><ScrollView className="flex-1" keyboardShouldPersistTaps="handled" contentContainerClassName="px-5 pb-12 pt-3" showsVerticalScrollIndicator={false}>
+    
     <View className="mb-5 rounded-[28px] p-5" style={{ backgroundColor: colors.heroStart }}>
       <View className="h-11 w-11 items-center justify-center rounded-2xl bg-white/15"><Layers3 size={22} color="white"/></View>
       <Text className="mt-4 text-2xl text-white" weight="black">{deckId ? 'Chỉnh sửa bộ thẻ' : 'Tạo bộ thẻ mới'}</Text>
@@ -58,5 +59,5 @@ export default function EditDeckScreen() {
       {error ? <View className="mt-4"><FormAlert tone="error" message={error}/></View> : null}
       <Button className="mt-6" label={deckId ? 'Lưu bộ thẻ' : 'Tạo bộ thẻ'} loading={mutation.isPending || loadingDeck} disabled={!name.trim() || uploadingCover || loadingDeck} onPress={() => { setError(''); mutation.mutate(); }}/>
     </View>
-  </ScrollView>;
+  </ScrollView></KeyboardAvoidingView></View>;
 }

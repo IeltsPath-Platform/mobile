@@ -91,11 +91,11 @@ export function LearningPath({
       }}>
       {/* Soft light map ground — not dark mode */}
       <View pointerEvents="none" className="absolute inset-0">
-        <View className="absolute -left-10 top-8 h-40 w-40 rounded-full bg-[#e7f6ec] opacity-90" />
-        <View className="absolute -right-8 top-48 h-48 w-48 rounded-full bg-[#eef3ff] opacity-90" />
-        <View className="absolute left-16 top-[420px] h-36 w-36 rounded-full bg-[#fff1e6] opacity-80" />
-        <View className="absolute -right-6 bottom-24 h-44 w-44 rounded-full bg-[#e8f5f2] opacity-85" />
-        <View className="absolute left-0 right-0 top-0 h-24 bg-[#f3f6ff]" />
+        <View className="absolute -left-10 top-8 h-40 w-40 rounded-full opacity-90" style={{ backgroundColor: colors.successSoft }} />
+        <View className="absolute -right-8 top-48 h-48 w-48 rounded-full opacity-90" style={{ backgroundColor: colors.accentSoft }} />
+        <View className="absolute left-16 top-[420px] h-36 w-36 rounded-full opacity-80" style={{ backgroundColor: colors.warmSoft }} />
+        <View className="absolute -right-6 bottom-24 h-44 w-44 rounded-full opacity-85" style={{ backgroundColor: colors.listeningSoft }} />
+        <View className="absolute left-0 right-0 top-0 h-24" style={{ backgroundColor: colors.surfaceTint }} />
       </View>
 
       {mapSize.width > 0 && trail ? (

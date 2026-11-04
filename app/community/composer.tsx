@@ -1,6 +1,7 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Check, ChevronDown, Hash, ImagePlus, Palette, RefreshCw, SlidersHorizontal, X } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -14,27 +15,23 @@ import {
   View,
   type ScrollViewInstance,
 } from 'react-native';
-import { ChevronDown, ImagePlus, SlidersHorizontal, X } from 'lucide-react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ActionSheet } from '@/src/components/ui/action-sheet';
+import { Button } from '@/src/components/ui/button';
 import { Text } from '@/src/components/ui/text';
 import { useCurrentUser } from '@/src/features/auth/auth-provider';
 import { communityApi, type PostBackground, type PostCategory } from '@/src/features/community/api';
 import { communityCategoryColor } from '@/src/features/community/community-colors';
-import { postBackgroundColor } from '@/src/features/community/post-background';
 import { CommunityAvatar, CommunityImage } from '@/src/features/community/components/community-image';
+import { CATEGORY_LABELS } from '@/src/features/community/format';
+import { postBackgroundColor } from '@/src/features/community/post-background';
+import { haptics } from '@/src/lib/haptics';
 import { colors } from '@/src/theme';
 
 type PickedImage = { uri: string; name: string; type: string; size: number; url?: string };
 
-const CATEGORIES: { key: PostCategory; label: string }[] = [
-  { key: 'GENERAL', label: 'Chung' },
-  { key: 'QUESTION', label: 'Hỏi đáp' },
-  { key: 'DISCUSSION', label: 'Thảo luận' },
-  { key: 'WRITING_SHARING', label: 'Chia sẻ Writing' },
-  { key: 'SPEAKING_PARTNER', label: 'Tìm bạn Speaking' },
-  { key: 'RESOURCE_TIPS', label: 'Tài nguyên & mẹo' },
-];
+const CATEGORIES = Object.keys(CATEGORY_LABELS) as PostCategory[];
 
 const BACKGROUNDS: { key: PostBackground; label: string }[] = [
   { key: 'VIOLET', label: 'Tím' },
@@ -50,6 +47,7 @@ const BACKGROUNDS: { key: PostBackground; label: string }[] = [
 const MAX_IMAGE_COUNT = 4;
 const MAX_SOURCE_IMAGE_SIZE = 20 * 1024 * 1024;
 const MAX_BODY_LENGTH = 5_000;
+const MAX_BACKGROUND_LENGTH = 280;
 const ALLOWED_IMAGE_HOSTS = ['images.unsplash.com', 'i.imgur.com', 'supabase.co'];
 const ALLOWED_VIDEO_HOSTS = ['youtube.com', 'www.youtube.com', 'youtu.be', 'loom.com', 'www.loom.com', 'drive.google.com'];
 const FEED_QUERY_KEY = ['community', 'feed'] as const;
@@ -68,8 +66,10 @@ function isAllowedHttpsUrl(value: string, hosts: readonly string[], includeSubdo
 export default function ComposerScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
   const currentUser = useCurrentUser();
   const { id } = useLocalSearchParams<{ id?: string }>();
+
   const [category, setCategory] = useState<PostCategory>('GENERAL');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -78,11 +78,12 @@ export default function ComposerScreen() {
   const [targetBand, setTargetBand] = useState('');
   const [background, setBackground] = useState<PostBackground>();
   const [imageUrlInput, setImageUrlInput] = useState('');
-  const [showOptions, setShowOptions] = useState(false);
-  const [showCategories, setShowCategories] = useState(false);
+  const [sheet, setSheet] = useState<'none' | 'category' | 'options'>('none');
+  const [showBackgrounds, setShowBackgrounds] = useState(false);
   const [busy, setBusy] = useState(false);
   const [picking, setPicking] = useState(false);
   const [uploadingUris, setUploadingUris] = useState<string[]>([]);
+  const [failedUris, setFailedUris] = useState<string[]>([]);
   const [error, setError] = useState('');
   const scrollRef = useRef<ScrollViewInstance>(null);
   const hydrated = useRef(false);
@@ -119,13 +120,13 @@ export default function ComposerScreen() {
   }, [existing.data]);
 
   const markDirty = () => { dirty.current = true; };
+  const goBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)/community' as never);
+  };
 
   const close = () => {
     if (busy) return;
-    const goBack = () => {
-      if (router.canGoBack()) router.back();
-      else router.replace('/(tabs)/community' as never);
-    };
     if (dirty.current && (body.trim() || title.trim() || images.length || videoUrl.trim())) {
       Alert.alert('Bỏ bài viết đang soạn?', 'Nội dung bạn vừa nhập sẽ bị xoá.', [
         { text: 'Tiếp tục soạn', style: 'cancel' },
@@ -166,18 +167,16 @@ export default function ComposerScreen() {
         const type = asset.mimeType?.toLowerCase() ?? 'image/jpeg';
         const size = asset.fileSize ?? 0;
         const name = asset.fileName ?? `community-${Date.now()}-${accepted.length}.${type.split('/')[1] ?? 'jpg'}`;
-        if (!type.startsWith('image/')) {
-          rejected.push(`${name}: tệp đã chọn không phải ảnh.`);
-        } else if (size > MAX_SOURCE_IMAGE_SIZE) {
-          rejected.push(`${name}: ảnh gốc cần nhỏ hơn 20 MB.`);
-        } else {
-          accepted.push({ uri: asset.uri, name, type, size });
-        }
+        if (!type.startsWith('image/')) rejected.push(`${name}: tệp đã chọn không phải ảnh.`);
+        else if (size > MAX_SOURCE_IMAGE_SIZE) rejected.push(`${name}: ảnh gốc cần nhỏ hơn 20 MB.`);
+        else accepted.push({ uri: asset.uri, name, type, size });
       }
       if (accepted.length) {
         markDirty();
         setImages((current) => [...current, ...accepted].slice(0, MAX_IMAGE_COUNT));
         setBackground(undefined);
+        setShowBackgrounds(false);
+        haptics.tap();
       }
       setError(rejected.join('\n'));
     } catch (cause) {
@@ -190,18 +189,12 @@ export default function ComposerScreen() {
   const addImageUrl = () => {
     const value = imageUrlInput.trim();
     setError('');
-    if (images.length >= MAX_IMAGE_COUNT) {
-      setError('Mỗi bài viết có thể đính kèm tối đa 4 ảnh.');
-      return;
-    }
+    if (images.length >= MAX_IMAGE_COUNT) { setError('Mỗi bài viết có thể đính kèm tối đa 4 ảnh.'); return; }
     if (value.length > 500 || !isAllowedHttpsUrl(value, ALLOWED_IMAGE_HOSTS, true)) {
       setError('Dùng link HTTPS từ images.unsplash.com, i.imgur.com hoặc kho ảnh Supabase.');
       return;
     }
-    if (images.some((image) => image.url === value)) {
-      setError('Ảnh này đã được thêm vào bài viết.');
-      return;
-    }
+    if (images.some((image) => image.url === value)) { setError('Ảnh này đã được thêm vào bài viết.'); return; }
     markDirty();
     setImages((current) => [...current, { uri: value, url: value, name: 'image-url', type: 'image/jpeg', size: 0 }]);
     setBackground(undefined);
@@ -218,6 +211,7 @@ export default function ComposerScreen() {
       while (index < pending.length) {
         const image = pending[index++];
         setUploadingUris((current) => [...current, image.uri]);
+        setFailedUris((current) => current.filter((uri) => uri !== image.uri));
         try {
           const result = await communityApi.uploadImage(image.uri, image.name, image.type);
           if (!result.url) throw new Error('Máy chủ không trả về đường dẫn ảnh.');
@@ -225,6 +219,7 @@ export default function ComposerScreen() {
           setImages((current) => current.map((item) => item.uri === image.uri ? { ...item, url: result.url } : item));
         } catch (cause) {
           uploadError ??= cause;
+          setFailedUris((current) => [...current, image.uri]);
         } finally {
           setUploadingUris((current) => current.filter((uri) => uri !== image.uri));
         }
@@ -234,6 +229,25 @@ export default function ComposerScreen() {
     await Promise.all(Array.from({ length: Math.min(2, pending.length) }, worker));
     if (uploadError) throw uploadError;
     return images.map((image) => image.url ?? uploadedByUri.get(image.uri)).filter((url): url is string => Boolean(url));
+  };
+
+  const retryUpload = async (image: PickedImage) => {
+    if (busy || uploadingUris.includes(image.uri)) return;
+    setError('');
+    setFailedUris((current) => current.filter((uri) => uri !== image.uri));
+    setUploadingUris((current) => [...current, image.uri]);
+    try {
+      const result = await communityApi.uploadImage(image.uri, image.name, image.type);
+      if (!result.url) throw new Error('Máy chủ không trả về đường dẫn ảnh.');
+      setImages((current) => current.map((item) => item.uri === image.uri ? { ...item, url: result.url } : item));
+      haptics.success();
+    } catch (cause) {
+      setFailedUris((current) => [...current, image.uri]);
+      setError(cause instanceof Error ? `Không tải được ảnh: ${cause.message}` : 'Không tải được ảnh. Hãy thử lại.');
+      haptics.error();
+    } finally {
+      setUploadingUris((current) => current.filter((uri) => uri !== image.uri));
+    }
   };
 
   const submit = async () => {
@@ -249,7 +263,7 @@ export default function ComposerScreen() {
     if (normalizedVideoUrl && (normalizedVideoUrl.length > 500 || !isAllowedHttpsUrl(normalizedVideoUrl, ALLOWED_VIDEO_HOSTS))) {
       return setError('Link video phải là HTTPS từ YouTube, Loom hoặc Google Drive.');
     }
-    if (background && (images.length || normalizedVideoUrl || normalizedBody.length > 280)) {
+    if (background && (images.length || normalizedVideoUrl || normalizedBody.length > MAX_BACKGROUND_LENGTH)) {
       return setError('Bài nền màu chỉ hỗ trợ nội dung chữ tối đa 280 ký tự.');
     }
 
@@ -274,9 +288,10 @@ export default function ComposerScreen() {
         queryClient.invalidateQueries({ queryKey: ['community', 'profile-list'] }),
         ...(id ? [queryClient.invalidateQueries({ queryKey: ['community', 'detail', id] })] : []),
       ]);
-      if (router.canGoBack()) router.back();
-      else router.replace('/(tabs)/community' as never);
+      haptics.success();
+      goBack();
     } catch (cause) {
+      haptics.error();
       setError(cause instanceof Error ? cause.message : 'Không thể đăng bài. Hãy kiểm tra kết nối rồi thử lại.');
       requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: 0, animated: true }));
     } finally {
@@ -284,22 +299,30 @@ export default function ComposerScreen() {
     }
   };
 
-  const canUseBackground = images.length === 0 && !videoUrl.trim() && body.trim().length <= 280;
-  const submittingLabel = uploadingUris.length ? `Đang tải ${uploadingUris.length} ảnh…` : id ? 'Đang lưu…' : 'Đang đăng…';
+  const canUseBackground = images.length === 0 && !videoUrl.trim() && body.trim().length <= MAX_BACKGROUND_LENGTH;
+  const bgColor = background ? postBackgroundColor(background) : undefined;
+  const uploadedCount = images.filter((image) => image.url).length;
+  const submittingLabel = uploadingUris.length ? `Đang tải ảnh ${Math.min(uploadedCount + 1, images.length)}/${images.length}…` : id ? 'Đang lưu…' : 'Đang đăng…';
+  const canPost = Boolean(body.trim()) && !busy && !picking && !(Boolean(id) && (existing.isLoading || existing.isError));
+  const palette = communityCategoryColor(category);
+  const optionCount = [title.trim(), targetBand.trim(), videoUrl.trim()].filter(Boolean).length;
 
   return (
-    <SafeAreaView className="flex-1 bg-canvas" edges={['top', 'bottom']}>
+    <SafeAreaView className="flex-1 bg-canvas" edges={['top']}>
       <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View className="flex-row items-center justify-between border-b border-line bg-surface px-4 py-2.5">
-          <Pressable onPress={close} disabled={busy} className="h-11 min-w-16 justify-center" accessibilityRole="button" accessibilityLabel="Đóng trình soạn bài">
-            <Text weight="semibold" className="text-sm text-muted">Hủy</Text>
+        <View className="min-h-14 flex-row items-center border-b border-line px-2">
+          <Pressable onPress={close} disabled={busy} className="h-11 w-11 items-center justify-center rounded-full active:bg-tint" accessibilityRole="button" accessibilityLabel="Đóng trình soạn bài">
+            <X size={24} color={colors.ink} />
           </Pressable>
-          <View className="items-center">
-            <Text weight="black" className="text-base">{id ? 'Chỉnh sửa bài' : 'Bài viết mới'}</Text>
-            <Text className="text-[10px] text-muted">Chia sẻ cùng IELTSPath</Text>
-          </View>
-          <Pressable onPress={() => void submit()} disabled={busy || picking || !body.trim() || (Boolean(id) && (existing.isLoading || existing.isError))} className={`min-h-10 min-w-[72px] items-center justify-center rounded-full px-4 ${busy || picking || !body.trim() ? 'bg-accent/40' : 'bg-accent'}`} accessibilityRole="button" accessibilityState={{ disabled: busy || picking || !body.trim(), busy }}>
-            <Text weight="bold" className="text-sm text-white">{busy ? 'Đang đăng…' : id ? 'Lưu bài' : 'Đăng'}</Text>
+          <Text accessibilityRole="header" weight="extrabold" className="flex-1 text-center text-base">{id ? 'Sửa bài viết' : 'Bài viết mới'}</Text>
+          <Pressable
+            onPress={() => void submit()}
+            disabled={!canPost}
+            className="min-h-10 min-w-[76px] items-center justify-center rounded-full px-5 active:opacity-80"
+            style={{ backgroundColor: canPost ? colors.accent : colors.surfaceTint }}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !canPost, busy }}>
+            {busy ? <ActivityIndicator size="small" color={colors.onAccent} /> : <Text weight="extrabold" className="text-sm" style={{ color: canPost ? colors.onAccent : colors.muted }}>{id ? 'Lưu' : 'Đăng'}</Text>}
           </Pressable>
         </View>
 
@@ -307,98 +330,215 @@ export default function ComposerScreen() {
           ref={scrollRef}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-          contentContainerClassName="grow px-4 pb-8 pt-3"
+          contentContainerClassName="grow px-4 pb-6 pt-4"
           showsVerticalScrollIndicator={false}>
           {id && existing.isLoading ? <View className="items-center py-10"><ActivityIndicator color={colors.accent} /><Text className="mt-3 text-sm text-muted">Đang tải bài viết…</Text></View> : null}
-          {id && existing.isError ? <View className="mb-4 rounded-2xl border border-danger/30 bg-danger-soft p-4"><Text accessibilityRole="alert" className="text-sm text-danger">Không tải được bài viết để sửa.</Text><Pressable onPress={() => void existing.refetch()} className="mt-3 min-h-11 justify-center"><Text weight="bold" className="text-accent">Thử lại</Text></Pressable></View> : null}
-          {error ? <Text accessibilityRole="alert" className="mb-4 rounded-xl bg-danger-soft px-3 py-2 text-sm leading-5 text-danger">{error}</Text> : null}
-
-          {(!id || existing.data) && !existing.isError ? <>
-            <View className="mb-4 flex-row items-center">
-              <CommunityAvatar uri={ownProfile.data?.avatarUrl} name={ownProfile.data?.displayName ?? currentUser.data?.fullName} size={44} />
-              <View className="ml-3 flex-1">
-                <Text weight="bold" className="text-sm">{currentUser.data?.fullName ?? 'Bạn'}</Text>
-                <Pressable onPress={() => setShowCategories(true)} disabled={busy} className="mt-1 min-h-8 flex-row items-center self-start rounded-full border px-3" style={{ backgroundColor: communityCategoryColor(category).background, borderColor: communityCategoryColor(category).border }} accessibilityRole="button" accessibilityLabel={`Chủ đề: ${CATEGORIES.find((item) => item.key === category)?.label}. Chạm để đổi`}>
-                  <Text weight="semibold" className="text-xs" style={{ color: communityCategoryColor(category).foreground }}>{CATEGORIES.find((item) => item.key === category)?.label ?? 'Chung'}</Text>
-                  <ChevronDown size={14} color={communityCategoryColor(category).foreground} />
-                </Pressable>
-              </View>
+          {id && existing.isError ? (
+            <View className="mb-4 rounded-2xl p-4" style={{ backgroundColor: colors.dangerSoft }}>
+              <Text accessibilityRole="alert" className="text-sm" style={{ color: colors.danger }}>Không tải được bài viết để sửa.</Text>
+              <Pressable onPress={() => void existing.refetch()} className="mt-2 min-h-11 justify-center"><Text weight="bold" className="text-accent">Thử lại</Text></Pressable>
             </View>
+          ) : null}
+          {error ? <Text accessibilityRole="alert" className="mb-4 rounded-xl px-3 py-2.5 text-sm leading-5" style={{ backgroundColor: colors.dangerSoft, color: colors.danger }}>{error}</Text> : null}
 
-            <TextInput
-              value={body}
-              onChangeText={(value) => { markDirty(); setBody(value); if (background && value.trim().length > 280) setBackground(undefined); }}
-              editable={!busy}
-              placeholder="Bạn đang nghĩ gì?"
-              placeholderTextColor={colors.muted}
-              multiline
-              textAlignVertical="top"
-              className="min-h-[168px] rounded-[26px] border border-line bg-surface px-4 py-4 text-base leading-7 text-ink"
-              maxLength={MAX_BODY_LENGTH}
-              accessibilityLabel="Nội dung bài viết"
-            />
-            {body.length > 4_500 ? <Text className="mb-3 text-right text-xs text-muted">{body.length}/{MAX_BODY_LENGTH}</Text> : null}
-
-            {images.length ? <View className="mb-4 mt-2 flex-row flex-wrap gap-2">
-              {images.map((image, index) => <View key={`${image.uri}-${index}`} className="relative">
-                <CommunityImage uri={image.uri} label={`Ảnh đính kèm ${index + 1}`} className="h-28 w-28 rounded-2xl" />
-                {uploadingUris.includes(image.uri) ? <View className="absolute inset-0 items-center justify-center rounded-2xl bg-black/40"><ActivityIndicator color="white" /></View> : null}
-                <Pressable disabled={busy} onPress={() => { markDirty(); setImages((current) => current.filter((_, itemIndex) => itemIndex !== index)); }} className="absolute right-1 top-1 h-8 w-8 items-center justify-center rounded-full bg-surface/95" accessibilityRole="button" accessibilityLabel={`Xóa ảnh ${index + 1}`}><X size={18} color={colors.ink} /></Pressable>
-              </View>)}
-            </View> : null}
-
-            <View className="mt-3 rounded-[26px] border border-line bg-surface p-4">
-              <View className="flex-row items-center justify-between">
-                <Text weight="bold" className="text-sm">Thêm vào bài viết</Text>
-                <Text className="text-xs text-muted">{images.length}/{MAX_IMAGE_COUNT} ảnh</Text>
-              </View>
-              {images.some((image) => !image.url) ? <Text className="mt-1 text-xs leading-5 text-muted">Ảnh sẽ tải lên khi bạn nhấn Đăng bài.</Text> : null}
-              <View className="mt-2 flex-row items-center gap-2">
-                <Pressable onPress={() => void pickImages()} disabled={busy || picking || images.length >= MAX_IMAGE_COUNT} className="h-12 w-12 items-center justify-center rounded-xl bg-success-soft" accessibilityRole="button" accessibilityLabel="Thêm ảnh">
-                  {picking ? <ActivityIndicator color={colors.success} /> : <ImagePlus size={22} color={colors.success} />}
-                </Pressable>
-                <Pressable onPress={() => setShowOptions((value) => !value)} disabled={busy} className="min-h-11 flex-row items-center gap-2 rounded-xl bg-canvas px-3" accessibilityRole="button" accessibilityState={{ expanded: showOptions }}>
-                  <SlidersHorizontal size={16} color={colors.muted} />
-                  <Text weight="semibold" className="text-sm text-muted">{showOptions ? 'Ẩn tuỳ chọn' : 'Tuỳ chọn thêm'}</Text>
-                </Pressable>
+          {(!id || existing.data) && !existing.isError ? (
+            <>
+              <View className="flex-row items-center">
+                <CommunityAvatar uri={ownProfile.data?.avatarUrl} name={ownProfile.data?.displayName ?? currentUser.data?.fullName} size={44} />
+                <View className="ml-3 flex-1 items-start">
+                  <Text weight="bold" className="text-base">{currentUser.data?.fullName ?? 'Bạn'}</Text>
+                  <Pressable
+                    onPress={() => setSheet('category')}
+                    disabled={busy}
+                    className="mt-1 min-h-8 flex-row items-center gap-1 rounded-full border px-3 active:opacity-70"
+                    style={{ backgroundColor: palette.background, borderColor: palette.border }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Chủ đề: ${CATEGORY_LABELS[category]}. Chạm để đổi`}>
+                    <Text weight="bold" className="text-xs" style={{ color: palette.foreground }}>{CATEGORY_LABELS[category]}</Text>
+                    <ChevronDown size={14} color={palette.foreground} />
+                  </Pressable>
+                </View>
               </View>
 
-              {showOptions ? <View className="mt-3 gap-3 border-t border-line pt-3">
-                <TextInput value={title} onChangeText={(value) => { markDirty(); setTitle(value); }} editable={!busy} placeholder="Tiêu đề (không bắt buộc)" placeholderTextColor={colors.muted} maxLength={200} className="min-h-11 rounded-xl border border-line bg-canvas px-3 text-base text-ink" accessibilityLabel="Tiêu đề bài viết" />
-                <TextInput value={imageUrlInput} onChangeText={setImageUrlInput} editable={!busy} placeholder="Dán link ảnh HTTPS" placeholderTextColor={colors.muted} autoCapitalize="none" keyboardType="url" className="min-h-11 rounded-xl border border-line bg-canvas px-3 text-sm text-ink" accessibilityLabel="Link ảnh" />
-                <Pressable onPress={addImageUrl} disabled={busy || !imageUrlInput.trim()} className="min-h-10 self-start justify-center rounded-full bg-accent-soft px-4"><Text weight="bold" className="text-sm text-accent">Thêm ảnh từ link</Text></Pressable>
-                <View className="flex-row gap-3">
-                  <TextInput value={targetBand} onChangeText={(value) => { markDirty(); setTargetBand(value); }} editable={!busy} placeholder="Band mục tiêu" placeholderTextColor={colors.muted} keyboardType="decimal-pad" className="min-h-11 flex-1 rounded-xl border border-line bg-canvas px-3 text-sm text-ink" accessibilityLabel="Band mục tiêu từ 0 đến 9 theo bước 0,5" />
-                  <TextInput value={videoUrl} onChangeText={(value) => { markDirty(); setVideoUrl(value); if (value.trim()) setBackground(undefined); }} editable={!busy} placeholder="Link YouTube, Loom…" placeholderTextColor={colors.muted} autoCapitalize="none" keyboardType="url" className="min-h-11 flex-1 rounded-xl border border-line bg-canvas px-3 text-sm text-ink" accessibilityLabel="Link video HTTPS từ YouTube, Loom hoặc Google Drive" />
+              {bgColor ? (
+                <View className="mt-4 min-h-[220px] justify-center rounded-2xl px-6 py-8" style={{ backgroundColor: bgColor }}>
+                  <TextInput
+                    value={body}
+                    onChangeText={(value) => { markDirty(); setBody(value); if (value.trim().length > MAX_BACKGROUND_LENGTH) setBackground(undefined); }}
+                    editable={!busy}
+                    placeholder="Viết điều bạn muốn chia sẻ…"
+                    placeholderTextColor="rgba(255,255,255,0.65)"
+                    multiline
+                    maxLength={MAX_BODY_LENGTH}
+                    accessibilityLabel="Nội dung bài viết"
+                    className="text-center text-xl leading-8 text-white"
+                    style={{ fontFamily: 'BeVietnamPro_700Bold' }}
+                  />
                 </View>
-                <View>
-                  <View className="flex-row items-center justify-between"><Text weight="bold" className="text-sm">Nền bài viết</Text><Text className="text-xs text-muted">Chỉ dùng cho bài chữ ngắn</Text></View>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-2" contentContainerClassName="gap-3 pb-1">
-                    <Pressable onPress={() => { markDirty(); setBackground(undefined); }} className="items-center" accessibilityRole="button" accessibilityState={{ selected: !background }}><View className="h-10 w-10 items-center justify-center rounded-full border border-line bg-surface"><Text>×</Text></View><Text className="mt-1 text-[10px] text-muted">Trắng</Text></Pressable>
-                    {BACKGROUNDS.map((item) => <Pressable key={item.key} onPress={() => { markDirty(); if (canUseBackground) setBackground(background === item.key ? undefined : item.key); else setError('Nền màu chỉ dùng cho bài chữ tối đa 280 ký tự.'); }} className="items-center" accessibilityRole="button" accessibilityState={{ selected: background === item.key }}><View className="h-10 w-10 rounded-full border-2" style={{ backgroundColor: postBackgroundColor(item.key), borderColor: background === item.key ? colors.accent : colors.line }} /><Text className="mt-1 text-[10px] text-muted">{item.label}</Text></Pressable>)}
-                  </ScrollView>
-                  {background ? <View className="mt-2 rounded-xl p-4" style={{ backgroundColor: postBackgroundColor(background) }}><Text className="text-center text-white">{body.trim() || 'Bài viết của bạn'}</Text></View> : null}
-                </View>
-              </View> : null}
-            </View>
-          </> : null}
+              ) : (
+                <TextInput
+                  value={body}
+                  onChangeText={(value) => { markDirty(); setBody(value); if (background && value.trim().length > MAX_BACKGROUND_LENGTH) setBackground(undefined); }}
+                  editable={!busy}
+                  autoFocus={!id}
+                  placeholder="Bạn đang học gì hôm nay? Hỏi, chia sẻ hoặc tìm bạn luyện cùng…"
+                  placeholderTextColor={colors.muted}
+                  multiline
+                  textAlignVertical="top"
+                  maxLength={MAX_BODY_LENGTH}
+                  accessibilityLabel="Nội dung bài viết"
+                  className="mt-3 min-h-[180px] text-lg leading-7 text-ink"
+                />
+              )}
 
-          {busy ? <View className="mt-4 flex-row items-center justify-center gap-2"><ActivityIndicator color={colors.accent} /><Text className="text-sm text-muted">{submittingLabel}</Text></View> : null}
+              {images.length ? (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-4" contentContainerClassName="gap-3 pr-2">
+                  {images.map((image, index) => (
+                    <View key={`${image.uri}-${index}`} className="relative">
+                      <CommunityImage uri={image.uri} label={`Ảnh đính kèm ${index + 1}`} className="h-32 w-32 rounded-2xl" />
+                      {uploadingUris.includes(image.uri) ? <View className="absolute inset-0 items-center justify-center rounded-2xl bg-black/45"><ActivityIndicator color="white" /></View> : null}
+                      {failedUris.includes(image.uri) && !uploadingUris.includes(image.uri) ? (
+                        <Pressable onPress={() => void retryUpload(image)} disabled={busy} className="absolute inset-0 items-center justify-center rounded-2xl bg-black/60" accessibilityRole="button" accessibilityLabel={`Tải lại ảnh ${index + 1} bị lỗi`}>
+                          <RefreshCw size={20} color="white" /><Text weight="bold" className="mt-1 text-[11px] text-white">Thử lại</Text>
+                        </Pressable>
+                      ) : null}
+                      {image.url && image.size > 0 && !uploadingUris.includes(image.uri) ? <View className="absolute bottom-1.5 left-1.5 h-5 w-5 items-center justify-center rounded-full" style={{ backgroundColor: colors.success }}><Check size={12} color="white" strokeWidth={3} /></View> : null}
+                      <Pressable disabled={busy} onPress={() => { markDirty(); setFailedUris((current) => current.filter((uri) => uri !== image.uri)); setImages((current) => current.filter((_, itemIndex) => itemIndex !== index)); }} className="absolute right-1 top-1 h-9 w-9 items-center justify-center rounded-full bg-black/55" accessibilityRole="button" accessibilityLabel={`Xóa ảnh ${index + 1}`}>
+                        <X size={17} color="white" />
+                      </Pressable>
+                    </View>
+                  ))}
+                </ScrollView>
+              ) : null}
+
+              {optionCount > 0 ? (
+                <View className="mt-4 flex-row flex-wrap gap-2">
+                  {title.trim() ? <SummaryChip label={`Tiêu đề: ${title.trim()}`} /> : null}
+                  {targetBand.trim() ? <SummaryChip label={`Band ${targetBand.trim()}`} /> : null}
+                  {videoUrl.trim() ? <SummaryChip label="Có video" /> : null}
+                </View>
+              ) : null}
+
+              {busy ? <View className="mt-4 flex-row items-center justify-center gap-2"><ActivityIndicator color={colors.accent} /><Text className="text-sm text-muted">{submittingLabel}</Text></View> : null}
+            </>
+          ) : null}
         </ScrollView>
+
+        {showBackgrounds ? (
+          <View className="border-t border-line bg-surface">
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="items-center gap-3 px-4 py-3">
+              <Pressable onPress={() => { markDirty(); setBackground(undefined); }} className="items-center" accessibilityRole="button" accessibilityLabel="Không dùng nền màu" accessibilityState={{ selected: !background }}>
+                <View className="h-11 w-11 items-center justify-center rounded-full border-2" style={{ borderColor: !background ? colors.accent : colors.line }}><X size={16} color={colors.muted} /></View>
+              </Pressable>
+              {BACKGROUNDS.map((item) => (
+                <Pressable
+                  key={item.key}
+                  onPress={() => {
+                    markDirty();
+                    if (!canUseBackground) { setError('Nền màu chỉ dùng cho bài chỉ có chữ, tối đa 280 ký tự.'); haptics.warning(); return; }
+                    haptics.select();
+                    setBackground(background === item.key ? undefined : item.key);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Nền ${item.label}`}
+                  accessibilityState={{ selected: background === item.key }}>
+                  <View className="h-11 w-11 rounded-full border-2" style={{ backgroundColor: postBackgroundColor(item.key), borderColor: background === item.key ? colors.accent : 'transparent' }} />
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
+
+        <View className="min-h-14 flex-row items-center border-t border-line bg-surface px-2" style={{ paddingBottom: Platform.OS === 'ios' ? Math.max(insets.bottom - 8, 0) : 0 }}>
+          <ToolButton label={picking ? 'Đang mở thư viện ảnh' : `Thêm ảnh, ${images.length}/${MAX_IMAGE_COUNT}`} disabled={busy || picking || images.length >= MAX_IMAGE_COUNT} onPress={() => void pickImages()}>
+            {picking ? <ActivityIndicator color={colors.success} /> : <ImagePlus size={23} color={colors.success} />}
+          </ToolButton>
+          <ToolButton label="Nền màu cho bài chữ" disabled={busy} active={showBackgrounds} onPress={() => setShowBackgrounds((open) => !open)}>
+            <Palette size={23} color={showBackgrounds ? colors.accent : colors.reaction.helpful} />
+          </ToolButton>
+          <ToolButton label={optionCount ? `Tùy chọn thêm, đã đặt ${optionCount}` : 'Tùy chọn thêm'} disabled={busy} onPress={() => setSheet('options')}>
+            <SlidersHorizontal size={22} color={colors.accentDeep} />
+            {optionCount ? <View className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full" style={{ backgroundColor: colors.accentWarm }} /> : null}
+          </ToolButton>
+          <View className="flex-1" />
+          <Text className="mr-3 text-xs" style={{ color: body.length > MAX_BODY_LENGTH - 500 ? colors.danger : colors.muted }}>
+            {images.length ? `${images.length}/${MAX_IMAGE_COUNT} ảnh · ` : ''}{body.length > 3_500 ? `${body.length}/${MAX_BODY_LENGTH}` : ''}
+          </Text>
+        </View>
       </KeyboardAvoidingView>
 
-      <Modal visible={showCategories} transparent animationType="slide" onRequestClose={() => setShowCategories(false)}>
-        <Pressable className="flex-1 justify-end bg-black/40" onPress={() => setShowCategories(false)}>
-          <Pressable className="rounded-t-3xl bg-surface px-5 pb-8 pt-3" onPress={(event) => event.stopPropagation()}>
+      <ActionSheet
+        visible={sheet === 'category'}
+        title="Chọn chủ đề"
+        items={CATEGORIES.map((key) => ({
+          label: CATEGORY_LABELS[key],
+          icon: key === category ? Check : Hash,
+          onPress: () => { markDirty(); setCategory(key); haptics.select(); },
+        }))}
+        onClose={() => setSheet('none')}
+      />
+
+      <Modal visible={sheet === 'options'} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setSheet('none')}>
+        <KeyboardAvoidingView className="flex-1 justify-end bg-black/50" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <Pressable className="flex-1" onPress={() => setSheet('none')} accessibilityRole="button" accessibilityLabel="Đóng tùy chọn" />
+          <View className="rounded-t-[28px] bg-surface px-5 pt-3" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
             <View className="mb-3 h-1 w-10 self-center rounded-full bg-line" />
-            <Text weight="black" className="mb-2 text-lg">Chọn chủ đề</Text>
-            {CATEGORIES.map((item) => { const palette = communityCategoryColor(item.key); return <Pressable key={item.key} disabled={busy} onPress={() => { markDirty(); setCategory(item.key); setShowCategories(false); }} className="min-h-12 flex-row items-center justify-between border-b border-line">
-              <View className="flex-row items-center gap-3"><View className="h-3 w-3 rounded-full" style={{ backgroundColor: palette.foreground }} /><Text weight={category === item.key ? 'bold' : 'regular'} style={{ color: category === item.key ? palette.foreground : colors.ink }}>{item.label}</Text></View>
-              {category === item.key ? <Text weight="bold" style={{ color: palette.foreground }}>✓</Text> : null}
-            </Pressable>; })}
-          </Pressable>
-        </Pressable>
+            <Text weight="extrabold" className="text-lg">Tùy chọn thêm</Text>
+            <ScrollView keyboardShouldPersistTaps="handled" className="max-h-[420px]" showsVerticalScrollIndicator={false}>
+              <Field label="Tiêu đề" hint="Không bắt buộc">
+                <TextInput value={title} onChangeText={(value) => { markDirty(); setTitle(value); }} placeholder="Ví dụ: Cách mình tăng Writing 0,5 band" placeholderTextColor={colors.muted} maxLength={200} className="min-h-12 rounded-xl bg-surfaceTint px-4 text-base text-ink" accessibilityLabel="Tiêu đề bài viết" />
+              </Field>
+              <Field label="Band mục tiêu" hint="Từ 0 đến 9, bước 0,5">
+                <TextInput value={targetBand} onChangeText={(value) => { markDirty(); setTargetBand(value); }} placeholder="6.5" placeholderTextColor={colors.muted} keyboardType="decimal-pad" className="min-h-12 rounded-xl bg-surfaceTint px-4 text-base text-ink" accessibilityLabel="Band mục tiêu" />
+              </Field>
+              <Field label="Link video" hint="YouTube, Loom hoặc Google Drive (HTTPS)">
+                <TextInput value={videoUrl} onChangeText={(value) => { markDirty(); setVideoUrl(value); if (value.trim()) setBackground(undefined); }} placeholder="https://youtu.be/…" placeholderTextColor={colors.muted} autoCapitalize="none" keyboardType="url" className="min-h-12 rounded-xl bg-surfaceTint px-4 text-base text-ink" accessibilityLabel="Link video" />
+              </Field>
+              <Field label="Thêm ảnh từ link" hint="images.unsplash.com, i.imgur.com hoặc kho ảnh Supabase">
+                <View className="flex-row items-center gap-2">
+                  <TextInput value={imageUrlInput} onChangeText={setImageUrlInput} placeholder="https://…" placeholderTextColor={colors.muted} autoCapitalize="none" keyboardType="url" className="min-h-12 flex-1 rounded-xl bg-surfaceTint px-4 text-base text-ink" accessibilityLabel="Link ảnh" />
+                  <Pressable onPress={addImageUrl} disabled={!imageUrlInput.trim()} accessibilityRole="button" className="min-h-12 justify-center rounded-xl px-4 active:opacity-80" style={{ backgroundColor: imageUrlInput.trim() ? colors.accent : colors.surfaceTint }}>
+                    <Text weight="bold" className="text-sm" style={{ color: imageUrlInput.trim() ? colors.onAccent : colors.muted }}>Thêm</Text>
+                  </Pressable>
+                </View>
+              </Field>
+            </ScrollView>
+            <View className="mt-4"><Button label="Xong" onPress={() => setSheet('none')} /></View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
+  );
+}
+
+function ToolButton({ label, onPress, disabled, active, children }: { label: string; onPress: () => void; disabled?: boolean; active?: boolean; children: React.ReactNode }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: Boolean(disabled), selected: Boolean(active) }}
+      className={`h-12 w-12 items-center justify-center rounded-full active:bg-tint ${disabled ? 'opacity-40' : ''}`}>
+      {children}
+    </Pressable>
+  );
+}
+
+function Field({ label, hint, children }: { label: string; hint: string; children: React.ReactNode }) {
+  return (
+    <View className="mt-4">
+      <Text weight="bold" className="text-sm">{label}</Text>
+      <Text className="mb-2 mt-0.5 text-xs text-muted">{hint}</Text>
+      {children}
+    </View>
+  );
+}
+
+function SummaryChip({ label }: { label: string }) {
+  return (
+    <View className="max-w-full rounded-full px-3 py-1.5" style={{ backgroundColor: colors.accentSoft }}>
+      <Text weight="semibold" numberOfLines={1} className="text-xs text-accent-deep">{label}</Text>
+    </View>
   );
 }

@@ -1,21 +1,25 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/src/components/ui/button';
 import { FormAlert } from '@/src/components/ui/form-alert';
 import { BackHeader } from '@/src/components/navigation/back-header';
-import { AnswerFeedback } from '@/src/features/session/components/answer-feedback';
 import { Text } from '@/src/components/ui/text';
 import { ChoiceButtons } from '@/src/features/session/components/choice-buttons';
 import { FillInput } from '@/src/features/session/components/fill-input';
+import { BlockReview } from '@/src/features/session/components/block-review';
+import { SoundToggle, useStudyMusic } from '@/src/features/session/components/sound-toggle';
 import { ProgressHeader } from '@/src/features/session/components/progress-header';
 import { TfngButtons } from '@/src/features/session/components/tfng-buttons';
 import { WordBank } from '@/src/features/session/components/word-bank';
 import { SESSION_DONE_KEY } from '@/src/features/session/completion';
 import { questionKind } from '@/src/features/session/question-kind';
 import { useSessionRunner } from '@/src/features/session/use-session-runner';
+import { haptics } from '@/src/lib/haptics';
+import { sound } from '@/src/lib/sound';
 import { colors } from '@/src/theme';
 
 export default function SessionScreen() {
@@ -23,6 +27,32 @@ export default function SessionScreen() {
   const queryClient = useQueryClient();
   const runner = useSessionRunner(lessonId ?? '');
   const [passageOpen, setPassageOpen] = useState(false);
+  const insets = useSafeAreaInsets();
+  useStudyMusic(runner.status === 'answering' || runner.status === 'feedback');
+  const inProgress = runner.status === 'answering' || runner.status === 'feedback';
+
+  // Leaving mid-lesson loses unsent answers, so confirm once there is something to lose.
+  const requestExit = () => {
+    const leave = () => { if (router.canGoBack()) router.back(); else router.replace('/(tabs)/practice' as never); };
+    if (!inProgress || (runner.globalIndex === 0 && runner.status === 'answering' && !runner.draft)) { leave(); return; }
+    Alert.alert('Thoát bài học?', 'Các câu bạn chưa nộp sẽ không được lưu.', [
+      { text: 'Tiếp tục học', style: 'cancel' },
+      { text: 'Thoát', style: 'destructive', onPress: leave },
+    ]);
+  };
+
+  useEffect(() => {
+    if (runner.status === 'feedback') {
+      if (runner.blockPassed) { haptics.success(); void sound.play('correct'); }
+      else { haptics.warning(); void sound.play('wrong'); }
+    }
+  }, [runner.status, runner.blockPassed]);
+
+  useEffect(() => {
+    if (runner.status !== 'summary') return;
+    if (runner.lessonCompleted) { haptics.success(); void sound.play('complete'); }
+    else haptics.warning();
+  }, [runner.status, runner.lessonCompleted]);
 
   useEffect(() => {
     if (runner.status === 'summary' && runner.lessonCompleted && lessonId) {
@@ -143,6 +173,30 @@ export default function SessionScreen() {
   }
 
   const question = runner.question;
+  const reviewBlock = runner.source?.blocks[runner.blockIndex];
+  if (runner.status === 'feedback' && reviewBlock) {
+    const total = reviewBlock.questions.length;
+    const right = reviewBlock.questions.filter((item) => runner.graded[item.id]?.correct).length;
+    const more = runner.blockIndex < (runner.source?.blocks.length ?? 0) - 1;
+    const reviewLabel = runner.blockPassed && more ? 'Sang phần tiếp theo' : runner.blockPassed ? 'Hoàn thành bài' : 'Xem kết quả';
+    return (
+      <View className="flex-1 bg-canvas">
+        <BackHeader title={runner.source?.title ?? 'Bài học'} onBack={requestExit} backLabel="Thoát bài học" fallbackHref="/(tabs)/practice" rightAction={<SoundToggle />} />
+        <ScrollView className="flex-1" contentContainerClassName="px-5 pb-8 pt-4" showsVerticalScrollIndicator={false}>
+          <View className="mb-4 rounded-2xl p-4" style={{ backgroundColor: runner.blockPassed ? colors.successSoft : colors.warmSoft }}>
+            <Text weight="black" className="text-xl" style={{ color: runner.blockPassed ? colors.success : colors.accentWarm }}>
+              {runner.blockPassed ? 'Làm tốt lắm!' : 'Chưa đạt, xem lại nhé'}
+            </Text>
+            <Text className="mt-1 text-sm text-muted">Đúng {right}/{total} câu{runner.blockPassed ? '' : ' · cần khoảng 70% để qua phần này'}</Text>
+          </View>
+          <BlockReview questions={reviewBlock.questions} answers={runner.answers} graded={runner.graded} />
+        </ScrollView>
+        <View className="border-t border-line bg-surface px-5 pt-3" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
+          <Button label={reviewLabel} onPress={runner.continueNext} />
+        </View>
+      </View>
+    );
+  }
   if (!question) {
     return (
       <View className="flex-1 bg-canvas">
@@ -155,25 +209,19 @@ export default function SessionScreen() {
   }
 
   const kind = questionKind(question);
-  const locked = runner.status === 'feedback';
+  const locked = false;
   const isLast = runner.index >= runner.blockTotal - 1;
-  const moreBlocks = Boolean(runner.source && runner.blockIndex < runner.source.blocks.length - 1);
-  const checkLabel = isLast ? 'Nộp bài' : 'Tiếp';
-  const continueLabel = !isLast ? 'Tiếp tục' : runner.blockPassed && moreBlocks ? 'Phần tiếp' : 'Xem kết quả';
+  const checkLabel = isLast ? 'Nộp bài' : 'Câu tiếp theo';
 
   return (
-    <View className="flex-1 bg-canvas">
-      <ScrollView contentContainerClassName="px-5 pb-8 pt-4" showsVerticalScrollIndicator={false}>
+    <KeyboardAvoidingView className="flex-1 bg-canvas" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <BackHeader title={runner.source?.title ?? 'Bài học'} onBack={requestExit} backLabel="Thoát bài học" fallbackHref="/(tabs)/practice" rightAction={<SoundToggle />} />
+      <ScrollView className="flex-1" keyboardShouldPersistTaps="handled" contentContainerClassName="px-5 pb-8 pt-4" showsVerticalScrollIndicator={false}>
         <ProgressHeader index={runner.globalIndex} total={runner.globalTotal} />
-        {runner.source?.title ? (
-          <Text weight="bold" className="mt-4 text-xs uppercase tracking-wide text-accent-deep">
-            {runner.source.title}
-          </Text>
-        ) : null}
-
         {question.passageExcerpt ? (
           <Pressable
             accessibilityRole="button"
+            accessibilityState={{ expanded: passageOpen }}
             onPress={() => setPassageOpen((open) => !open)}
             className="mt-3 rounded-2xl bg-surface px-4 py-3">
             <Text weight="bold" className="text-xs text-muted">
@@ -206,18 +254,6 @@ export default function SessionScreen() {
           ) : null}
         </View>
 
-        {runner.feedback ? (
-          <AnswerFeedback
-            key={`${runner.globalIndex}-${runner.feedback.correct}`}
-            correct={runner.feedback.correct}
-            title={runner.feedback.correct ? 'Chính xác! Làm tốt lắm.' : 'Chưa đúng, mình thử lại nhé.'}
-            detail={[
-              !runner.feedback.correct && runner.feedback.correctAnswer ? `Đáp án: ${runner.feedback.correctAnswer}` : null,
-              runner.feedback.explanation,
-            ].filter(Boolean).join('\n') || null}
-          />
-        ) : null}
-
         {runner.message ? (
           <View className="mt-4">
             <FormAlert tone="error" message={runner.message} />
@@ -225,18 +261,21 @@ export default function SessionScreen() {
         ) : null}
       </ScrollView>
 
-      <View className="border-t border-line bg-surface px-5 pb-6 pt-3">
-        {runner.status === 'answering' ? (
+      <View className="border-t border-line bg-surface px-5 pt-3" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
+        <View className="flex-row gap-3">
+          {runner.index > 0 ? (
+            <Button className="flex-1" variant="secondary" label="Câu trước" disabled={runner.submitting} onPress={runner.back} />
+          ) : null}
           <Button
+            className="flex-[2]"
             label={checkLabel}
             loading={runner.submitting}
+            loadingLabel="Đang chấm bài…"
             disabled={!runner.draft.trim()}
-            onPress={() => void runner.check()}
+            onPress={() => { haptics.tap(); void runner.check(); }}
           />
-        ) : (
-          <Button label={continueLabel} onPress={runner.continueNext} />
-        )}
+        </View>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }

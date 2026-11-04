@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useFocusEffect } from 'expo-router';
 import { BookOpenCheck, ChevronRight, Layers3, Plus, RotateCcw, Sparkles } from 'lucide-react-native';
 import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, View, type ScrollViewInstance } from 'react-native';
+import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, View, type ScrollViewInstance } from 'react-native';
 
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
@@ -35,7 +35,7 @@ export default function FlashcardsScreen() {
   };
 
   return (
-    <ScrollView ref={scrollRef} className="flex-1 bg-canvas" contentContainerClassName="px-5 pb-28 pt-3" showsVerticalScrollIndicator={false}>
+    <ScrollView ref={scrollRef} className="flex-1 bg-canvas" contentContainerClassName="px-5 pb-28 pt-3" showsVerticalScrollIndicator={false} refreshControl={enabled ? <RefreshControl refreshing={(decks.isRefetching || cards.isRefetching) && !decks.isPending} onRefresh={() => { void decks.refetch(); void cards.refetch(); }} tintColor={colors.accent} /> : undefined}>
       <View className="mb-5 flex-row items-center justify-between">
         <View>
           <Text className="text-[25px] leading-8" weight="black">Flashcards</Text>
@@ -48,7 +48,7 @@ export default function FlashcardsScreen() {
         <View className="flex-row items-center gap-3">
           <View className="h-11 w-11 items-center justify-center rounded-2xl bg-white/15"><RotateCcw size={21} color="white"/></View>
           <View className="flex-1"><Text className="text-[10px] uppercase tracking-[1.6px] text-white/70" weight="bold">HÔM NAY</Text><Text className="mt-1 text-xl text-white" weight="black">{due} thẻ đến hạn</Text></View>
-          <Sparkles size={21} color="#ffd68a"/>
+          <Sparkles size={21} color={colors.warning}/>
         </View>
         <Text className="mt-3 text-sm leading-5 text-white/75">Ôn đều mỗi ngày để từ mới ở lại lâu hơn.</Text>
         <Pressable accessibilityRole="button" onPress={() => due > 0 ? router.push('/flashcards/study') : setTab('decks')} className="mt-4 min-h-11 flex-row items-center justify-center gap-2 self-start rounded-full bg-white px-5">

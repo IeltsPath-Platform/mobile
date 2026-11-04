@@ -2,6 +2,7 @@ import { Pressable, View } from 'react-native';
 
 import { Text } from '@/src/components/ui/text';
 import type { QuestionOptionDto } from '@/src/features/learning/types';
+import { haptics } from '@/src/lib/haptics';
 import { colors } from '@/src/theme';
 
 type ChoiceButtonsProps = {
@@ -23,8 +24,8 @@ export function ChoiceButtons({ options, value, onChange, disabled }: ChoiceButt
             accessibilityRole="button"
             accessibilityState={{ selected, disabled }}
             disabled={disabled}
-            onPress={() => onChange(option.optionKey)}
-            className="min-h-14 justify-center rounded-2xl border px-4 py-3"
+            onPress={() => { if (!selected) haptics.select(); onChange(option.optionKey); }}
+            className="min-h-14 active:opacity-80 justify-center rounded-2xl border px-4 py-3"
             style={{
               borderColor: selected ? colors.accent : colors.line,
               backgroundColor: selected ? colors.accentSoft : colors.surface,

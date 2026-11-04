@@ -1,32 +1,32 @@
 import { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, Heart, Lightbulb, ThumbsUp } from 'lucide-react-native';
+import { ThumbsUp } from 'lucide-react-native';
 import { Animated, Pressable, View, type GestureResponderEvent, type ViewInstance } from 'react-native';
 import { Text } from '@/src/components/ui/text';
 import type { ReactionType } from '@/src/features/community/api';
+import { getReactions } from '@/src/features/community/reaction-meta';
+import { haptics } from '@/src/lib/haptics';
 import { colors } from '@/src/theme';
 
-const reactions: { type: ReactionType; label: string; Icon: typeof ThumbsUp; color: string }[] = [
-  { type: 'LIKE', label: 'Thích', Icon: ThumbsUp, color: '#1877f2' },
-  { type: 'LOVE', label: 'Yêu thích', Icon: Heart, color: '#e41e3f' },
-  { type: 'HELPFUL', label: 'Hữu ích', Icon: Lightbulb, color: '#d97706' },
-  { type: 'ACCURATE', label: 'Chính xác', Icon: CheckCircle2, color: '#059669' },
-];
-
 type Props = {
+  /** Icon + count only (feed rows); the full labelled button is used on the detail screen. */
+  compact?: boolean;
+  count?: number;
   selected?: ReactionType | null;
   disabled?: boolean;
   onSelect: (reaction: ReactionType) => void;
 };
 
 /** Quick tap applies/removes the current reaction; holding opens the reaction tray. */
-export function CommunityReactionControl({ selected, disabled = false, onSelect }: Props) {
+export function CommunityReactionControl({ selected, disabled = false, onSelect, compact = false, count = 0 }: Props) {
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState<ReactionType | null>(null);
+  const hoveredRef = useRef<ReactionType | null>(null);
   const suppressTap = useRef(false);
   const dragging = useRef(false);
   const clearSuppressTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const reactionRefs = useRef(new Map<ReactionType, ViewInstance>());
   const reactionBounds = useRef(new Map<ReactionType, { left: number; top: number; right: number; bottom: number }>());
+  const reactions = getReactions();
   const scales = useRef(new Map(reactions.map(({ type }) => [type, new Animated.Value(1)]))).current;
   const active = reactions.find((item) => item.type === selected);
   const ActiveIcon = active?.Icon ?? ThumbsUp;
@@ -60,7 +60,11 @@ export function CommunityReactionControl({ selected, disabled = false, onSelect 
   const updateHovered = (event: GestureResponderEvent) => {
     if (!dragging.current) return;
     const point = touchPoint(event);
-    if (point) setHovered(findReaction(point.x, point.y));
+    if (!point) return;
+    const next = findReaction(point.x, point.y);
+    if (next && next !== hoveredRef.current) haptics.select();
+    hoveredRef.current = next;
+    setHovered(next);
   };
   const finishDrag = (event: GestureResponderEvent) => {
     if (!dragging.current) return;
@@ -69,10 +73,13 @@ export function CommunityReactionControl({ selected, disabled = false, onSelect 
     const target = point ? findReaction(point.x, point.y) : hovered;
     setOpen(false);
     setHovered(null);
-    if (target) onSelect(target);
+    hoveredRef.current = null;
+    if (target) { haptics.tap(); onSelect(target); }
   };
 
   const onLongPress = () => {
+    haptics.hold();
+    hoveredRef.current = null;
     suppressTap.current = true;
     dragging.current = true;
     reactionBounds.current.clear();
@@ -90,11 +97,12 @@ export function CommunityReactionControl({ selected, disabled = false, onSelect 
       return;
     }
     setOpen(false);
+    haptics.tap();
     onSelect(selected ?? 'LIKE');
   };
   return (
     <View
-      className="relative flex-1"
+      className={compact ? 'relative' : 'relative flex-1'}
       style={{ zIndex: open ? 20 : 0 }}
       onMoveShouldSetResponderCapture={() => dragging.current}
       onResponderTerminationRequest={() => !dragging.current}
@@ -108,7 +116,7 @@ export function CommunityReactionControl({ selected, disabled = false, onSelect 
       {open ? (
         <View
           className="absolute bottom-12 left-0 z-20 flex-row items-center rounded-full border border-line bg-surface p-1.5"
-          style={{ shadowColor: '#14213d', shadowOpacity: 0.16, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 12 }}
+          style={{ shadowColor: colors.shadow, shadowOpacity: 0.16, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 12 }}
           accessibilityLabel="Chọn cảm xúc"
           pointerEvents="none"
         >
@@ -132,17 +140,19 @@ export function CommunityReactionControl({ selected, disabled = false, onSelect 
           onPressOut={onPressOut}
           onLongPress={onLongPress}
           delayLongPress={350}
-          className="min-h-11 flex-1 flex-row items-center justify-center gap-2 rounded-lg"
+          className={compact ? 'min-h-11 min-w-11 flex-row items-center justify-center gap-1.5 rounded-full px-2.5 active:opacity-60' : 'min-h-11 flex-1 flex-row items-center justify-center gap-2 rounded-lg active:opacity-60'}
           accessibilityRole="button"
-          accessibilityLabel={active?.label ?? 'Thích'}
+          accessibilityLabel={`${active?.label ?? 'Thích'}${count > 0 ? `, ${count} lượt` : ''}`}
           accessibilityHint="Nhấn nhanh để thích; nhấn giữ, trượt tới cảm xúc rồi thả tay để chọn"
         >
           <ActiveIcon
-            size={18}
+            size={compact ? 21 : 18}
             color={active?.color ?? colors.muted}
-            fill={selected === 'LIKE' || (selected === 'LOVE' && active) ? active?.color ?? colors.accent : 'transparent'}
+            fill={selected === 'LIKE' || selected === 'LOVE' ? active?.color ?? colors.accent : 'transparent'}
           />
-          <TextLabel label={active?.label ?? 'Thích'} color={active?.color ?? colors.muted} />
+          {compact
+            ? (count > 0 ? <Text weight="semibold" className="text-[13px]" style={{ color: active?.color ?? colors.muted }}>{count}</Text> : null)
+            : <TextLabel label={active?.label ?? 'Thích'} color={active?.color ?? colors.muted} />}
         </Pressable>
       </View>
     </View>

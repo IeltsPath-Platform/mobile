@@ -2,19 +2,14 @@ import { Stack } from 'expo-router';
 
 import { colors } from '@/src/theme';
 
+/** Screens render their own BackHeader so back navigation looks the same across the app. */
 export default function LearnLayout() {
   return (
-    <Stack
-      screenOptions={{
-        headerStyle: { backgroundColor: colors.surface },
-        headerTintColor: colors.accentDeep,
-        headerTitleStyle: { fontWeight: '700' },
-        contentStyle: { backgroundColor: colors.canvas },
-      }}>
-      <Stack.Screen name="topic/[topicId]" options={{ title: 'Chủ đề' }} />
-      <Stack.Screen name="lesson/[lessonId]" options={{ title: 'Bài học' }} />
-      <Stack.Screen name="session/[lessonId]" options={{ title: 'Luyện' }} />
-      <Stack.Screen name="review/[reviewId]" options={{ title: 'Ôn tập' }} />
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas } }}>
+      <Stack.Screen name="topic/[topicId]" />
+      <Stack.Screen name="lesson/[lessonId]" />
+      <Stack.Screen name="session/[lessonId]" />
+      <Stack.Screen name="review/[reviewId]" />
     </Stack>
   );
 }

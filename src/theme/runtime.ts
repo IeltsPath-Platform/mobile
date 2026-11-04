@@ -4,9 +4,24 @@ import { colors as lightTokens } from './tokens';
 
 type TokenColors = typeof lightTokens;
 
+/** Semantic colors that are not part of the brand token file but must follow light/dark. */
 export type AppColors = TokenColors & {
   warmSoft: string;
   listeningSoft: string;
+  /** Text / icons placed on accent or status-colored fills. */
+  onAccent: string;
+  /** Amber for "almost" states (Wordly present letter, progress highlights). */
+  warning: string;
+  /** Neutral for ruled-out states (Wordly absent letter). */
+  absent: string;
+  /** Streak flame, XP coin and social accent shared by home / profile summaries. */
+  flame: string;
+  coin: string;
+  social: string;
+  /** Soft elevation tint for cards. */
+  shadow: string;
+  /** Reaction accents used by the community reaction tray and summaries. */
+  reaction: Record<'like' | 'love' | 'helpful' | 'accurate', string>;
 };
 
 export const FONT_SCALE = { S: 0.9, M: 1, L: 1.15 } as const;
@@ -15,6 +30,14 @@ export const lightColors: AppColors = {
   ...lightTokens,
   warmSoft: '#fff3ea',
   listeningSoft: '#e8effc',
+  onAccent: '#ffffff',
+  warning: '#e6a321',
+  flame: '#ff864b',
+  coin: '#f4c44e',
+  social: '#d76280',
+  absent: '#7d8799',
+  shadow: '#14213d',
+  reaction: { like: '#1877f2', love: '#e41e3f', helpful: '#d97706', accurate: '#059669' },
 };
 
 export const darkColors: AppColors = {
@@ -49,6 +72,14 @@ export const darkColors: AppColors = {
   skill: lightTokens.skill,
   warmSoft: '#332319',
   listeningSoft: '#172832',
+  onAccent: '#ffffff',
+  warning: '#f0b84a',
+  flame: '#ff9c6b',
+  coin: '#f4c44e',
+  social: '#e8809a',
+  absent: '#4a5260',
+  shadow: '#000000',
+  reaction: { like: '#4c9bff', love: '#ff5a78', helpful: '#f0a23a', accurate: '#34c48f' },
 };
 
 const COLOR_VARS = [

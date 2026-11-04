@@ -1,9 +1,8 @@
 import Constants from 'expo-constants';
-import * as WebBrowser from 'expo-web-browser';
-import { Bell, BookOpen, Check, ChevronDown, ChevronRight, CircleHelp, KeyRound, LogOut, Moon, Settings2, Trash2, UserRound, Zap } from 'lucide-react-native';
+import { Bell, BookOpen, Check, ChevronDown, ChevronRight, CircleHelp, KeyRound, LogOut, Moon, Music, Settings2, Trash2, UserRound, Volume2, Zap } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Alert, Animated, Platform, Pressable, RefreshControl, ScrollView, Switch, View, type ScrollViewInstance } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Linking, Platform, Pressable, RefreshControl, ScrollView, Switch, View, type ScrollViewInstance } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect, useRouter } from 'expo-router';
 
@@ -23,6 +22,8 @@ import { useProgress } from '@/src/features/progress/progress-summary';
 import { useStreak } from '@/src/features/progress/use-streak';
 import { clearAppSettingsStorage, type FontSizeOption, useAppSettings } from '@/src/features/settings/use-app-settings';
 import { vocabApi } from '@/src/features/vocab/api';
+import { haptics } from '@/src/lib/haptics';
+import { sound } from '@/src/lib/sound';
 import { colors } from '@/src/theme';
 
 const FONT_OPTIONS: FontSizeOption[] = ['S', 'M', 'L'];
@@ -72,7 +73,9 @@ export default function AccountScreen() {
   const signOutPrompt = () => {
     const run = async () => {
       setBusy('signout');
-      try { await signOut(); } finally { setBusy(null); }
+      try { await signOut(); }
+      catch (error) { haptics.error(); Alert.alert('Không đăng xuất được', error instanceof Error ? error.message : 'Vui lòng thử lại.'); }
+      finally { setBusy(null); }
     };
     if (Platform.OS === 'web') {
       if (window.confirm('Bạn muốn đăng xuất khỏi IELTSPath?')) void run();
@@ -90,8 +93,12 @@ export default function AccountScreen() {
       try {
         await clearAppSettingsStorage();
         queryClient.clear();
+        haptics.success();
         if (Platform.OS === 'web') window.alert('Đã xóa dữ liệu tạm trên máy.');
         else Alert.alert('Đã xóa dữ liệu tạm', 'Cài đặt ứng dụng đã được đặt lại.');
+      } catch (error) {
+        haptics.error();
+        Alert.alert('Không xóa được dữ liệu tạm', error instanceof Error ? error.message : 'Vui lòng thử lại.');
       } finally { setBusy(null); }
     };
     if (Platform.OS === 'web') {
@@ -168,12 +175,14 @@ export default function AccountScreen() {
             title="TÙY CHỈNH"
             label="Tùy chỉnh ứng dụng"
             icon={Settings2}
-            summary={`${settings.notifyStudy ? 'Nhắc học' : 'Tắt nhắc học'} · ${settings.notifyStreak ? 'Nhắc streak' : 'Tắt streak'} · Chữ ${settings.fontSize} · ${settings.theme === 'light' ? 'Sáng' : 'Tối'}`}
+            summary={`${settings.notifyStudy ? 'Nhắc học' : 'Tắt nhắc học'} · ${settings.notifyStreak ? 'Nhắc streak' : 'Tắt streak'} · ${settings.soundEnabled ? 'Có âm thanh' : 'Tắt tiếng'} · Chữ ${settings.fontSize} · ${settings.theme === 'light' ? 'Sáng' : 'Tối'}`}
             expanded={expandedPreference === 'custom'}
             onPress={() => setExpandedPreference(expandedPreference === 'custom' ? null : 'custom')}>
             <View className="border-t border-line">
-              <SettingsRow icon={Bell} title="Nhắc học" trailing={<Switch value={settings.notifyStudy} onValueChange={(notifyStudy) => void update({ notifyStudy })} trackColor={{ false: colors.line, true: colors.accentSoft }} thumbColor={settings.notifyStudy ? colors.accent : colors.muted} accessibilityLabel="Nhắc học mỗi ngày" />} />
-              <SettingsRow icon={Zap} title="Nhắc streak" trailing={<Switch value={settings.notifyStreak} onValueChange={(notifyStreak) => void update({ notifyStreak })} trackColor={{ false: colors.line, true: colors.accentSoft }} thumbColor={settings.notifyStreak ? colors.accent : colors.muted} accessibilityLabel="Nhắc duy trì streak" />} />
+              <SettingsRow icon={Bell} title="Nhắc học" trailing={<Switch value={settings.notifyStudy} onValueChange={(notifyStudy) => { haptics.select(); void update({ notifyStudy }); }} trackColor={{ false: colors.line, true: colors.accentSoft }} thumbColor={settings.notifyStudy ? colors.accent : colors.muted} accessibilityLabel="Nhắc học mỗi ngày" />} />
+              <SettingsRow icon={Zap} title="Nhắc streak" trailing={<Switch value={settings.notifyStreak} onValueChange={(notifyStreak) => { haptics.select(); void update({ notifyStreak }); }} trackColor={{ false: colors.line, true: colors.accentSoft }} thumbColor={settings.notifyStreak ? colors.accent : colors.muted} accessibilityLabel="Nhắc duy trì streak" />} />
+              <SettingsRow icon={Volume2} title="Âm thanh & phát âm" trailing={<Switch value={settings.soundEnabled} onValueChange={(soundEnabled) => { haptics.select(); void update({ soundEnabled }); if (soundEnabled) void sound.play('tap'); }} trackColor={{ false: colors.line, true: colors.accentSoft }} thumbColor={settings.soundEnabled ? colors.accent : colors.muted} accessibilityLabel="Bật âm thanh và phát âm" />} />
+              <SettingsRow icon={Music} title="Nhạc nền khi học" trailing={<Switch value={settings.musicEnabled} onValueChange={(musicEnabled) => { haptics.select(); void update({ musicEnabled }); }} trackColor={{ false: colors.line, true: colors.accentSoft }} thumbColor={settings.musicEnabled ? colors.accent : colors.muted} accessibilityLabel="Bật nhạc nền khi học" />} />
               <View className="px-4 pb-4 pt-3">
                 <View className="mb-3 flex-row items-center gap-2"><Settings2 size={16} color={colors.muted} /><Text className="text-sm text-muted">Cỡ chữ</Text></View>
                 <View className="flex-row gap-2">{FONT_OPTIONS.map((size) => <Choice key={size} label={size} selected={settings.fontSize === size} onPress={() => void update({ fontSize: size })} />)}</View>
@@ -186,11 +195,11 @@ export default function AccountScreen() {
           </SettingsDisclosure>
 
           <SettingsGroup title="ỨNG DỤNG">
-            <SettingsRow icon={CircleHelp} title="Trợ giúp" onPress={() => void WebBrowser.openBrowserAsync('mailto:support@ieltspath.local')} />
+            <SettingsRow icon={CircleHelp} title="Trợ giúp" onPress={() => void Linking.openURL('mailto:support@ieltspath.local').catch(() => Alert.alert('Không mở được ứng dụng email', 'Hãy gửi thư tới support@ieltspath.local.'))} />
             <SettingsRow icon={Trash2} title="Xóa dữ liệu tạm" onPress={clearCachePrompt} danger busy={busy === 'cache'} />
           </SettingsGroup>
 
-          <Pressable onPress={signOutPrompt} disabled={busy !== null} accessibilityRole="button" className="mt-2 min-h-12 flex-row items-center justify-center gap-2 rounded-2xl bg-surface active:opacity-70">
+          <Pressable onPress={signOutPrompt} disabled={busy !== null} accessibilityRole="button" accessibilityLabel="Đăng xuất" accessibilityState={{ busy: busy === 'signout' }} className="mt-2 min-h-12 flex-row items-center justify-center gap-2 rounded-2xl bg-surface active:opacity-70">
             {busy === 'signout' ? <ActivityIndicator color={colors.danger} /> : <LogOut size={17} color={colors.danger} />}
             <Text weight="semibold" className="text-sm" style={{ color: colors.danger }}>Đăng xuất</Text>
           </Pressable>
@@ -236,7 +245,7 @@ function SettingsRow({ icon: Icon, title, badge, onPress, trailing, danger = fal
 }
 
 function Choice({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
-  return <Pressable accessibilityRole="button" accessibilityState={{ selected }} onPress={onPress} className="min-h-10 flex-1 flex-row items-center justify-center gap-1 rounded-xl" style={{ backgroundColor: selected ? colors.accentSoft : colors.canvas }}>
+  return <Pressable accessibilityRole="button" accessibilityState={{ selected }} onPress={() => { if (!selected) haptics.select(); onPress(); }} className="min-h-11 flex-1 active:opacity-80 flex-row items-center justify-center gap-1 rounded-xl" style={{ backgroundColor: selected ? colors.accentSoft : colors.canvas }}>
     {selected ? <Check size={13} color={colors.accentDeep} /> : null}
     <Text weight="bold" className="text-sm" style={{ color: selected ? colors.accentDeep : colors.ink }}>{label}</Text>
   </Pressable>;

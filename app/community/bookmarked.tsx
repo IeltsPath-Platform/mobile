@@ -1,43 +1,89 @@
-import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { Bookmark, Heart, MessageCircle } from 'lucide-react-native';
-import { useCallback } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, View } from 'react-native';
+import { Bookmark } from 'lucide-react-native';
+import { useCallback, useMemo } from 'react';
+import { ActivityIndicator, FlatList, RefreshControl, View } from 'react-native';
+
+import { BackHeader } from '@/src/components/navigation/back-header';
 import { Button } from '@/src/components/ui/button';
-import { Card } from '@/src/components/ui/card';
+import { FormAlert } from '@/src/components/ui/form-alert';
+import { Skeleton } from '@/src/components/ui/skeleton';
 import { Text } from '@/src/components/ui/text';
+import { useCurrentUser } from '@/src/features/auth/auth-provider';
 import { communityApi, type CommunityPost } from '@/src/features/community/api';
-import { CommunityAvatar, CommunityImage } from '@/src/features/community/components/community-image';
+import { usePostMenu } from '@/src/features/community/components/post-menu';
+import { PostRow } from '@/src/features/community/components/post-row';
 import { colors } from '@/src/theme';
 
 export default function BookmarkedScreen() {
-  const router = useRouter(); const qc = useQueryClient();
-  const query = useInfiniteQuery({ queryKey: ['community', 'bookmarks'], initialPageParam: undefined as string | undefined, queryFn: ({ pageParam }) => communityApi.bookmarks(pageParam), getNextPageParam: (page) => page.hasNext ? page.nextCursor ?? undefined : undefined });
-  const seen = new Set<string>();
-  const posts = (query.data?.pages.flatMap((page) => page.content) ?? []).filter((post) => { if (seen.has(post.id)) return false; seen.add(post.id); return true; });
-  const refresh = useCallback(() => { void query.refetch(); }, [query.refetch]);
-  const remove = useCallback(async (id: string) => {
-    try { await communityApi.bookmark(id, true); await Promise.all([qc.invalidateQueries({ queryKey: ['community', 'bookmarks'] }), qc.invalidateQueries({ queryKey: ['community', 'feed'] }), qc.invalidateQueries({ queryKey: ['community', 'detail', id] })]); }
-    catch (error) { Alert.alert('Không thể bỏ lưu', error instanceof Error ? error.message : 'Vui lòng thử lại.'); }
-  }, [qc]);
-  const empty = query.isPending ? <View className="py-12"><ActivityIndicator color={colors.accent} /></View> : query.isError ? <Card className="rounded-3xl border-b-0 bg-surface p-5"><Text>Không tải được bài viết đã lưu.</Text><View className="mt-3"><Button label="Thử lại" onPress={refresh} /></View></Card> : <Card className="items-center rounded-3xl border-b-0 bg-surface p-7"><Bookmark size={26} color={colors.accent} /><Text weight="bold" className="mt-3 text-center">Bạn chưa lưu bài viết nào</Text><Text className="mt-2 text-center text-sm text-muted">Lưu bài viết hay để xem lại sau.</Text></Card>;
-  return <View className="flex-1 bg-canvas"><View className="border-b border-line bg-surface px-4 pb-3 pt-4"><Pressable onPress={() => router.back()} className="min-h-10 justify-center"><Text weight="semibold" className="text-accent">‹  Cộng đồng</Text></Pressable><Text weight="black" className="mt-1 text-2xl">Bài viết đã lưu</Text></View>
-    <FlatList
-      className="flex-1" contentContainerClassName="grow px-4 pb-10 pt-4" data={posts} keyExtractor={(post) => post.id} ListEmptyComponent={empty ?? undefined}
-      renderItem={({ item: post }) => <SavedPost post={post} onOpen={() => router.push(`/community/${post.id}` as never)} onRemove={() => void remove(post.id)} />}
-      ListFooterComponent={query.isFetchingNextPage ? <ActivityIndicator className="py-4" color={colors.accent} /> : undefined}
-      onEndReached={() => { if (query.hasNextPage && !query.isFetchingNextPage) void query.fetchNextPage(); }} onEndReachedThreshold={0.4}
-      initialNumToRender={8} maxToRenderPerBatch={6} windowSize={7}
-      refreshControl={<RefreshControl refreshing={query.isRefetching && !query.isFetchingNextPage} onRefresh={refresh} tintColor={colors.accent} />}
-    />
-  </View>;
-}
+  const router = useRouter();
+  const user = useCurrentUser();
+  const menu = usePostMenu(user.data?.id);
+  const query = useInfiniteQuery({
+    queryKey: ['community', 'bookmarks'],
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) => communityApi.bookmarks(pageParam),
+    getNextPageParam: (page) => (page.hasNext ? page.nextCursor ?? undefined : undefined),
+  });
 
-const SavedPost = function SavedPost({ post, onOpen, onRemove }: { post: CommunityPost; onOpen: () => void; onRemove: () => void }) {
-  const reactionCount = Object.values(post.reactionCounts ?? {}).reduce((sum, count) => sum + count, 0);
-  return <View className="mb-4 overflow-hidden rounded-3xl border border-line bg-surface">
-    <Pressable onPress={onOpen} className="p-4"><View className="flex-row items-center"><CommunityAvatar uri={post.author?.avatarUrl} name={post.author?.displayName} size={40} /><View className="ml-3"><Text weight="bold" className="text-sm">{post.author?.displayName ?? 'Thành viên'}</Text><Text className="mt-0.5 text-xs text-muted">{post.category.replaceAll('_', ' ')}</Text></View></View>{post.title ? <Text weight="bold" className="mt-3">{post.title}</Text> : null}<Text numberOfLines={4} className="mt-1 text-sm leading-5">{post.body}</Text></Pressable>
-    {post.imageUrls?.[0] ? <CommunityImage preview uri={post.imageUrls[0]} className="mx-4 mb-3 h-48 rounded-xl" /> : null}
-    <View className="mx-4 border-t border-line" /><View className="flex-row items-center px-4 py-2"><Pressable onPress={onOpen} className="min-h-10 flex-row items-center gap-1.5"><Heart size={16} color={colors.muted} /><Text className="text-xs text-muted">{reactionCount}</Text></Pressable><Pressable onPress={onOpen} className="ml-5 min-h-10 flex-row items-center gap-1.5"><MessageCircle size={16} color={colors.muted} /><Text className="text-xs text-muted">{post.commentCount}</Text></Pressable><Pressable onPress={onRemove} className="ml-auto h-10 w-11 items-center justify-center" accessibilityLabel="Bỏ lưu bài viết"><Bookmark size={18} color={colors.accent} fill={colors.accent} /></Pressable></View>
-  </View>;
-};
+  const posts = useMemo(() => {
+    const seen = new Set<string>();
+    return (query.data?.pages.flatMap((page) => page.content) ?? []).filter((post) => {
+      if (seen.has(post.id)) return false;
+      seen.add(post.id);
+      return true;
+    });
+  }, [query.data]);
+
+  const openPost = useCallback((id: string) => router.push(`/community/${id}` as never), [router]);
+  const openProfile = useCallback((id: string) => router.push(`/community/users/${id}` as never), [router]);
+
+  let empty: React.ReactElement;
+  if (query.isPending) {
+    empty = (
+      <View className="gap-5 px-4 pt-5">
+        {[0, 1, 2].map((row) => (
+          <View key={row} className="gap-2"><Skeleton width={160} height={14} /><Skeleton height={12} /><Skeleton height={12} width="70%" /></View>
+        ))}
+      </View>
+    );
+  } else if (query.isError) {
+    empty = (
+      <View className="px-4 pt-6">
+        <FormAlert tone="error" message={query.error instanceof Error ? query.error.message : 'Không tải được bài viết đã lưu.'} />
+        <View className="mt-3"><Button label="Thử lại" onPress={() => void query.refetch()} /></View>
+      </View>
+    );
+  } else {
+    empty = (
+      <View className="items-center px-8 pt-20">
+        <View className="h-16 w-16 items-center justify-center rounded-full" style={{ backgroundColor: colors.accentSoft }}><Bookmark size={28} color={colors.accent} /></View>
+        <Text weight="extrabold" className="mt-4 text-center text-lg">Chưa lưu bài nào</Text>
+        <Text className="mt-2 text-center text-sm leading-5 text-muted">Chạm biểu tượng dấu trang dưới mỗi bài để giữ lại đọc sau.</Text>
+        <View className="mt-5 self-stretch"><Button variant="secondary" label="Về bảng tin" onPress={() => router.replace('/(tabs)/community' as never)} /></View>
+      </View>
+    );
+  }
+
+  return (
+    <View className="flex-1 bg-canvas">
+      <BackHeader title="Đã lưu" subtitle={posts.length ? `${posts.length}${query.hasNextPage ? '+' : ''} bài viết` : undefined} fallbackHref="/(tabs)/community" />
+      <FlatList<CommunityPost>
+        data={posts}
+        keyExtractor={(post) => post.id}
+        renderItem={({ item }) => <PostRow post={item} onOpen={openPost} onOpenProfile={openProfile} onMenu={menu.open} />}
+        ListEmptyComponent={empty}
+        ListFooterComponent={query.isFetchingNextPage ? <ActivityIndicator className="py-5" color={colors.accent} /> : undefined}
+        onEndReached={() => { if (query.hasNextPage && !query.isFetchingNextPage) void query.fetchNextPage(); }}
+        onEndReachedThreshold={0.5}
+        removeClippedSubviews
+        initialNumToRender={5}
+        maxToRenderPerBatch={5}
+        windowSize={9}
+        contentContainerClassName="pb-10"
+        refreshControl={<RefreshControl refreshing={query.isRefetching && !query.isFetchingNextPage} onRefresh={() => void query.refetch()} tintColor={colors.accent} />}
+      />
+      {menu.element}
+    </View>
+  );
+}

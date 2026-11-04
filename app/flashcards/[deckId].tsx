@@ -1,8 +1,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Layers } from 'lucide-react-native';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 
+import { BackHeader } from '@/src/components/navigation/back-header';
 import { Button } from '@/src/components/ui/button';
 import { FormAlert } from '@/src/components/ui/form-alert';
 import { Text } from '@/src/components/ui/text';
@@ -28,8 +28,8 @@ export default function DeckStudyScreen() {
   const cards = cardsFromDue(dueQuery.data?.items ?? []);
   const hasMoreCards = (dueQuery.data?.total ?? 0) > (dueQuery.data?.items.length ?? 0);
 
-  if (deckQuery.isPending || dueQuery.isPending) return <View className="flex-1 items-center justify-center bg-canvas"><ActivityIndicator color={colors.accent} /><Text className="mt-3 text-sm text-muted">Đang đồng bộ thẻ đến hạn…</Text></View>;
-  if (deckQuery.isError || dueQuery.isError) return <View className="flex-1 bg-canvas px-5 pt-5"><Pressable onPress={() => router.back()} className="mb-5 h-11 w-11 items-center justify-center rounded-full bg-surface"><ArrowLeft size={20} color={colors.ink} /></Pressable><FormAlert tone="error" message={deckQuery.error?.message ?? dueQuery.error?.message ?? 'Không tải được dữ liệu bộ thẻ.'} /><View className="mt-4"><Button variant="secondary" label="Thử lại" onPress={() => { void deckQuery.refetch(); void dueQuery.refetch(); }} /></View></View>;
+  if (deckQuery.isPending || dueQuery.isPending) return <View className="flex-1 bg-canvas"><BackHeader title="Học thẻ" fallbackHref="/(tabs)/flashcards" /><View className="flex-1 items-center justify-center"><ActivityIndicator color={colors.accent} /><Text className="mt-3 text-sm text-muted">Đang đồng bộ thẻ đến hạn…</Text></View></View>;
+  if (deckQuery.isError || dueQuery.isError) return <View className="flex-1 bg-canvas"><BackHeader title="Học thẻ" fallbackHref="/(tabs)/flashcards" /><View className="px-5 pt-5"><FormAlert tone="error" message={deckQuery.error?.message ?? dueQuery.error?.message ?? 'Không tải được dữ liệu bộ thẻ.'} /><View className="mt-4"><Button variant="secondary" label="Thử lại" onPress={() => { void deckQuery.refetch(); void dueQuery.refetch(); }} /></View></View></View>;
 
   const deck = deckQuery.data;
   const review = async (cardId: string, correct: boolean, requestId: string) => {
@@ -56,7 +56,7 @@ export default function DeckStudyScreen() {
   };
 
   return <View className="flex-1 bg-canvas">
-    <View className="flex-row items-center border-b border-line bg-surface px-5 py-3"><Pressable onPress={() => router.back()} className="h-11 w-11 items-center justify-center rounded-full bg-canvas" accessibilityLabel="Quay lại"><ArrowLeft size={20} color={colors.ink} /></Pressable><View className="ml-3 flex-1"><Text weight="black" numberOfLines={1} className="text-base">{deck.name}</Text><Text className="mt-0.5 text-xs text-muted">{deck.dueCount} thẻ đến hạn · {deck.cardCount} thẻ tất cả</Text></View><View className="h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: colors.listeningSoft }}><Layers size={19} color={colors.skill.listening} /></View></View>
+    <BackHeader title={deck.name} subtitle={`${deck.dueCount} thẻ đến hạn · ${deck.cardCount} thẻ tất cả`} fallbackHref="/(tabs)/flashcards" />
     <StudySession key={deckId} cards={cards} onReview={review} hasMoreCards={hasMoreCards} onLoadMore={loadMore} onExit={exit} />
   </View>;
 }

@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { TextInput, View, type TextInputInstance } from 'react-native';
 
+import { haptics } from '@/src/lib/haptics';
 import { Button } from '@/src/components/ui/button';
 import { FormAlert } from '@/src/components/ui/form-alert';
 import { TextField } from '@/src/components/ui/text-field';
@@ -33,6 +34,7 @@ export default function LoginScreen() {
     try {
       await signIn(values);
     } catch (error) {
+      haptics.error();
       setFormError(applyApiError(error, setError, ['email', 'password']));
     }
   });

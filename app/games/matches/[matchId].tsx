@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Award, Delete, Heart, Lightbulb, Sparkles, Timer, Wifi, WifiOff } from 'lucide-react-native';
+import { Award, Delete, Heart, Lightbulb, Sparkles, Timer, Wifi, WifiOff } from 'lucide-react-native';
 
+import { BackButton } from '@/src/components/navigation/back-header';
 import { Button } from '@/src/components/ui/button';
 import { Text } from '@/src/components/ui/text';
 import { gameApi } from '@/src/features/games/api';
@@ -11,13 +12,15 @@ import { useGameSocket } from '@/src/features/games/use-game-socket';
 import type { CurrentWord, GameEvent, LetterStatus } from '@/src/features/games/types';
 import { dueAt } from '@/src/features/games/types';
 import { createRequestId } from '@/src/lib/request-id';
+import { haptics } from '@/src/lib/haptics';
+import { sound } from '@/src/lib/sound';
 import { colors } from '@/src/theme';
 
 const keyRows = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
 function colorForStatus(status: LetterStatus) {
   if (status === 'CORRECT') return colors.success;
-  if (status === 'PRESENT') return '#e6a321';
-  return '#7d8799';
+  if (status === 'PRESENT') return colors.warning;
+  return colors.absent;
 }
 
 function StatusPill({ connected }: { connected: boolean }) {
@@ -139,6 +142,8 @@ export default function WordlyMatchScreen() {
       } else {
         const accepted = result as import('@/src/features/games/types').GuessResponse;
         pendingGuess.current = null;
+        if (accepted.letters.every((status) => status === 'CORRECT')) { haptics.success(); void sound.play('correct'); }
+        else { haptics.warning(); void sound.play('wrong'); }
         if (accepted.nextWord) qc.setQueryData(['games', 'current', matchId], accepted.nextWord);
         else void qc.invalidateQueries({ queryKey: ['games', 'current', matchId] });
         if (accepted.matchFinished) {
@@ -150,6 +155,8 @@ export default function WordlyMatchScreen() {
       void qc.invalidateQueries({ queryKey: ['games', 'match', matchId] });
       void qc.invalidateQueries({ queryKey: ['games', 'ranking', matchId] });
     } catch (cause) {
+      haptics.error();
+      void sound.play('wrong');
       setError(cause instanceof Error ? cause.message : 'Không gửi được lượt đoán.');
     } finally {
       setBusy(false);
@@ -181,23 +188,29 @@ export default function WordlyMatchScreen() {
 
   if (match.isPending || current.isPending) {
     return (
-      <View className="flex-1 items-center justify-center bg-canvas px-6">
+      <View className="flex-1 bg-canvas">
+        <View className="px-5 pt-3"><BackButton fallbackHref="/games" /></View>
+        <View className="flex-1 items-center justify-center  px-6">
         <View className="h-16 w-16 items-center justify-center rounded-3xl" style={{ backgroundColor: colors.accentSoft }}>
           <ActivityIndicator color={colors.accent} size="large" />
         </View>
         <Text weight="bold" className="mt-4 text-base">Đang vào ván Wordly</Text>
         <Text className="mt-1 text-center text-sm text-muted">Đang đồng bộ câu hỏi và trạng thái của bạn…</Text>
+        </View>
       </View>
     );
   }
 
   if (match.isError || !match.data) {
     return (
-      <View className="flex-1 justify-center bg-canvas px-5">
+      <View className="flex-1 bg-canvas">
+        <View className="px-5 pt-3"><BackButton fallbackHref="/games" /></View>
+        <View className="flex-1 justify-center  px-5">
         <View className="rounded-3xl border border-line bg-surface p-6">
           <Text weight="black" className="text-xl">Chưa tải được ván chơi</Text>
           <Text className="mt-2 text-sm leading-6 text-muted">Kiểm tra kết nối rồi đồng bộ lại ván Wordly của bạn.</Text>
           <Button className="mt-5" label="Thử tải lại" onPress={() => { void match.refetch(); void current.refetch(); }} />
+        </View>
         </View>
       </View>
     );
@@ -205,11 +218,14 @@ export default function WordlyMatchScreen() {
 
   if (current.isError && !word) {
     return (
-      <View className="flex-1 justify-center bg-canvas px-5">
+      <View className="flex-1 bg-canvas">
+        <View className="px-5 pt-3"><BackButton fallbackHref="/games" /></View>
+        <View className="flex-1 justify-center  px-5">
         <View className="rounded-3xl border border-line bg-surface p-6">
           <Text weight="black" className="text-xl">Chưa có lượt chơi hiện tại</Text>
           <Text className="mt-2 text-sm leading-6 text-muted">Có thể bạn chưa được xếp lượt trong ván nhiều người. Hãy đồng bộ lại sau ít giây.</Text>
           <Button className="mt-5" label="Đồng bộ lại" onPress={() => void current.refetch()} />
+        </View>
         </View>
       </View>
     );
@@ -219,13 +235,8 @@ export default function WordlyMatchScreen() {
     <View className="flex-1 bg-canvas">
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerClassName="px-5 pb-10 pt-3">
         <View className="flex-row items-center justify-between">
-          <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Quay lại" className="h-11 w-11 items-center justify-center rounded-2xl border border-line bg-surface">
-            <ArrowLeft size={20} color={colors.ink} />
-          </Pressable>
-          <View className="flex-row items-center gap-2">
-            <View className="h-2 w-2 rounded-full" style={{ backgroundColor: connected ? colors.success : colors.accentWarm }} />
-            <StatusPill connected={connected} />
-          </View>
+          <BackButton fallbackHref="/games" />
+          <StatusPill connected={connected} />
         </View>
 
         {word ? <>
@@ -251,7 +262,7 @@ export default function WordlyMatchScreen() {
             {word.wordLimit ? <View className="mt-5">
               <View className="mb-2 flex-row justify-between"><Text className="text-[10px] text-blue-100">TIẾN ĐỘ VÁN</Text><Text weight="bold" className="text-[10px] text-white">{word.wordNumber}/{word.wordLimit}</Text></View>
               <View className="h-2 overflow-hidden rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>
-                <View className="h-full rounded-full" style={{ width: `${progress * 100}%`, backgroundColor: '#ffc66d' }} />
+                <View className="h-full rounded-full" style={{ width: `${progress * 100}%`, backgroundColor: colors.warning }} />
               </View>
             </View> : null}
           </View>
@@ -309,7 +320,7 @@ export default function WordlyMatchScreen() {
                         const border = statusColor ?? (hinted ? colors.accent : letter ? colors.accentWarm : colors.line);
                         return (
                           <View key={column} className="items-center justify-center rounded-xl border-2" style={{ width: tileSize, height: tileSize, backgroundColor: background, borderColor: border }}>
-                            <Text weight="black" className="text-xl" style={{ color: status ? '#fff' : colors.ink }}>
+                            <Text weight="black" className="text-xl" style={{ color: status ? colors.onAccent : colors.ink }}>
                               {letter || (hinted ? word.hint?.revealedCell.letter : '')}
                             </Text>
                           </View>
@@ -334,11 +345,11 @@ export default function WordlyMatchScreen() {
                         accessibilityLabel={`Chữ ${letter}`}
                         accessibilityState={{ disabled }}
                         disabled={disabled}
-                        onPress={() => setGuess((previous) => previous.length < word.columns ? previous + letter : previous)}
+                        onPress={() => { haptics.select(); setGuess((previous) => previous.length < word.columns ? previous + letter : previous); }}
                         className="h-11 min-w-0 flex-1 items-center justify-center rounded-xl"
                         style={{ backgroundColor: status ? colorForStatus(status) : colors.surfaceTint, opacity: disabled && !status ? 0.52 : 1 }}
                       >
-                        <Text weight="bold" className="text-xs" style={{ color: status ? '#fff' : colors.ink }}>{letter}</Text>
+                        <Text weight="bold" className="text-xs" style={{ color: status ? colors.onAccent : colors.ink }}>{letter}</Text>
                       </Pressable>
                     );
                   })}
@@ -366,6 +377,7 @@ export default function WordlyMatchScreen() {
             </View>
           </View>
 
+          {myTurn && word.wordStatus === 'ACTIVE' && guess.length !== word.columns ? <Text className="mt-3 text-center text-xs text-muted">{guess.length === 0 ? `Nhập ${word.columns} chữ cái để kiểm tra từ.` : `Còn thiếu ${word.columns - guess.length} chữ cái.`}</Text> : null}
           {error ? <View className="mt-3 rounded-2xl border px-4 py-3" style={{ backgroundColor: colors.dangerSoft, borderColor: colors.danger }}>
             <Text accessibilityRole="alert" className="text-sm leading-5" style={{ color: colors.danger }}>{error}</Text>
           </View> : null}
@@ -378,7 +390,7 @@ export default function WordlyMatchScreen() {
             {ranking.data.players.map((player, index) => (
               <View key={player.userId} className="mt-3 flex-row items-center rounded-2xl px-3 py-2.5" style={{ backgroundColor: index === 0 ? colors.warmSoft : colors.canvas }}>
                 <View className="h-8 w-8 items-center justify-center rounded-full" style={{ backgroundColor: index === 0 ? colors.accentWarm : colors.surfaceTint }}>
-                  <Text weight="black" className="text-xs" style={{ color: index === 0 ? '#fff' : colors.muted }}>#{player.rank}</Text>
+                  <Text weight="black" className="text-xs" style={{ color: index === 0 ? colors.onAccent : colors.muted }}>#{player.rank}</Text>
                 </View>
                 <Text weight="semibold" className="ml-3 flex-1 text-sm">{player.displayName ?? 'Người chơi'}</Text>
                 <Text weight="black" className="text-sm text-accent">{player.totalScore} điểm</Text>

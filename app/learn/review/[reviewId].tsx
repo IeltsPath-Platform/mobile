@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 
+import { BackHeader } from '@/src/components/navigation/back-header';
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
 import { FormAlert } from '@/src/components/ui/form-alert';
@@ -50,15 +51,18 @@ export default function ReviewScreen() {
 
   if (reviewQuery.isPending) {
     return (
-      <View className="flex-1 items-center justify-center bg-canvas">
-        <ActivityIndicator color={colors.accent} />
+      <View className="flex-1 bg-canvas">
+        <BackHeader title="Bài ôn" fallbackHref="/(tabs)/practice" />
+        <View className="flex-1 items-center justify-center"><ActivityIndicator color={colors.accent} /></View>
       </View>
     );
   }
 
   if (reviewQuery.error || !reviewQuery.data) {
     return (
-      <View className="flex-1 bg-canvas px-5 py-6">
+      <View className="flex-1 bg-canvas">
+      <BackHeader title="Bài ôn" fallbackHref="/(tabs)/practice" />
+      <View className="px-5 py-6">
         <FormAlert
           tone="error"
           message={
@@ -67,6 +71,8 @@ export default function ReviewScreen() {
               : 'Không tải được bài ôn.'
           }
         />
+        <View className="mt-4"><Button label="Thử lại" variant="secondary" onPress={() => void reviewQuery.refetch()} /></View>
+      </View>
       </View>
     );
   }
@@ -74,11 +80,10 @@ export default function ReviewScreen() {
   const review = reviewQuery.data;
 
   return (
-    <ScrollView className="flex-1 bg-canvas" contentContainerClassName="gap-3 px-5 pb-16 pt-4">
-      <Text weight="black" className="text-2xl">
-        Bài ôn
-      </Text>
-      <Text className="text-sm text-muted">Trạng thái: {review.reviewStatus}</Text>
+    <View className="flex-1 bg-canvas">
+    <BackHeader title="Bài ôn" fallbackHref="/(tabs)/practice" />
+    <ScrollView className="flex-1" contentContainerClassName="gap-3 px-5 pb-16 pt-4">
+      <Text className="text-sm text-muted">{review.reviewStatus === 'PENDING' ? 'Xem lại lý thuyết rồi làm bài ôn bên dưới.' : 'Bạn đã hoàn thành bài ôn này.'}</Text>
 
       <Card>
         <Text weight="extrabold" className="mb-2">
@@ -107,10 +112,12 @@ export default function ReviewScreen() {
                   return (
                     <Pressable
                       key={opt.optionKey}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
                       onPress={() =>
                         setAnswers((prev) => ({ ...prev, [q.questionVersionId]: opt.optionKey }))
                       }
-                      className="rounded-xl border px-3 py-2.5"
+                      className="min-h-12 justify-center rounded-xl border px-3 py-2.5 active:opacity-80"
                       style={{
                         borderColor: selected ? colors.accent : colors.line,
                         backgroundColor: selected ? colors.accentSoft : colors.surface,
@@ -129,7 +136,7 @@ export default function ReviewScreen() {
             <View className="mt-3">
               <FormAlert
                 tone="error"
-                message={isLearningApiError(submit.error) ? submit.error.message : 'Nộp ôn lỗi.'}
+                message={isLearningApiError(submit.error) ? submit.error.message : 'Không nộp được bài ôn. Hãy thử lại.'}
               />
             </View>
           ) : null}
@@ -145,8 +152,9 @@ export default function ReviewScreen() {
           ) : null}
         </Card>
       ) : (
-        <Text className="text-sm text-success">Review đã xong — không còn set.</Text>
+        <Text className="text-sm text-success">Bạn đã hoàn thành bài ôn này.</Text>
       )}
     </ScrollView>
+    </View>
   );
 }

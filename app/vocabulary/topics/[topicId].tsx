@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, BookOpen, Check, LockKeyhole, Play } from 'lucide-react-native';
+import { BookOpen, Check, LockKeyhole, Play } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, ImageBackground, Pressable, ScrollView, View } from 'react-native';
 
+import { BackHeader } from '@/src/components/navigation/back-header';
 import { Text } from '@/src/components/ui/text';
 import { TopicStudySheet } from '@/src/features/vocab/components/topic-study-sheet';
 import { vocabApi } from '@/src/features/vocab/api';
@@ -23,11 +24,10 @@ export default function VocabularyTopicScreen() {
 
   return (
     <View className="flex-1 bg-canvas">
+      <BackHeader title="Từ vựng" fallbackHref="/(tabs)/practice" />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerClassName="pb-10">
         <View className="px-5 pb-5 pt-3">
-          <Pressable accessibilityRole="button" accessibilityLabel="Quay lại" onPress={() => router.back()} className="mb-4 h-11 w-11 items-center justify-center rounded-full bg-surface">
-            <ArrowLeft size={21} color={colors.ink} />
-          </Pressable>
+          
           {topic ? (
             <View className="overflow-hidden rounded-[26px]">
               {cover ? <ImageBackground source={{ uri: cover }} resizeMode="cover" className="h-[168px] justify-end bg-surfaceTint">

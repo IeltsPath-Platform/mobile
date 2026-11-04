@@ -2,8 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, AppState, Pressable, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, CheckCircle2, Clock3, Flame, Rocket, Wifi, WifiOff, XCircle } from 'lucide-react-native';
+import { CheckCircle2, Clock3, Flame, Rocket, Wifi, WifiOff, XCircle } from 'lucide-react-native';
 
+import { BackButton } from '@/src/components/navigation/back-header';
+import { haptics } from '@/src/lib/haptics';
+import { sound } from '@/src/lib/sound';
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
 import { Text } from '@/src/components/ui/text';
@@ -40,6 +43,11 @@ export default function RocketMatchScreen() {
   const rankingOffset = ranking.data ? Date.parse(ranking.data.serverTime) - Date.now() : 0;
   const awaitingOpen = Boolean(round && !round.deadlineAt && Date.parse(round.opensAt) > Date.now() + offset);
   const result = current.data?.lastRoundResult;
+  useEffect(() => {
+    if (!result) return;
+    if (result.correct) { haptics.success(); void sound.play('correct'); }
+    else { haptics.error(); void sound.play('wrong'); }
+  }, [result?.roundId]);
 
   useEffect(() => {
     if (!round) return;
@@ -63,6 +71,7 @@ export default function RocketMatchScreen() {
       pending = { roundId: round.roundId, optionId, requestId: createRequestId() };
       pendingAnswer.current = pending;
     }
+    haptics.select();
     setSelectedOption(optionId); setBusy(true); setError('');
     try {
       const ack = await gameApi.rocketAnswer(matchId, round.roundId, pending.requestId, optionId);
@@ -88,15 +97,15 @@ export default function RocketMatchScreen() {
   };
   const askLeave = () => Alert.alert('Rời ván Rocket?', 'Bạn sẽ giữ điểm đã có nhưng rời khỏi lượt chơi.', [{ text: 'Ở lại', style: 'cancel' }, { text: 'Rời ván', style: 'destructive', onPress: () => void leave() }]);
 
-  if (match.isPending || current.isPending) return <View className="flex-1 items-center justify-center bg-canvas"><Rocket size={26} color={colors.accentWarm}/><Text className="mt-3 text-sm text-muted">Đang đồng bộ Rocket…</Text></View>;
-  if (match.isError || !match.data) return <View className="flex-1 justify-center bg-canvas px-5"><Text weight="bold">Không tải được ván Rocket.</Text><Text className="mt-2 text-sm text-muted">{match.error?.message}</Text><Button className="mt-4" label="Thử lại" onPress={() => void match.refetch()}/><Button className="mt-3" variant="secondary" label="Về trò chơi" onPress={() => router.replace('/games' as never)}/></View>;
+  if (match.isPending || current.isPending) return <View className="flex-1 bg-canvas"><View className="px-5 pt-3"><BackButton fallbackHref="/games" /></View><View className="flex-1 items-center justify-center"><Rocket size={26} color={colors.accentWarm}/><Text className="mt-3 text-sm text-muted">Đang đồng bộ Rocket…</Text></View></View>;
+  if (match.isError || !match.data) return <View className="flex-1 bg-canvas"><View className="px-5 pt-3"><BackButton fallbackHref="/games" /></View><View className="flex-1 justify-center px-5"><Text weight="bold">Không tải được ván Rocket.</Text><Text className="mt-2 text-sm text-muted">{match.error?.message}</Text><Button className="mt-4" label="Thử lại" onPress={() => void match.refetch()}/><Button className="mt-3" variant="secondary" label="Về trò chơi" onPress={() => router.replace('/games' as never)}/></View></View>;
 
   const resultForPreviousRound = result && (!round || awaitingOpen) ? result : null;
   const alive = round?.player.status === 'ACTIVE';
   const totalScore = round?.player.totalScore ?? result?.totalScore ?? 0;
   const lives = round?.player.livesRemaining ?? result?.livesRemaining ?? 0;
   return <View className="flex-1 bg-canvas"><ScrollView contentContainerClassName="px-5 pb-10 pt-3">
-    <View className="flex-row items-center justify-between"><Pressable onPress={askLeave} className="h-11 w-11 items-center justify-center rounded-full bg-surface" accessibilityLabel="Rời ván"><ArrowLeft size={20} color={colors.ink}/></Pressable><View className="flex-row items-center gap-2">{connected ? <Wifi size={16} color={colors.success}/> : <WifiOff size={16} color={colors.muted}/>}<Text className="text-xs text-muted">{connected ? 'Đang đồng bộ' : 'Đang kết nối lại'}</Text></View></View>
+    <View className="flex-row items-center justify-between"><BackButton onBack={askLeave} label="Rời ván" /><View className="flex-row items-center gap-2">{connected ? <Wifi size={16} color={colors.success}/> : <WifiOff size={16} color={colors.muted}/>}<Text className="text-xs text-muted">{connected ? 'Đang đồng bộ' : 'Đang kết nối lại'}</Text></View></View>
     <View className="mt-5 overflow-hidden rounded-3xl p-5" style={{ backgroundColor: colors.heroStart }}><View className="absolute -right-5 -top-7 h-32 w-32 rounded-full" style={{ backgroundColor: colors.heroEnd, opacity: 0.7 }}/><View className="flex-row items-center"><View className="h-11 w-11 items-center justify-center rounded-2xl bg-white/15"><Rocket size={22} color={colors.accentWarm}/></View><View className="ml-3 flex-1"><Text weight="bold" className="text-xs uppercase tracking-widest text-white/75">ROCKET · {round ? `VÒNG ${round.number}/${round.total}` : 'ĐANG CHƠI'}</Text><Text weight="black" className="mt-1 text-2xl text-white">Chọn từ đúng</Text></View><View className="items-end"><Text weight="black" className="text-lg text-white">{totalScore}</Text><Text className="text-[10px] text-white/75">điểm</Text></View></View></View>
     <View className="mt-4 flex-row gap-3"><View className="flex-1 flex-row items-center gap-2 rounded-2xl border border-line bg-surface p-3"><Flame size={18} color={colors.accentWarm} fill={colors.accentWarm}/><View><Text weight="bold" className="text-sm">{lives} mạng</Text><Text className="text-[10px] text-muted">còn lại</Text></View></View><View className="flex-1 flex-row items-center gap-2 rounded-2xl border border-line bg-surface p-3"><Clock3 size={18} color={colors.accent}/><View><Text weight="bold" className="text-sm">{awaitingOpen ? `${secondsLeft}s` : round?.deadlineAt ? `${secondsLeft}s` : 'Sẵn sàng'}</Text><Text className="text-[10px] text-muted">{awaitingOpen ? 'vòng mở sau' : 'thời gian'}</Text></View></View></View>
 

@@ -2,16 +2,7 @@ import { Stack } from 'expo-router';
 
 import { colors } from '@/src/theme';
 
+/** Screens render their own BackHeader so back navigation looks the same across the app. */
 export default function FlashcardsLayout() {
-  return (
-    <Stack
-      screenOptions={{
-        headerStyle: { backgroundColor: colors.surface },
-        headerTintColor: colors.accentDeep,
-        headerTitleStyle: { fontWeight: '700' },
-        contentStyle: { backgroundColor: colors.canvas },
-      }}>
-      <Stack.Screen name="[deckId]" options={{ title: 'Học thẻ' }} />
-    </Stack>
-  );
+  return <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas } }} />;
 }

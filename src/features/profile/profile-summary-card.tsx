@@ -13,8 +13,8 @@ export function ProfileSummaryCard({ name, email, joined, band, streak, xp, onEd
       </View>
       <View className="flex-row items-stretch px-2 py-4">
         <View className="flex-1 items-center border-r border-line px-1"><BookOpen size={18} color={colors.accentDeep} /><Text weight="bold" className="mt-2 text-xs">{'Kh\u00f3a h\u1ecdc'}</Text><Text weight="black" className="mt-1 text-sm">{band}</Text></View>
-        <View className="flex-1 items-center border-r border-line px-1"><Flame size={18} color="#ff864b" /><Text weight="bold" className="mt-2 text-xs">{'Chu\u1ed7i ng\u00e0y h\u1ecdc'}</Text><Text weight="black" className="mt-1 text-sm">{streak ?? '\u2014'}</Text></View>
-        <View className="flex-1 items-center px-1"><Sparkles size={18} color="#e6ad2f" /><Text weight="bold" className="mt-2 text-xs">XP</Text><Text weight="black" className="mt-1 text-sm">{xp ?? '\u2014'}</Text></View>
+        <View className="flex-1 items-center border-r border-line px-1"><Flame size={18} color={colors.flame} /><Text weight="bold" className="mt-2 text-xs">{'Chu\u1ed7i ng\u00e0y h\u1ecdc'}</Text><Text weight="black" className="mt-1 text-sm">{streak ?? '\u2014'}</Text></View>
+        <View className="flex-1 items-center px-1"><Sparkles size={18} color={colors.coin} /><Text weight="bold" className="mt-2 text-xs">XP</Text><Text weight="black" className="mt-1 text-sm">{xp ?? '\u2014'}</Text></View>
       </View>
       {error ? <Text className="px-4 pb-3 text-xs text-danger">{'M\u1ed9t s\u1ed1 s\u1ed1 li\u1ec7u ch\u01b0a t\u1ea3i \u0111\u01b0\u1ee3c. K\u00e9o xu\u1ed1ng \u0111\u1ec3 th\u1eed l\u1ea1i.'}</Text> : null}
     </View>

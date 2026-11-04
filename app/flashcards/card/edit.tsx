@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { ArrowLeft, BookOpenCheck, ChevronDown, ImagePlus, Search, Sparkles, X } from 'lucide-react-native';
+import { BookOpenCheck, ChevronDown, ImagePlus, Search, Sparkles, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, TextInput, View, KeyboardAvoidingView, Platform } from 'react-native';
+import { BackHeader } from '@/src/components/navigation/back-header';
 import { Button } from '@/src/components/ui/button';
 import { FormAlert } from '@/src/components/ui/form-alert';
 import { Text } from '@/src/components/ui/text';
@@ -47,10 +48,10 @@ export default function EditCardScreen() {
       setUploadingImage(false);
     }
   };
-  const remove = () => Alert.alert('Xóa thẻ?', 'Thẻ sẽ bị xóa khỏi thư viện của bạn.', [{ text: 'Hủy', style: 'cancel' }, { text: 'Xóa thẻ', style: 'destructive', onPress: async () => { await vocabApi.deleteCard(cardId!); await client.invalidateQueries({ queryKey: ['flashcards'] }); router.back(); } }]);
+  const remove = () => Alert.alert('Xóa thẻ?', 'Thẻ sẽ bị xóa khỏi thư viện của bạn.', [{ text: 'Hủy', style: 'cancel' }, { text: 'Xóa thẻ', style: 'destructive', onPress: async () => { try { await vocabApi.deleteCard(cardId!); await client.invalidateQueries({ queryKey: ['flashcards'] }); router.back(); } catch (e) { Alert.alert('Không thể xóa thẻ', e instanceof Error ? e.message : 'Vui lòng thử lại.'); } } }]);
   const loadingCard = Boolean(cardId && card.isPending);
-  return <ScrollView className="flex-1 bg-canvas" keyboardShouldPersistTaps="handled" contentContainerClassName="px-5 pb-12 pt-3" showsVerticalScrollIndicator={false}>
-    <Pressable accessibilityRole="button" accessibilityLabel="Quay lại" onPress={() => router.back()} className="mb-4 h-11 w-11 items-center justify-center rounded-full bg-surface"><ArrowLeft color={colors.ink}/></Pressable>
+  return <View className="flex-1 bg-canvas"><BackHeader title={cardId ? 'Chỉnh sửa thẻ' : 'Tạo thẻ mới'} fallbackHref="/(tabs)/flashcards" /><KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}><ScrollView className="flex-1" keyboardShouldPersistTaps="handled" contentContainerClassName="px-5 pb-12 pt-3" showsVerticalScrollIndicator={false}>
+    
     <View className="mb-5 rounded-[28px] p-5" style={{ backgroundColor: colors.heroStart }}>
       <View className="h-11 w-11 items-center justify-center rounded-2xl bg-white/15"><BookOpenCheck size={21} color="white"/></View>
       <Text className="mt-4 text-2xl text-white" weight="black">{cardId ? 'Chỉnh sửa thẻ' : 'Tạo thẻ mới'}</Text>
@@ -85,5 +86,5 @@ export default function EditCardScreen() {
     {error ? <View className="mt-4"><FormAlert tone="error" message={error}/></View> : null}
     <Button className="mt-5" label={cardId ? 'Lưu thẻ' : deckId ? 'Tạo và thêm vào bộ' : 'Tạo thẻ'} loading={mutation.isPending || loadingCard} disabled={!front.trim() || !back.trim() || uploadingImage || loadingCard} onPress={() => { setError(''); mutation.mutate();}}/>
     {cardId ? <Pressable onPress={remove} className="mt-3 min-h-12 items-center justify-center"><Text className="text-danger" weight="bold">Xóa thẻ</Text></Pressable> : null}
-  </ScrollView>;
+  </ScrollView></KeyboardAvoidingView></View>;
 }

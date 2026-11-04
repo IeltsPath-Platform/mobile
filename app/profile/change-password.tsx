@@ -1,10 +1,11 @@
 import { useMutation } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { CheckCircle2, ChevronLeft, LockKeyhole, ShieldCheck } from 'lucide-react-native';
+import { CheckCircle2, LockKeyhole, ShieldCheck } from 'lucide-react-native';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { BackButton } from '@/src/components/navigation/back-header';
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
 import { FormAlert } from '@/src/components/ui/form-alert';
@@ -48,9 +49,7 @@ export default function ChangePasswordScreen() {
           contentContainerClassName="px-5 pb-6"
           contentContainerStyle={{ paddingTop: Math.max(insets.top, 12) + 8 }}>
           <View className="mb-5 flex-row items-center gap-3">
-            <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Quay lại" hitSlop={8} className="h-11 w-11 items-center justify-center rounded-2xl border border-line bg-surface">
-              <ChevronLeft size={22} color={colors.ink} />
-            </Pressable>
+            <BackButton fallbackHref="/(tabs)/account" />
             <View className="flex-1">
               <Text weight="black" className="text-xl">Đổi mật khẩu</Text>
               <Text className="text-xs text-muted">Bảo mật tài khoản của bạn</Text>

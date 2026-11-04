@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
-import { Camera, Check, ChevronLeft, Clock3, ImagePlus, Trash2, UserRound } from 'lucide-react-native';
+import { Camera, Check, Clock3, ImagePlus, Trash2, UserRound } from 'lucide-react-native';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { BackButton } from '@/src/components/navigation/back-header';
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
 import { FormAlert } from '@/src/components/ui/form-alert';
@@ -172,9 +173,7 @@ export default function EditProfileScreen() {
           contentContainerClassName="px-5 pb-6"
           contentContainerStyle={{ paddingTop: Math.max(insets.top, 12) + 8 }}>
           <View className="mb-5 flex-row items-center gap-3">
-            <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Quay lại" hitSlop={8} className="h-11 w-11 items-center justify-center rounded-2xl border border-line bg-surface">
-              <ChevronLeft size={22} color={colors.ink} />
-            </Pressable>
+            <BackButton fallbackHref="/(tabs)/account" />
             <View className="flex-1">
               <Text weight="black" className="text-xl">Chỉnh sửa hồ sơ</Text>
               <Text className="text-xs text-muted">Thông tin và ảnh đại diện</Text>

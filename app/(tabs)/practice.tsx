@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { router, useFocusEffect } from 'expo-router';
 import { BookOpen, ChevronRight, CircleHelp, Flame, Gamepad2, Rocket, Search, Sparkles, Users, Zap } from 'lucide-react-native';
 import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, TextInput, View, type ScrollViewInstance } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, TextInput, View, type ScrollViewInstance } from 'react-native';
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
 import { Text } from '@/src/components/ui/text';
@@ -35,7 +35,7 @@ export default function PracticeScreen() {
   const games: GameCatalog['games'] = catalog.data?.games.filter((item) => item.gameType === 'WORDLY' || item.gameType === 'ROCKET') ?? [];
   const activeRoute = active.data?.matchId ? matchRoute(active.data.gameType, active.data.matchId) : active.data ? `/games/rooms/${active.data.roomId}` as never : null;
   const openGame = (gameType: GameType, playerMode: 'SOLO' | 'MULTIPLAYER') => router.push({ pathname: '/games', params: { gameType, playerMode } } as never);
-  return <ScrollView ref={scrollRef} className="flex-1 bg-canvas" contentContainerClassName="px-5 pb-28 pt-5" keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+  return <ScrollView ref={scrollRef} className="flex-1 bg-canvas" contentContainerClassName="px-5 pb-28 pt-5" keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} refreshControl={canFetch ? <RefreshControl refreshing={(catalog.isRefetching || active.isRefetching) && !catalog.isPending} onRefresh={() => { void catalog.refetch(); void active.refetch(); }} tintColor={colors.accent} /> : undefined}>
     <View className="mb-4 flex-row items-center justify-between"><Text className="text-3xl" weight="black">Luyện tập</Text><View className="h-12 w-12 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.warmSoft }}><Zap size={22} color={colors.accentWarm}/></View></View>
     <View className="mb-3 mt-1 flex-row items-center gap-2"><View className="h-8 w-8 items-center justify-center rounded-xl" style={{ backgroundColor: colors.accentSoft }}><Gamepad2 size={17} color={colors.accent}/></View><Text className="text-sm tracking-[1.5px] text-accent" weight="black">GAME</Text><View className="h-px flex-1 bg-line" /></View>
     {!canFetch ? <Card className="mb-4 border-b-0 bg-surface p-5"><Text weight="bold">Đăng nhập để chơi</Text><Text className="mt-2 text-sm leading-5 text-muted">Trạng thái game, phòng chơi và kết quả được đồng bộ với tài khoản của bạn.</Text><Button className="mt-4" label="Đăng nhập" onPress={() => router.push('/(auth)/login' as never)}/></Card> : null}

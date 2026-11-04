@@ -1,13 +1,21 @@
-import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { CheckCheck, ChevronLeft, Settings, Sparkles } from 'lucide-react-native';
-import { memo, useCallback } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, View } from 'react-native';
+import { AtSign, BellOff, CheckCheck, CornerDownRight, Heart, MessageCircle, Settings, UserPlus, type LucideIcon } from 'lucide-react-native';
+import { memo, useCallback, useMemo } from 'react';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, SectionList, View } from 'react-native';
 
+import { BackHeader } from '@/src/components/navigation/back-header';
+import { Button } from '@/src/components/ui/button';
+import { Skeleton } from '@/src/components/ui/skeleton';
 import { Text } from '@/src/components/ui/text';
 import { communityApi, notificationHasNext, type Notification } from '@/src/features/community/api';
 import { CommunityAvatar } from '@/src/features/community/components/community-image';
+import { timeAgo } from '@/src/features/community/format';
+import { haptics } from '@/src/lib/haptics';
 import { colors } from '@/src/theme';
+
+const notificationsKey = ['community', 'notifications'] as const;
+const unreadKey = ['community', 'unread'] as const;
 
 export const eventLabels: Record<string, string> = {
   'community.post-commented.v1': 'đã bình luận về bài viết của bạn',
@@ -21,6 +29,36 @@ export function eventLabel(type: string) {
   return eventLabels[type] ?? 'đã tương tác với bạn trong cộng đồng';
 }
 
+/** Icon + tint for the small badge on each avatar, so the event type reads before the text does. */
+function eventBadge(type: string): { Icon: LucideIcon; color: string } {
+  switch (type) {
+    case 'community.post-commented.v1': return { Icon: MessageCircle, color: colors.accent };
+    case 'community.comment-replied.v1': return { Icon: CornerDownRight, color: colors.accent };
+    case 'community.comment-mentioned.v1': return { Icon: AtSign, color: colors.warning };
+    case 'community.post-reacted.v1': return { Icon: Heart, color: colors.reaction.love };
+    case 'community.user-followed.v1': return { Icon: UserPlus, color: colors.success };
+    default: return { Icon: MessageCircle, color: colors.muted };
+  }
+}
+
+type Section = { title: string; data: Notification[] };
+
+/** Stable day buckets: marking one as read never moves it between sections. */
+function groupByDay(items: Notification[]): Section[] {
+  const startOfToday = new Date().setHours(0, 0, 0, 0);
+  const startOfWeek = startOfToday - 6 * 86_400_000;
+  const buckets: Section[] = [
+    { title: 'Hôm nay', data: [] },
+    { title: '7 ngày qua', data: [] },
+    { title: 'Trước đó', data: [] },
+  ];
+  for (const item of items) {
+    const at = new Date(item.createdAt).getTime();
+    (at >= startOfToday ? buckets[0] : at >= startOfWeek ? buckets[1] : buckets[2]).data.push(item);
+  }
+  return buckets.filter((bucket) => bucket.data.length > 0);
+}
+
 const NotificationRow = memo(function NotificationRow({ item, onOpen }: { item: Notification; onOpen: (item: Notification) => void }) {
   const actorQuery = useQuery({
     queryKey: ['community', 'profile', item.actorId],
@@ -31,22 +69,30 @@ const NotificationRow = memo(function NotificationRow({ item, onOpen }: { item: 
   });
   const actor = item.actor ?? actorQuery.data;
   const unread = !item.readAt;
+  const { Icon, color } = eventBadge(item.eventType);
+  const name = actor?.displayName ?? 'Thành viên';
+
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${actor?.displayName ?? 'Thành viên'} ${eventLabel(item.eventType)}`}
+      accessibilityLabel={`${unread ? 'Chưa đọc. ' : ''}${name} ${eventLabel(item.eventType)}`}
       onPress={() => onOpen(item)}
-      className={`mb-3 min-h-[76px] flex-row items-center rounded-2xl border px-4 py-3 ${unread ? '' : 'border-line bg-surface'}`}
-      style={unread ? { backgroundColor: colors.accentSoft, borderColor: colors.accent } : undefined}>
-      <CommunityAvatar uri={actor?.avatarUrl} name={actor?.displayName} size={42} />
-      <View className="ml-3 flex-1">
-        <Text className="text-sm leading-5">
-          <Text weight={unread ? 'bold' : 'regular'}>{actor?.displayName ?? 'Thành viên'}</Text>
+      className="min-h-[76px] flex-row items-center px-4 py-3 active:opacity-80"
+      style={{ backgroundColor: unread ? colors.accentSoft : colors.canvas }}>
+      <View>
+        <CommunityAvatar uri={actor?.avatarUrl} name={actor?.displayName} size={46} />
+        <View className="absolute -bottom-1 -right-1 h-6 w-6 items-center justify-center rounded-full border-2" style={{ backgroundColor: colors.surface, borderColor: unread ? colors.accentSoft : colors.canvas }}>
+          <Icon size={12} color={color} fill={item.eventType === 'community.post-reacted.v1' ? color : 'transparent'} />
+        </View>
+      </View>
+      <View className="ml-3.5 flex-1">
+        <Text className="text-[15px] leading-5">
+          <Text weight="bold">{name}</Text>
           <Text className="text-muted"> {eventLabel(item.eventType)}.</Text>
         </Text>
-        <Text className="mt-1 text-xs text-muted">{new Date(item.createdAt).toLocaleString('vi-VN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</Text>
+        <Text weight={unread ? 'semibold' : 'regular'} className="mt-1 text-xs" style={{ color: unread ? colors.accentDeep : colors.muted }}>{timeAgo(item.createdAt)}</Text>
       </View>
-      {unread ? <View className="ml-3 h-2.5 w-2.5 rounded-full bg-accent" /> : null}
+      {unread ? <View className="ml-3 h-2.5 w-2.5 rounded-full" style={{ backgroundColor: colors.accent }} /> : null}
     </Pressable>
   );
 });
@@ -55,26 +101,34 @@ export default function NotificationsScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const list = useInfiniteQuery({
-    queryKey: ['community', 'notifications'] as const,
+    queryKey: notificationsKey,
     queryFn: ({ pageParam }) => communityApi.notifications(Number(pageParam), 20),
     initialPageParam: 0 as number,
-    getNextPageParam: (last, pages) => notificationHasNext(last, 20) ? pages.length : undefined,
+    getNextPageParam: (last, pages) => (notificationHasNext(last, 20) ? pages.length : undefined),
   });
-  const unread = useQuery({ queryKey: ['community', 'unread'], queryFn: communityApi.unread });
-  const notifications = list.data?.pages.flat() ?? [];
+  const unread = useQuery({ queryKey: unreadKey, queryFn: communityApi.unread });
+  const unreadCount = unread.data?.count ?? 0;
+  const sections = useMemo(() => groupByDay(list.data?.pages.flat() ?? []), [list.data]);
 
   const refresh = useCallback(async () => {
     await Promise.all([list.refetch(), unread.refetch()]);
   }, [list.refetch, unread.refetch]);
 
   const markAll = useCallback(async () => {
+    const previousList = queryClient.getQueryData<InfiniteData<Notification[]>>(notificationsKey);
+    const previousUnread = queryClient.getQueryData<{ count: number }>(unreadKey);
+    const readAt = new Date().toISOString();
+    haptics.tap();
+    queryClient.setQueryData<InfiniteData<Notification[]>>(notificationsKey, (data) => data && ({
+      ...data, pages: data.pages.map((page) => page.map((row) => (row.readAt ? row : { ...row, readAt }))),
+    }));
+    queryClient.setQueryData(unreadKey, { count: 0 });
     try {
       await communityApi.markAll();
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['community', 'notifications'] }),
-        queryClient.invalidateQueries({ queryKey: ['community', 'unread'] }),
-      ]);
     } catch (error) {
+      queryClient.setQueryData(notificationsKey, previousList);
+      queryClient.setQueryData(unreadKey, previousUnread);
+      haptics.error();
       Alert.alert('Chưa thể cập nhật', error instanceof Error ? error.message : 'Vui lòng thử lại.');
     }
   }, [queryClient]);
@@ -82,11 +136,18 @@ export default function NotificationsScreen() {
   const openNotification = useCallback(async (item: Notification) => {
     try {
       if (!item.readAt) {
-        await communityApi.markRead(item.id);
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: ['community', 'unread'] }),
-          queryClient.invalidateQueries({ queryKey: ['community', 'notifications'] }),
-        ]);
+        // Reflect the read state immediately; the list keeps its scroll position.
+        const readAt = new Date().toISOString();
+        queryClient.setQueryData<InfiniteData<Notification[]>>(notificationsKey, (data) => data && ({
+          ...data, pages: data.pages.map((page) => page.map((row) => (row.id === item.id ? { ...row, readAt } : row))),
+        }));
+        queryClient.setQueryData<{ count: number }>(unreadKey, (data) => data && ({ count: Math.max(0, data.count - 1) }));
+        try { await communityApi.markRead(item.id); }
+        catch (error) {
+          void queryClient.invalidateQueries({ queryKey: notificationsKey });
+          void queryClient.invalidateQueries({ queryKey: unreadKey });
+          throw error;
+        }
       }
       if (item.eventType === 'community.user-followed.v1') router.push(`/community/users/${item.actorId}` as never);
       else if (item.postId) router.push({ pathname: '/community/[postId]', params: { postId: item.postId, commentId: item.commentId ?? '' } } as never);
@@ -96,51 +157,78 @@ export default function NotificationsScreen() {
     }
   }, [queryClient, router]);
 
-  const header = (
-    <View className="border-b border-line bg-surface px-4 pb-4 pt-3">
-      <View className="flex-row items-center justify-between">
-        <Pressable onPress={() => router.back()} className="h-11 w-11 items-center justify-center rounded-full bg-canvas" accessibilityLabel="Quay lại"><ChevronLeft size={21} color={colors.ink} /></Pressable>
-        <Text weight="black" className="text-lg">Thông báo</Text>
-        <Pressable onPress={() => router.push('/community/notification-preferences' as never)} className="h-11 w-11 items-center justify-center rounded-full bg-canvas" accessibilityLabel="Tuỳ chọn thông báo"><Settings size={19} color={colors.ink} /></Pressable>
+  let empty: React.ReactElement;
+  if (list.isPending) {
+    empty = (
+      <View className="gap-5 px-4 pt-5" accessibilityLabel="Đang tải thông báo" accessibilityRole="progressbar">
+        {[0, 1, 2, 3].map((row) => (
+          <View key={row} className="flex-row items-center">
+            <Skeleton width={46} height={46} radius={23} />
+            <View className="ml-3.5 flex-1 gap-2"><Skeleton height={13} /><Skeleton height={10} width="40%" /></View>
+          </View>
+        ))}
       </View>
-      <View className="mt-4 flex-row items-center justify-between">
-        <View><Text weight="bold" className="text-2xl">Hoạt động</Text><Text className="mt-1 text-sm text-muted">{unread.data?.count ?? 0} thông báo chưa đọc</Text></View>
-        <Pressable disabled={!unread.data?.count} onPress={() => void markAll()} className="min-h-11 flex-row items-center gap-2 rounded-full px-4" style={{ backgroundColor: colors.accentSoft }}><CheckCheck size={16} color={colors.accent} /><Text weight="semibold" className="text-xs text-accent">Đọc tất cả</Text></Pressable>
+    );
+  } else if (list.isError) {
+    empty = (
+      <View className="px-4 pt-6">
+        <Text weight="bold">Không tải được thông báo</Text>
+        <Text className="mt-1 text-sm text-muted">{list.error instanceof Error ? list.error.message : 'Hãy kiểm tra kết nối rồi thử lại.'}</Text>
+        <View className="mt-4"><Button label="Thử lại" onPress={() => void refresh()} /></View>
       </View>
-    </View>
-  );
-
-  const empty = list.isPending ? (
-    <View className="items-center py-16"><ActivityIndicator color={colors.accent} /><Text className="mt-3 text-sm text-muted">Đang tải hoạt động…</Text></View>
-  ) : list.isError ? (
-    <Pressable onPress={() => void refresh()} className="items-center rounded-3xl border border-line bg-surface p-6"><Text weight="bold">Không tải được thông báo</Text><Text className="mt-2 text-sm text-accent">Chạm để thử lại</Text></Pressable>
-  ) : (
-    <View className="items-center rounded-3xl border border-line bg-surface px-7 py-10">
-      <View className="h-16 w-16 items-center justify-center rounded-full bg-accent-soft"><Sparkles size={28} color={colors.accent} /></View>
-      <Text weight="bold" className="mt-4 text-lg">Bạn đã cập nhật hết rồi</Text>
-      <Text className="mt-2 text-center text-sm leading-5 text-muted">Khi có người tương tác với bạn, thông báo sẽ xuất hiện ở đây.</Text>
-    </View>
-  );
+    );
+  } else {
+    empty = (
+      <View className="items-center px-8 pt-20">
+        <View className="h-16 w-16 items-center justify-center rounded-full" style={{ backgroundColor: colors.accentSoft }}><BellOff size={28} color={colors.accent} /></View>
+        <Text weight="extrabold" className="mt-4 text-center text-lg">Chưa có thông báo</Text>
+        <Text className="mt-2 text-center text-sm leading-5 text-muted">Khi ai đó thích, bình luận hoặc theo dõi bạn, bạn sẽ thấy ở đây.</Text>
+      </View>
+    );
+  }
 
   return (
-    <FlatList
-      className="flex-1 bg-canvas"
-      contentContainerClassName="grow px-4 pb-10 pt-4"
-      data={notifications}
-      keyExtractor={(item) => item.id}
-      renderItem={({ item }) => <NotificationRow item={item} onOpen={openNotification} />}
-      ListHeaderComponent={header}
-      ListEmptyComponent={empty ?? undefined}
-      ListFooterComponent={notifications.length > 0 ? <>
-        {list.isFetchingNextPage ? <ActivityIndicator className="py-4" color={colors.accent} /> : null}
-        {list.isFetchNextPageError ? <Pressable onPress={() => void list.fetchNextPage()} className="min-h-11 items-center justify-center"><Text weight="bold" className="text-accent">Thử tải lại</Text></Pressable> : null}
-      </> : undefined}
-      onEndReached={() => { if (list.hasNextPage && !list.isFetchingNextPage) void list.fetchNextPage(); }}
-      onEndReachedThreshold={0.5}
-      initialNumToRender={10}
-      maxToRenderPerBatch={8}
-      windowSize={7}
-      refreshControl={<RefreshControl refreshing={list.isRefetching && !list.isFetchingNextPage} onRefresh={() => void refresh()} tintColor={colors.accent} />}
-    />
+    <View className="flex-1 bg-canvas">
+      <BackHeader
+        title="Thông báo"
+        subtitle={unreadCount > 0 ? `${unreadCount} chưa đọc` : undefined}
+        fallbackHref="/(tabs)/community"
+        rightAction={
+          <>
+            {unreadCount > 0 ? (
+              <Pressable onPress={() => void markAll()} accessibilityRole="button" accessibilityLabel="Đánh dấu tất cả là đã đọc" className="h-11 flex-row items-center gap-1.5 rounded-full px-3 active:opacity-70" style={{ backgroundColor: colors.accentSoft }}>
+                <CheckCheck size={16} color={colors.accentDeep} /><Text weight="bold" className="text-xs text-accent-deep">Đọc hết</Text>
+              </Pressable>
+            ) : null}
+            <Pressable onPress={() => router.push('/community/notification-preferences' as never)} accessibilityRole="button" accessibilityLabel="Tuỳ chọn thông báo" className="h-11 w-11 items-center justify-center rounded-full active:bg-tint">
+              <Settings size={20} color={colors.ink} />
+            </Pressable>
+          </>
+        }
+      />
+      <SectionList<Notification, Section>
+        sections={sections}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => <NotificationRow item={item} onOpen={openNotification} />}
+        renderSectionHeader={({ section }) => (
+          <Text weight="extrabold" className="bg-canvas px-4 pb-2 pt-4 text-[13px] uppercase tracking-wider text-muted">{section.title}</Text>
+        )}
+        stickySectionHeadersEnabled
+        ListEmptyComponent={empty}
+        ListFooterComponent={
+          <>
+            {list.isFetchingNextPage ? <ActivityIndicator className="py-4" color={colors.accent} /> : null}
+            {list.isFetchNextPageError ? <Pressable onPress={() => void list.fetchNextPage()} className="min-h-11 items-center justify-center"><Text weight="bold" className="text-accent">Thử tải lại</Text></Pressable> : null}
+          </>
+        }
+        onEndReached={() => { if (list.hasNextPage && !list.isFetchingNextPage) void list.fetchNextPage(); }}
+        onEndReachedThreshold={0.5}
+        initialNumToRender={10}
+        maxToRenderPerBatch={8}
+        windowSize={7}
+        contentContainerClassName="pb-10"
+        refreshControl={<RefreshControl refreshing={list.isRefetching && !list.isFetchingNextPage} onRefresh={() => void refresh()} tintColor={colors.accent} />}
+      />
+    </View>
   );
 }

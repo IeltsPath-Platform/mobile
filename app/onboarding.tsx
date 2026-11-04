@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BackButton } from '@/src/components/navigation/back-header';
+import { haptics } from '@/src/lib/haptics';
 import { Text } from '@/src/components/ui/text';
 import { useOnboarding, type OnboardingAnswers } from '@/src/features/onboarding/use-onboarding';
 import { AUTH_ENABLED } from '@/src/lib/env';
@@ -59,14 +61,7 @@ export default function OnboardingScreen() {
     <SafeAreaView className="flex-1 bg-canvas" edges={['top', 'bottom']}>
       <View className="px-5 pt-3">
         <View className="flex-row items-center gap-3">
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Quay lại"
-            hitSlop={6}
-            onPress={() => step > 0 ? setStep((value) => value - 1) : router.back()}
-            className="h-11 w-11 items-center justify-center rounded-2xl bg-surface">
-            <ArrowLeft size={20} color={colors.ink} />
-          </Pressable>
+          <BackButton onBack={() => step > 0 ? setStep((value) => value - 1) : router.back()} fallbackHref="/welcome" />
           <View className="flex-1">
             <View className="h-2 overflow-hidden rounded-full bg-line">
               <View className="h-full rounded-full bg-accent" style={{ width: `${((step + 1) / STEPS.length) * 100}%` }} />
@@ -88,7 +83,7 @@ export default function OnboardingScreen() {
                 key={option}
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
-                onPress={() => choose(option)}
+                onPress={() => { if (!active) haptics.select(); choose(option); }}
                 className="min-h-16 justify-center rounded-2xl border border-b-4 px-4"
                 style={{
                   borderColor: active ? colors.accent : colors.line,

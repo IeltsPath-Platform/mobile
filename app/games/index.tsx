@@ -1,9 +1,10 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, ArrowRight, Flame, Gamepad2, Rocket, Users, UserRound } from 'lucide-react-native';
+import { ArrowRight, Flame, Gamepad2, Rocket, Users, UserRound } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Switch, TextInput, View } from 'react-native';
 
+import { BackButton } from '@/src/components/navigation/back-header';
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
 import { Text } from '@/src/components/ui/text';
@@ -83,7 +84,7 @@ export default function GameCatalogScreen() {
   const activeRoute = active.data?.matchId ? routeForMatch(active.data.gameType, active.data.matchId) : active.data ? `/games/rooms/${active.data.roomId}` as never : null;
 
   return <View className="flex-1 bg-canvas"><ScrollView keyboardShouldPersistTaps="handled" contentContainerClassName="px-5 pb-12 pt-3">
-    <Pressable accessibilityRole="button" onPress={() => router.back()} className="h-11 w-11 items-center justify-center rounded-full bg-surface"><ArrowLeft size={20} color={colors.ink} /></Pressable>
+    <BackButton fallbackHref="/(tabs)" />
     <View className="mt-5"><Text weight="bold" className="text-xs uppercase tracking-widest text-accent">HỌC QUA TRÒ CHƠI</Text><Text weight="black" className="mt-1 text-3xl">Chọn thử thách của bạn</Text><Text className="mt-2 text-sm leading-6 text-muted">Luyện từ vựng, phản xạ và chơi cùng bạn bè.</Text></View>
 
     {!enabled ? <Card className="mt-5 border-b-0 bg-surface p-5"><Text weight="bold">Đăng nhập để chơi</Text><Text className="mt-2 text-sm text-muted">Phòng chơi và kết quả sẽ được đồng bộ với tài khoản.</Text><Button className="mt-4" label="Đăng nhập" onPress={() => router.push('/(auth)/login' as never)} /></Card> : null}

@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useFocusEffect } from 'expo-router';
 import { Coins, Flame } from 'lucide-react-native';
 import { useCallback, useMemo, useRef } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, View, type ScrollViewInstance, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, View, type ScrollViewInstance, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import { Button } from '@/src/components/ui/button';
@@ -26,7 +26,7 @@ export default function HomeScreen() {
 
   return (
     <View className="flex-1 bg-canvas">
-      <View className="overflow-hidden px-5 pb-4 pt-2" style={{ backgroundColor: isDark ? '#111418' : colors.surface }}>
+      <View className="overflow-hidden px-5 pb-4 pt-2" style={{ backgroundColor: colors.surface }}>
           <FeatherOrnament color={isDark ? '#9eb1ff' : colors.accent} style={{ right: -34, top: -28, transform: [{ rotate: '-24deg' }] }} opacity={isDark ? 0.28 : 0.16} size={152} />
           <FeatherOrnament color={isDark ? '#9eb1ff' : colors.accent} style={{ left: -42, top: 42, transform: [{ rotate: '154deg' }] }} opacity={isDark ? 0.22 : 0.12} size={106} />
           <Text pointerEvents="none" className="absolute right-24 top-2 text-lg" style={{ color: isDark ? '#ffffff40' : '#163c7625' }}>✦</Text>
@@ -42,17 +42,17 @@ export default function HomeScreen() {
               <Text className="text-[25px] leading-[30px]">🇺🇸</Text>
             </View>
             <View accessibilityLabel={`Chuỗi học: ${streak.currentDays ?? 'chưa có dữ liệu'} ngày`} className="min-h-10 flex-1 flex-row items-center justify-center gap-1.5 rounded-full border px-2.5" style={{ borderColor: isDark ? '#ffffff26' : colors.line, backgroundColor: isDark ? '#00000055' : colors.canvas }}>
-              <Flame size={17} color="#ff864b" fill="#ff864b" />
+              <Flame size={17} color={colors.flame} fill={colors.flame} />
               <Text weight="black" className={`text-sm ${isDark ? 'text-white' : 'text-ink'}`}>{streak.currentDays ?? '—'}</Text>
             </View>
             <View accessibilityLabel={`Tổng XP: ${progress.data?.totalXp ?? 'chưa có dữ liệu'}`} className="min-h-10 flex-1 flex-row items-center justify-center gap-1.5 rounded-full border px-2.5" style={{ borderColor: isDark ? '#ffffff26' : colors.line, backgroundColor: isDark ? '#00000055' : colors.canvas }}>
-              <Coins size={16} color="#f4c44e" />
+              <Coins size={16} color={colors.coin} />
               <Text weight="black" className={`text-sm ${isDark ? 'text-white' : 'text-ink'}`}>{progress.data?.totalXp ?? '—'}</Text>
             </View>
           </View>
       </View>
 
-      <ScrollView ref={scrollRef} className="flex-1" contentContainerClassName="px-5 pb-10 pt-4" showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scrollRef} className="flex-1" contentContainerClassName="px-5 pb-10 pt-4" showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={topicsQuery.isRefetching} onRefresh={() => { void topicsQuery.refetch(); void streak.refetch?.(); }} tintColor={colors.accent} />}>
           {topicsQuery.isPending ? <View className="items-center py-12"><ActivityIndicator color={colors.accent} /><Text className="mt-3 text-sm text-muted">Đang tải chủ đề…</Text></View> : null}
           {topicsQuery.isError ? <View className="mb-5 rounded-3xl border border-line bg-surface p-5"><Text weight="bold">Chưa tải được chủ đề</Text><Text className="mt-2 text-sm leading-5 text-muted">Kiểm tra kết nối máy chủ rồi thử lại.</Text><Button className="mt-4" variant="secondary" label="Thử lại" onPress={() => void queryClient.invalidateQueries({ queryKey: ['vocab', 'topics'] })} /></View> : null}
           {topicsQuery.isSuccess && !topics.length ? <View className="rounded-3xl border border-line bg-surface p-5"><Text weight="bold">Chưa có chủ đề từ vựng</Text><Text className="mt-2 text-sm text-muted">Các chủ đề sẽ hiện ở đây sau khi được xuất bản.</Text></View> : null}
