@@ -2,6 +2,7 @@ export type StudyCard = {
   id: string;
   front: string;
   back: string;
+  pronunciationAudioReference?: string | null;
   imageUrl?: string | null;
 };
 

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { SoundToggle, useStudyMusic } from '@/src/features/session/components/sound-toggle';
 import { haptics } from '@/src/lib/haptics';
 import { sound } from '@/src/lib/sound';
+import { loadVocabularyPronunciations, speakVocabularyPronunciation } from '@/src/features/vocab/pronunciation';
 import { ActivityIndicator, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Share, TextInput, View } from 'react-native';
 
 import { Button } from '@/src/components/ui/button';
@@ -95,9 +96,20 @@ export function TopicStudySheet({ topic, setId, setTitle, topicPage, topicPageSi
   useStudyMusic(studying);
   useEffect(() => {
     if (!studying || mode !== 'words') return;
-    const lemma = practiceWords[studyIndex]?.word.lemma;
-    if (lemma) void sound.speak(lemma);
-    return () => sound.stopSpeaking();
+    const upcoming = practiceWords.slice(studyIndex, studyIndex + 10);
+    const lemma = upcoming[0]?.word.lemma;
+    if (!lemma) return;
+    let cancelled = false;
+    void loadVocabularyPronunciations(upcoming.map(({ word }) => word.lemma)).then((audioByLemma) => {
+      if (cancelled) return;
+      const audio = audioByLemma[lemma.trim().toLocaleLowerCase()];
+      if (audio) {
+        void sound.playPronunciation(audio).then((played) => {
+          if (!played && !cancelled) void sound.speak(lemma);
+        });
+      } else void sound.speak(lemma);
+    });
+    return () => { cancelled = true; sound.stopSpeaking(); };
   }, [studying, mode, studyIndex, practiceWords]);
   const quizLength = Math.min(10, practiceWords.length);
   const quizWord = practiceWords[quizIndex]?.word;
@@ -260,7 +272,7 @@ export function TopicStudySheet({ topic, setId, setTitle, topicPage, topicPageSi
               <View className="mb-6 flex-row items-center justify-center gap-3"><View className="h-px flex-1 bg-line"/><Text weight="bold" className="text-xs uppercase tracking-[2px] text-muted">{item.sense.partOfSpeech || 'TỪ VỰNG'}</Text><View className="h-px flex-1 bg-line"/></View>
               <View className="flex-row items-center justify-center gap-3">
                 <Text weight="black" className="text-center text-[34px] text-accent-deep">{item.word.lemma}</Text>
-                <Pressable accessibilityRole="button" accessibilityLabel={`Nghe phát âm ${item.word.lemma}`} hitSlop={8} onPress={() => { haptics.tap(); void sound.speak(item.word.lemma); }} className="h-11 w-11 items-center justify-center rounded-full active:opacity-70" style={{ backgroundColor: colors.accentSoft }}><Volume2 size={21} color={colors.accentDeep} /></Pressable>
+                <Pressable accessibilityRole="button" accessibilityLabel={`Nghe phát âm ${item.word.lemma}`} hitSlop={8} onPress={() => { haptics.tap(); void speakVocabularyPronunciation(item.word.lemma, undefined); }} className="h-11 w-11 items-center justify-center rounded-full active:opacity-70" style={{ backgroundColor: colors.accentSoft }}><Volume2 size={21} color={colors.accentDeep} /></Pressable>
               </View>
               {item.word.ipa ? <Text className="mt-1 text-center text-base text-muted">/{item.word.ipa}/</Text> : null}
               <Text className="mt-7 text-center text-[20px] leading-9 text-ink"><Text weight="black" className="text-accent-deep">{item.word.lemma}</Text> có nghĩa là “{item.meaning}”.</Text>

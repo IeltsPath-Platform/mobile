@@ -9,7 +9,7 @@ export function ProfileCommunityCard({ followers, following, onPress }: { follow
     <Pressable accessibilityRole="button" onPress={onPress} className="mb-5 overflow-hidden rounded-[26px] border border-line bg-surface p-4 active:opacity-80">
       <View className="flex-row items-center gap-3">
         <View className="h-12 w-12 items-center justify-center rounded-2xl" style={{ backgroundColor: `${colors.social}20` }}><UsersRound size={22} color={colors.social} /></View>
-        <View className="flex-1"><Text weight="black" className="text-base">{'C\u1ed9ng \u0111\u1ed3ng h\u1ecdc t\u1eadp'}</Text><Text className="mt-1 text-xs text-muted">{'K\u1ebft n\u1ed1i v\u1edbi nh\u1eefng ng\u01b0\u1eddi c\u00f9ng h\u1ecdc IELTS'}</Text></View>
+        <View className="flex-1"><Text weight="black" className="text-base">Hồ sơ cộng đồng</Text><Text className="mt-1 text-xs text-muted">Bài viết và kết nối của bạn</Text></View>
         <ChevronRight size={18} color={colors.muted} />
       </View>
       <View className="mt-4 flex-row rounded-2xl" style={{ backgroundColor: colors.canvas }}>

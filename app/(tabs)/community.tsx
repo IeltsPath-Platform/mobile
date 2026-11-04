@@ -1,6 +1,6 @@
-import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { Bell, Bookmark, PenLine, Search, Users, X } from 'lucide-react-native';
+import { Bell, PenLine, Search, Users, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, TextInput, View } from 'react-native';
 
@@ -12,9 +12,10 @@ import { useAuth, useCurrentUser } from '@/src/features/auth/auth-provider';
 import { communityApi, type CommunityPost, type PostCategory } from '@/src/features/community/api';
 import { communityCategoryColor } from '@/src/features/community/community-colors';
 import { PostRow } from '@/src/features/community/components/post-row';
+import { CommunityAvatar } from '@/src/features/community/components/community-image';
+import { useUnread } from '@/src/features/community/use-unread';
 import { usePostMenu } from '@/src/features/community/components/post-menu';
 import { CATEGORY_LABELS } from '@/src/features/community/format';
-import { useUnread } from '@/src/features/community/use-unread';
 import { haptics } from '@/src/lib/haptics';
 import { colors } from '@/src/theme';
 
@@ -30,8 +31,9 @@ export default function CommunityScreen() {
   const router = useRouter();
   const { authEnabled, status } = useAuth();
   const user = useCurrentUser();
-  const unread = useUnread();
   const signedIn = authEnabled && status === 'authenticated';
+  const unread = useUnread();
+  const ownProfile = useQuery({ queryKey: ['community', 'profile', user.data?.id], queryFn: () => communityApi.profile(user.data!.id), enabled: signedIn && Boolean(user.data?.id), staleTime: 5 * 60_000 });
 
   const [scope, setScope] = useState<Scope>('ALL');
   const [category, setCategory] = useState<PostCategory | undefined>();
@@ -65,10 +67,10 @@ export default function CommunityScreen() {
   const menu = usePostMenu(user.data?.id);
   const openPost = useCallback((id: string) => router.push(`/community/${id}` as never), [router]);
   const openProfile = useCallback((id: string) => router.push(`/community/users/${id}` as never), [router]);
+  const openOwnProfile = () => { if (user.data?.id) { haptics.tap(); openProfile(user.data.id); } };
   const compose = () => { haptics.tap(); router.push('/community/composer' as never); };
 
   const closeSearch = () => { setSearching(false); setSearch(''); };
-  const unreadCount = unread.data?.count ?? 0;
 
   const listHeader = (
     <View className="bg-canvas">
@@ -144,23 +146,22 @@ export default function CommunityScreen() {
   return (
     <View className="flex-1 bg-canvas">
       <View className="flex-row items-center px-4 pb-1 pt-2">
-        <Text accessibilityRole="header" weight="black" className="flex-1 text-[26px]" style={{ letterSpacing: -0.5 }}>Cộng đồng</Text>
+        <Text accessibilityRole="header" weight="black" className="flex-1 text-[24px]">Cộng đồng</Text>
         {signedIn ? (
-          <>
-            <BarButton label="Tìm bài viết" onPress={() => { haptics.tap(); setSearching((open) => !open); }}><Search size={22} color={colors.ink} /></BarButton>
-            <BarButton label="Bài viết đã lưu" onPress={() => router.push('/community/bookmarked' as never)}><Bookmark size={22} color={colors.ink} /></BarButton>
-            <BarButton label={unreadCount ? `Thông báo, ${unreadCount} chưa đọc` : 'Thông báo'} onPress={() => router.push('/community/notifications' as never)}>
-              <Bell size={22} color={colors.ink} />
-              {unreadCount > 0 ? (
-                <View className="absolute right-1 top-1 min-w-[18px] items-center rounded-full px-1" style={{ backgroundColor: colors.accentWarm }}>
-                  <Text weight="bold" className="text-[10px] text-white">{unreadCount > 99 ? '99+' : unreadCount}</Text>
-                </View>
-              ) : null}
+          <View className="flex-row">
+            <BarButton label="Tìm bài viết" onPress={() => { haptics.tap(); setSearching((open) => !open); }}><Search size={21} color={colors.ink} /></BarButton>
+            <BarButton label={`Thông báo${unread.data?.count ? `, ${unread.data.count} chưa đọc` : ''}`} onPress={() => router.push('/community/notifications' as never)}>
+              <View>
+                <Bell size={21} color={colors.ink} />
+                {Boolean(unread.data?.count) ? <View className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border border-canvas bg-danger" /> : null}
+              </View>
             </BarButton>
-          </>
+            <Pressable onPress={openOwnProfile} disabled={!user.data?.id} accessibilityRole="button" accessibilityLabel="Hồ sơ cộng đồng của tôi" className="h-11 w-11 items-center justify-center rounded-full active:bg-tint">
+              <CommunityAvatar uri={ownProfile.data?.avatarUrl} name={ownProfile.data?.displayName ?? user.data?.fullName} size={34} />
+            </Pressable>
+          </View>
         ) : null}
       </View>
-
       {searching ? (
         <View className="mx-4 mb-2 mt-1 min-h-11 flex-row items-center rounded-full bg-surfaceTint px-4">
           <Search size={17} color={colors.muted} />

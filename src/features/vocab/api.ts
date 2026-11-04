@@ -23,6 +23,7 @@ export type VocabularyCatalogWord = {
   id: string; lemma: string; ipa: string | null; pronunciationAudioReference: string | null;
   senses: Array<Pick<VocabularySense, 'id' | 'partOfSpeech' | 'englishDefinition' | 'vietnameseMeaning' | 'exampleSentence'>>;
 };
+export type VocabularyPronunciation = { lemma: string; normalizedLemma: string; ipa: string | null; audioUk: string | null; audioUs: string | null };
 export type LibraryStatus = 'ACTIVE' | 'ARCHIVED' | 'DELETED';
 export type FlashcardSourceType = 'MANUAL' | 'VOCABULARY_SENSE' | 'HIGHLIGHT' | 'PRACTICE_QUESTION';
 export type FlashcardDeck = {
@@ -61,6 +62,15 @@ const params = (values: Record<string, string | number | undefined>) => {
 
 export const vocabApi = {
   search: (query: string, signal?: AbortSignal) => apiRequest<VocabularyItem[]>(`/api/content/vocabulary/search${params({ query })}`, { auth: true, signal }),
+  lookupPronunciations: async (forms: string[]) => {
+    const normalized = [...new Set(forms.map((form) => form.trim()).filter(Boolean))];
+    const chunks: string[][] = [];
+    for (let index = 0; index < normalized.length; index += 10) chunks.push(normalized.slice(index, index + 10));
+    const pages = await Promise.all(chunks.map((chunk) => apiRequest<VocabularyPronunciation[]>(
+      `${contentVocabularyPath}/lookup${params({ forms: chunk.join(',') })}`, { auth: true },
+    )));
+    return pages.flat();
+  },
   listTopics: (signal?: AbortSignal) => apiRequest<VocabularyTopic[]>(`${contentVocabularyPath}/topics`, { auth: false, signal }),
   achievements: (timezone = 'Asia/Ho_Chi_Minh') => apiRequest<{ items: VocabularyAchievement[] }>(`/api/learning-support/flashcards/notebook/achievements${params({ timezone })}`, { auth: true }),
   listTopicWords: (topicId: string, page = 0, size = 30, signal?: AbortSignal) =>

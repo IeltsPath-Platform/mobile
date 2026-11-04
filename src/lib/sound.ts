@@ -17,6 +17,7 @@ export type SoundName = keyof typeof effects;
 const MUSIC_VOLUME = 0.22;
 const players = new Map<SoundName, AudioPlayer>();
 let music: AudioPlayer | null = null;
+let pronunciation: AudioPlayer | null = null;
 let musicWanted = false;
 let configured = false;
 
@@ -55,6 +56,7 @@ export const sound = {
     try {
       if (!(await getAppSettings()).soundEnabled || !text.trim()) return;
       await configure();
+      pronunciation?.pause();
       Speech.stop();
       Speech.speak(text, { language, rate: 0.9 });
     } catch {
@@ -62,8 +64,27 @@ export const sound = {
     }
   },
 
+  /** Play a pronunciation recording whose URL was returned by the vocabulary API. */
+  async playPronunciation(uri: string) {
+    try {
+      if (!(await getAppSettings()).soundEnabled || !uri.trim()) return false;
+      await configure();
+      Speech.stop();
+      if (!pronunciation) pronunciation = createAudioPlayer(uri);
+      else {
+        pronunciation.pause();
+        pronunciation.replace(uri);
+      }
+      pronunciation.play();
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
   stopSpeaking() {
     try { Speech.stop(); } catch { /* ignore */ }
+    try { pronunciation?.pause(); } catch { /* ignore */ }
   },
 
   async startMusic() {

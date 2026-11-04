@@ -1,28 +1,27 @@
 /**
- * IELTS mobile tokens — aligned with FE classroom/site brand.
- * Source: frontend/src/styles/globals.css + practice.css
+ * IELTSPath mobile palette: warm paper, ink, cobalt and marigold.
+ * Mobile uses the shared owl/blue brand with a softer, more tactile native feel.
  */
 const colors = {
-  canvas: '#f8f9fc',
-  surface: '#ffffff',
-  surfaceTint: '#eef3ff',
-  ink: '#202633',
-  muted: '#77808e',
-  line: '#e3e7ef',
-  edge: '#e9edf4',
-  // Primary = FE --classroom-primary
-  accent: '#123ab5',
-  accentDeep: '#0d2b8d',
-  accentSoft: '#eef3ff',
-  accentEdge: '#0d2b8d',
+  canvas: '#f5f3ed',
+  surface: '#fffefa',
+  surfaceTint: '#edf2fa',
+  ink: '#182536',
+  muted: '#647185',
+  line: '#e2e4e3',
+  edge: '#e9e8e1',
+  accent: '#2867d8',
+  accentDeep: '#1a4fae',
+  accentSoft: '#e8f0ff',
+  accentEdge: '#b9cff8',
   // CTA / streak warm = FE --classroom-warning / site-orange
-  accentWarm: '#ff7624',
-  xp: '#ff7624',
-  xpDeep: '#c95219',
-  danger: '#c2332b',
-  dangerSoft: '#fdecea',
-  success: '#13845a',
-  successSoft: '#e6f5ee',
+  accentWarm: '#ef8b49',
+  xp: '#e9a63b',
+  xpDeep: '#a85c20',
+  danger: '#bd4d43',
+  dangerSoft: '#f9e9e5',
+  success: '#39856a',
+  successSoft: '#e3f1e9',
   community: {
     general: { foreground: '#1741a6', background: '#e9efff', border: '#c9d6ff' },
     question: { foreground: '#a92d49', background: '#fff0f2', border: '#ffd1d9' },
@@ -31,8 +30,8 @@ const colors = {
     speaking: { foreground: '#075c86', background: '#e8f6fc', border: '#bde7f6' },
     resources: { foreground: '#87540b', background: '#fff5df', border: '#f4dfaa' },
   },
-  heroStart: '#061c64',
-  heroEnd: '#1647d6',
+  heroStart: '#193e77',
+  heroEnd: '#3279d8',
   skill: {
     listening: '#0e44cf',
     reading: '#ff7624',

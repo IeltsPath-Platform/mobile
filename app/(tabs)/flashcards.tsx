@@ -9,6 +9,8 @@ import { Card } from '@/src/components/ui/card';
 import { Text } from '@/src/components/ui/text';
 import { useAuth } from '@/src/features/auth/auth-provider';
 import { listActiveDecks, vocabApi, type FlashcardDeck } from '@/src/features/vocab/api';
+import { haptics } from '@/src/lib/haptics';
+import { sound } from '@/src/lib/sound';
 import { colors } from '@/src/theme';
 
 type Tab = 'decks' | 'cards';
@@ -31,49 +33,31 @@ export default function FlashcardsScreen() {
   const openCreate = (kind: Tab = tab) => {
     if (status === 'loading') return;
     if (!enabled) { router.push('/(auth)/login' as never); return; }
+    haptics.tap();
+    void sound.play('tap');
     router.push(kind === 'decks' ? '/flashcards/deck/edit' : '/flashcards/card/edit');
   };
 
   return (
-    <ScrollView ref={scrollRef} className="flex-1 bg-canvas" contentContainerClassName="px-5 pb-28 pt-3" showsVerticalScrollIndicator={false} refreshControl={enabled ? <RefreshControl refreshing={(decks.isRefetching || cards.isRefetching) && !decks.isPending} onRefresh={() => { void decks.refetch(); void cards.refetch(); }} tintColor={colors.accent} /> : undefined}>
-      <View className="mb-5 flex-row items-center justify-between">
-        <View>
-          <Text className="text-[25px] leading-8" weight="black">Flashcards</Text>
-        </View>
-        <View className="h-10 w-10 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.listeningSoft }}><BookOpenCheck size={21} color={colors.skill.listening}/></View>
-      </View>
-
-      <View className="overflow-hidden rounded-[28px] p-5" style={{ backgroundColor: colors.heroStart }}>
-        <View className="absolute -right-8 -top-10 h-40 w-40 rounded-full" style={{ backgroundColor: colors.heroEnd, opacity: 0.28 }}/>
-        <View className="flex-row items-center gap-3">
-          <View className="h-11 w-11 items-center justify-center rounded-2xl bg-white/15"><RotateCcw size={21} color="white"/></View>
-          <View className="flex-1"><Text className="text-[10px] uppercase tracking-[1.6px] text-white/70" weight="bold">HÔM NAY</Text><Text className="mt-1 text-xl text-white" weight="black">{due} thẻ đến hạn</Text></View>
-          <Sparkles size={21} color={colors.warning}/>
-        </View>
-        <Text className="mt-3 text-sm leading-5 text-white/75">Ôn đều mỗi ngày để từ mới ở lại lâu hơn.</Text>
-        <Pressable accessibilityRole="button" onPress={() => due > 0 ? router.push('/flashcards/study') : setTab('decks')} className="mt-4 min-h-11 flex-row items-center justify-center gap-2 self-start rounded-full bg-white px-5">
-          <Text weight="bold" className="text-accent-deep">{due > 0 ? 'Bắt đầu ôn' : 'Xem bộ thẻ'}</Text><ChevronRight size={16} color={colors.accentDeep}/>
+    <ScrollView ref={scrollRef} className="flex-1 bg-canvas" contentContainerClassName="px-5 pb-8 pt-3" showsVerticalScrollIndicator={false} refreshControl={enabled ? <RefreshControl refreshing={(decks.isRefetching || cards.isRefetching) && !decks.isPending} onRefresh={() => { void decks.refetch(); void cards.refetch(); }} tintColor={colors.accent} /> : undefined}>
+      <Text accessibilityRole="header" className="mb-4 text-[24px]" weight="black">Thẻ từ</Text>
+      <View className="flex-row items-center rounded-[20px] px-4 py-4" style={{ backgroundColor: colors.warmSoft }}>
+        <RotateCcw size={22} color={colors.accentWarm} />
+        <Text className="ml-3 flex-1 text-lg" weight="bold">{due} thẻ cần ôn</Text>
+        <Pressable accessibilityRole="button" onPress={() => { haptics.tap(); void sound.play('tap'); if (due > 0) router.push('/flashcards/study'); else setTab('decks'); }} className="min-h-11 flex-row items-center gap-1 px-2 active:opacity-70">
+          <Text weight="bold" className="text-accent-deep">{due > 0 ? 'Ôn ngay' : 'Xem bộ'}</Text><ChevronRight size={16} color={colors.accentDeep}/>
         </Pressable>
       </View>
-
-      <View className="mt-5 flex-row gap-3">
-        <Pressable accessibilityRole="button" onPress={() => openCreate('decks')} className="min-h-[82px] flex-1 flex-row items-center gap-3 rounded-3xl border border-line bg-surface p-4 active:opacity-80">
-          <View className="h-10 w-10 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.listeningSoft }}><Layers3 size={20} color={colors.skill.listening}/></View>
-          <View className="flex-1"><Text weight="bold">Tạo bộ thẻ</Text><Text className="mt-1 text-xs text-muted">Gom theo chủ đề</Text></View>
+      <View className="mt-2 flex-row">
+        <Pressable accessibilityRole="button" onPress={() => openCreate('decks')} className="min-h-11 flex-1 flex-row items-center justify-center gap-2 active:opacity-70">
+          <Layers3 size={17} color={colors.accentDeep}/><Text weight="semibold" className="text-sm">Tạo bộ</Text>
         </Pressable>
-        <Pressable accessibilityRole="button" onPress={() => openCreate('cards')} className="min-h-[82px] flex-1 flex-row items-center gap-3 rounded-3xl border border-line bg-surface p-4 active:opacity-80">
-          <View className="h-10 w-10 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.warmSoft }}><Plus size={20} color={colors.accentWarm}/></View>
-          <View className="flex-1"><Text weight="bold">Tạo thẻ</Text><Text className="mt-1 text-xs text-muted">Thêm từ cần nhớ</Text></View>
+        <Pressable accessibilityRole="button" onPress={() => openCreate('cards')} className="min-h-11 flex-1 flex-row items-center justify-center gap-2 active:opacity-70">
+          <Plus size={17} color={colors.accentDeep}/><Text weight="semibold" className="text-sm">Thêm thẻ</Text>
         </Pressable>
       </View>
-
-      <View className="mt-6 flex-row rounded-2xl bg-surfaceTint p-1">
-        {([{ id: 'decks', label: 'Bộ thẻ' }, { id: 'cards', label: 'Thẻ của tôi' }] as const).map((item) => <Pressable key={item.id} accessibilityRole="tab" accessibilityState={{ selected: tab === item.id }} onPress={() => setTab(item.id)} className={`min-h-11 flex-1 items-center justify-center rounded-xl ${tab === item.id ? 'bg-surface' : ''}`}><Text weight="bold" className={tab === item.id ? 'text-accent-deep' : 'text-muted'}>{item.label}</Text></Pressable>)}
-      </View>
-
-      <View className="mb-3 mt-5 flex-row items-end justify-between">
-        <View className="flex-1 pr-3"><Text className="text-xl" weight="black">{tab === 'decks' ? 'Bộ học của bạn' : 'Thư viện thẻ'}</Text><Text className="mt-1 text-sm text-muted">{tab === 'decks' ? `${deckList.length} bộ · ${due} thẻ cần ôn` : `${cardList.length} thẻ đang hoạt động`}</Text></View>
-        <Pressable accessibilityRole="button" accessibilityLabel={tab === 'decks' ? 'Tạo bộ thẻ' : 'Tạo thẻ'} onPress={() => openCreate()} className="h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.accent }}><Plus size={22} color="white"/></Pressable>
+      <View className="mb-4 mt-3 flex-row border-b" style={{ borderBottomColor: colors.line }}>
+        {([{ id: 'decks', label: 'Bộ thẻ' }, { id: 'cards', label: 'Thẻ của tôi' }] as const).map((item) => <Pressable key={item.id} accessibilityRole="tab" accessibilityState={{ selected: tab === item.id }} onPress={() => setTab(item.id)} className="min-h-12 flex-1 items-center justify-center"><Text weight="bold" className={tab === item.id ? 'text-accent-deep' : 'text-muted'}>{item.label}</Text>{tab === item.id ? <View className="absolute bottom-0 h-[3px] w-10 rounded-full" style={{ backgroundColor: colors.accent }} /> : null}</Pressable>)}
       </View>
 
       {!enabled ? <Card className="border-line bg-surface"><Text weight="bold">Đăng nhập để đồng bộ Flashcards</Text><Text className="mt-2 text-sm leading-5 text-muted">Bộ thẻ và tiến độ ôn tập được lưu trong tài khoản của bạn.</Text><Button className="mt-4" label="Đăng nhập" onPress={() => router.push('/(auth)/login' as never)}/></Card> : null}

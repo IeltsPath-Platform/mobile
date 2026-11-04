@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarProps } from 'expo-router/build/react-navigation/bottom-tabs/types';
 
 import { Text } from '@/src/components/ui/text';
+import { haptics } from '@/src/lib/haptics';
 import { colors, spacing, touchTarget } from '@/src/theme';
 
 const tabs = {
@@ -36,7 +37,10 @@ export function ColorfulTabBar({ state, emitter, navigateToTab }: BottomTabBarPr
             const event = emitter.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
             if (event.defaultPrevented) return;
 
-            if (!focused) navigateToTab(route.key);
+            if (!focused) {
+              haptics.select();
+              navigateToTab(route.key);
+            }
           };
 
           return (

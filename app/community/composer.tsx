@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -85,9 +86,17 @@ export default function ComposerScreen() {
   const [uploadingUris, setUploadingUris] = useState<string[]>([]);
   const [failedUris, setFailedUris] = useState<string[]>([]);
   const [error, setError] = useState('');
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const scrollRef = useRef<ScrollViewInstance>(null);
   const hydrated = useRef(false);
   const dirty = useRef(false);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => setKeyboardVisible(false));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
 
   const existing = useQuery({
     queryKey: ['community', 'detail', id],
@@ -309,7 +318,7 @@ export default function ComposerScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-canvas" edges={['top']}>
-      <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'web' ? undefined : 'padding'}>
         <View className="min-h-14 flex-row items-center border-b border-line px-2">
           <Pressable onPress={close} disabled={busy} className="h-11 w-11 items-center justify-center rounded-full active:bg-tint" accessibilityRole="button" accessibilityLabel="Đóng trình soạn bài">
             <X size={24} color={colors.ink} />
@@ -328,6 +337,7 @@ export default function ComposerScreen() {
 
         <ScrollView
           ref={scrollRef}
+          className="flex-1"
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
           contentContainerClassName="grow px-4 pb-6 pt-4"
@@ -348,7 +358,7 @@ export default function ComposerScreen() {
                 <View className="ml-3 flex-1 items-start">
                   <Text weight="bold" className="text-base">{currentUser.data?.fullName ?? 'Bạn'}</Text>
                   <Pressable
-                    onPress={() => setSheet('category')}
+                    onPress={() => { Keyboard.dismiss(); setSheet('category'); }}
                     disabled={busy}
                     className="mt-1 min-h-8 flex-row items-center gap-1 rounded-full border px-3 active:opacity-70"
                     style={{ backgroundColor: palette.background, borderColor: palette.border }}
@@ -449,14 +459,14 @@ export default function ComposerScreen() {
           </View>
         ) : null}
 
-        <View className="min-h-14 flex-row items-center border-t border-line bg-surface px-2" style={{ paddingBottom: Platform.OS === 'ios' ? Math.max(insets.bottom - 8, 0) : 0 }}>
+        <View className="min-h-14 flex-row items-center border-t border-line bg-surface px-2" style={{ paddingBottom: Platform.OS === 'ios' && !keyboardVisible ? Math.max(insets.bottom - 8, 0) : 0 }}>
           <ToolButton label={picking ? 'Đang mở thư viện ảnh' : `Thêm ảnh, ${images.length}/${MAX_IMAGE_COUNT}`} disabled={busy || picking || images.length >= MAX_IMAGE_COUNT} onPress={() => void pickImages()}>
             {picking ? <ActivityIndicator color={colors.success} /> : <ImagePlus size={23} color={colors.success} />}
           </ToolButton>
           <ToolButton label="Nền màu cho bài chữ" disabled={busy} active={showBackgrounds} onPress={() => setShowBackgrounds((open) => !open)}>
             <Palette size={23} color={showBackgrounds ? colors.accent : colors.reaction.helpful} />
           </ToolButton>
-          <ToolButton label={optionCount ? `Tùy chọn thêm, đã đặt ${optionCount}` : 'Tùy chọn thêm'} disabled={busy} onPress={() => setSheet('options')}>
+          <ToolButton label={optionCount ? `Tùy chọn thêm, đã đặt ${optionCount}` : 'Tùy chọn thêm'} disabled={busy} onPress={() => { Keyboard.dismiss(); setSheet('options'); }}>
             <SlidersHorizontal size={22} color={colors.accentDeep} />
             {optionCount ? <View className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full" style={{ backgroundColor: colors.accentWarm }} /> : null}
           </ToolButton>
@@ -479,12 +489,12 @@ export default function ComposerScreen() {
       />
 
       <Modal visible={sheet === 'options'} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setSheet('none')}>
-        <KeyboardAvoidingView className="flex-1 justify-end bg-black/50" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView className="flex-1 justify-end bg-black/50" behavior={Platform.OS === 'web' ? undefined : 'padding'}>
           <Pressable className="flex-1" onPress={() => setSheet('none')} accessibilityRole="button" accessibilityLabel="Đóng tùy chọn" />
           <View className="rounded-t-[28px] bg-surface px-5 pt-3" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
             <View className="mb-3 h-1 w-10 self-center rounded-full bg-line" />
             <Text weight="extrabold" className="text-lg">Tùy chọn thêm</Text>
-            <ScrollView keyboardShouldPersistTaps="handled" className="max-h-[420px]" showsVerticalScrollIndicator={false}>
+            <ScrollView keyboardShouldPersistTaps="handled" className="max-h-[420px]" style={{ flexShrink: 1 }} showsVerticalScrollIndicator={false}>
               <Field label="Tiêu đề" hint="Không bắt buộc">
                 <TextInput value={title} onChangeText={(value) => { markDirty(); setTitle(value); }} placeholder="Ví dụ: Cách mình tăng Writing 0,5 band" placeholderTextColor={colors.muted} maxLength={200} className="min-h-12 rounded-xl bg-surfaceTint px-4 text-base text-ink" accessibilityLabel="Tiêu đề bài viết" />
               </Field>

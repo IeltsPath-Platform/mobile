@@ -37,7 +37,6 @@ export default function AccountScreen() {
   const userQuery = useCurrentUser();
   const user = userQuery.data;
   const learnerQuery = useQuery({ queryKey: profileQueryKeys.learner, queryFn: profileApi.getLearnerProfile, enabled: authEnabled && Boolean(user) });
-  const topicQuery = useQuery({ queryKey: ['vocab', 'topics'], queryFn: ({ signal }) => vocabApi.listTopics(signal), staleTime: 5 * 60_000 });
   const relationshipsQuery = useQuery({ queryKey: ['community', 'relationship', user?.id], queryFn: () => communityApi.relationship(user!.id), enabled: authEnabled && Boolean(user), staleTime: 60_000 });
   const achievementsQuery = useQuery({ queryKey: ['vocab', 'achievements'], queryFn: () => vocabApi.achievements(), enabled: authEnabled && Boolean(user), staleTime: 60_000 });
   const progress = useProgress();
@@ -116,7 +115,7 @@ export default function AccountScreen() {
       ref={scrollRef}
       className="flex-1 bg-canvas"
       contentContainerClassName="px-5 pb-10 pt-0"
-      refreshControl={authEnabled ? <RefreshControl refreshing={userQuery.isRefetching || learnerQuery.isRefetching || topicQuery.isRefetching || relationshipsQuery.isRefetching || achievementsQuery.isRefetching || progress.isRefetching || streak.isRefetching || unread.isRefetching} onRefresh={() => { void userQuery.refetch(); void learnerQuery.refetch(); void topicQuery.refetch(); void relationshipsQuery.refetch(); void achievementsQuery.refetch(); void progress.refetch(); void streak.refetch(); void unread.refetch(); }} tintColor={colors.accent} /> : undefined}>
+      refreshControl={authEnabled ? <RefreshControl refreshing={userQuery.isRefetching || learnerQuery.isRefetching || relationshipsQuery.isRefetching || achievementsQuery.isRefetching || progress.isRefetching || streak.isRefetching || unread.isRefetching} onRefresh={() => { void userQuery.refetch(); void learnerQuery.refetch(); void relationshipsQuery.refetch(); void achievementsQuery.refetch(); void progress.refetch(); void streak.refetch(); void unread.refetch(); }} tintColor={colors.accent} /> : undefined}>
       {!authEnabled ? (
         <Card className="items-center rounded-3xl p-6">
           <View className="h-14 w-14 items-center justify-center rounded-full bg-accent-soft"><UserRound size={27} color={colors.accentDeep} /></View>
@@ -129,7 +128,7 @@ export default function AccountScreen() {
         <View className="gap-3"><FormAlert message={userQuery.error.message} /><Button variant="secondary" label="Thử lại" onPress={() => void userQuery.refetch()} /></View>
       ) : user ? (
         <>
-          <ProfileHero topics={topicQuery.data ?? []} pulse={owlGlow} xpToday={progress.data?.xpToday ?? 0} dailyGoal={settings.dailyXpGoal} onStart={() => router.push('/(tabs)/practice' as never)} />
+          <ProfileHero pulse={owlGlow} xpToday={progress.data?.xpToday ?? 0} dailyGoal={settings.dailyXpGoal} onStart={() => { haptics.tap(); void sound.play('tap'); router.push('/(tabs)/practice' as never); }} />
 
           <ProfileSummaryCard
             name={learnerQuery.data?.displayName || user.fullName}
@@ -142,7 +141,7 @@ export default function AccountScreen() {
             error={learnerQuery.isError || progress.isError || Boolean(streak.error)}
           />
 
-          <ProfileCommunityCard followers={relationshipsQuery.data?.followerCount} following={relationshipsQuery.data?.followingCount} onPress={() => router.push('/(tabs)/community' as never)} />
+          <ProfileCommunityCard followers={relationshipsQuery.data?.followerCount} following={relationshipsQuery.data?.followingCount} onPress={() => router.push(user?.id ? `/community/users/${user.id}` as never : '/(tabs)/community' as never)} />
 
           <ProfileAchievements items={achievementsQuery.data?.items} loading={achievementsQuery.isPending} error={achievementsQuery.isError} onRetry={() => void achievementsQuery.refetch()} />
 

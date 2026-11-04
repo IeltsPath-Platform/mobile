@@ -23,6 +23,7 @@ export default function GameCatalogScreen() {
   const auth = useAuth();
   const enabled = auth.authEnabled && auth.status === 'authenticated';
   const catalog = useQuery({ queryKey: ['games', 'catalog'], queryFn: gameApi.catalog, enabled, staleTime: 0, refetchOnMount: 'always', retry: 1 });
+  const filters = useQuery({ queryKey: ['games', 'word-filters'], queryFn: gameApi.wordFilters, enabled, staleTime: 60_000, retry: 1 });
   const active = useQuery({ queryKey: ['games', 'active'], queryFn: gameApi.activeGame, enabled, staleTime: 10_000, retry: 1 });
   const [gameType, setGameType] = useState<GameType>(params.gameType === 'ROCKET' ? 'ROCKET' : 'WORDLY');
   const [mode, setMode] = useState<PlayerMode>(params.playerMode === 'MULTIPLAYER' ? 'MULTIPLAYER' : 'SOLO');
@@ -32,11 +33,17 @@ export default function GameCatalogScreen() {
   const [wordLimit, setWordLimit] = useState('10');
   const [questionCount, setQuestionCount] = useState('10');
   const [seconds, setSeconds] = useState(15);
+  const [cefrLevel, setCefrLevel] = useState<string | null>(null);
+  const [topicId, setTopicId] = useState<string | null>(null);
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const games = catalog.data?.games ?? [];
   const available = useMemo(() => games.filter((item) => item.status === 'AVAILABLE'), [games]);
   const currentGame = available.find((item) => item.gameType === gameType);
+  const availableWords = filters.data ? filters.data.availability.find((item) => item.cefrLevel === cefrLevel && item.topicId === topicId)?.words ?? 0 : undefined;
+  const requestedWords = gameType === 'ROCKET' ? Number(questionCount) : playMode === 'FINITE' ? Number(wordLimit) : 5;
+  const minimumWords = gameType === 'ROCKET' ? 4 : 5;
+  const insufficientWords = availableWords !== undefined && availableWords < Math.max(requestedWords, minimumWords);
   useEffect(() => {
     if (!catalog.data || currentGame) return;
     const fallback = available.find((item) => item.gameType === 'WORDLY' || item.gameType === 'ROCKET');
@@ -49,9 +56,10 @@ export default function GameCatalogScreen() {
       const parsedLimit = Number(wordLimit);
       if (gameType === 'ROCKET' && (!Number.isInteger(parsedCount) || parsedCount < (mode === 'SOLO' ? 3 : 5) || parsedCount > 20)) throw new Error(`Số câu phải từ ${mode === 'SOLO' ? 3 : 5} đến 20.`);
       if (gameType === 'WORDLY' && playMode === 'FINITE' && (!Number.isInteger(parsedLimit) || parsedLimit < 5)) throw new Error('Số từ phải là số nguyên từ 5 trở lên.');
+      if (insufficientWords) throw new Error(`Kho đang có ${availableWords} từ phù hợp. Hãy giảm số câu/từ hoặc chọn chủ đề khác.`);
       const room = gameType === 'ROCKET'
-        ? await gameApi.createRocket({ playerMode: mode, questionCount: parsedCount, initialLives: mode === 'MULTIPLAYER' ? lives : undefined, secondsPerQuestion: mode === 'MULTIPLAYER' ? seconds : undefined })
-        : await gameApi.create({ playerMode: mode, playMode, initialLives: lives, wordLimit: playMode === 'ENDLESS' ? null : parsedLimit, timeEnabled });
+        ? await gameApi.createRocket({ playerMode: mode, questionCount: parsedCount, initialLives: mode === 'MULTIPLAYER' ? lives : undefined, secondsPerQuestion: mode === 'MULTIPLAYER' ? seconds : undefined, cefrLevel, topicId })
+        : await gameApi.create({ playerMode: mode, playMode, initialLives: lives, wordLimit: playMode === 'ENDLESS' ? null : parsedLimit, timeEnabled, cefrLevel, topicId });
       if (mode === 'MULTIPLAYER') return { room, match: null };
       await gameApi.ready(room.id, true);
       try { return { room, match: await gameApi.start(room.id) }; }
@@ -110,6 +118,18 @@ export default function GameCatalogScreen() {
         <Card className="border-b-0 bg-surface p-4">
           <View className="flex-row gap-3">{(['SOLO', 'MULTIPLAYER'] as PlayerMode[]).map((item) => { const selected = mode === item; return <Pressable key={item} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => { setMode(item); if (gameType === 'ROCKET' && item === 'MULTIPLAYER') setQuestionCount((count) => String(Math.max(5, Number(count) || 5))); }} className="min-h-14 flex-1 flex-row items-center justify-center gap-2 rounded-2xl border" style={{ borderColor: selected ? colors.accent : colors.line, backgroundColor: selected ? colors.accentSoft : colors.surface }}><View className="h-8 w-8 items-center justify-center rounded-full" style={{ backgroundColor: selected ? colors.surface : colors.canvas }}>{item === 'SOLO' ? <UserRound size={16} color={colors.accent} /> : <Users size={16} color={colors.accent} />}</View><Text weight="bold" className="text-sm">{item === 'SOLO' ? 'Chơi đơn' : 'Cùng bạn'}</Text></Pressable>; })}</View>
 
+          <Text weight="bold" className="mt-4 text-sm">Từ vựng trong ván</Text>
+          {filters.isError ? <Pressable onPress={() => void filters.refetch()} className="min-h-11 justify-center"><Text className="text-xs text-danger">Không tải được chủ đề từ máy chủ · Thử lại</Text></Pressable> : null}
+          {filters.data ? <>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2 py-3">
+              {[null, 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'].map((level) => <Pressable key={level ?? 'all'} onPress={() => { setCefrLevel(level); setError(''); }} className="min-h-10 justify-center rounded-full border px-3" style={{ borderColor: cefrLevel === level ? colors.accent : colors.line, backgroundColor: cefrLevel === level ? colors.accentSoft : colors.canvas }}><Text weight="semibold" className="text-xs" style={{ color: cefrLevel === level ? colors.accent : colors.muted }}>{level ?? 'Mọi cấp độ'}</Text></Pressable>)}
+            </ScrollView>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2 pb-2">
+              {[{ id: null, nameVi: 'Mọi chủ đề', name: 'All' }, ...filters.data.topics].map((topic) => <Pressable key={topic.id ?? 'all'} onPress={() => { setTopicId(topic.id); setError(''); }} className="min-h-10 justify-center rounded-full border px-3" style={{ borderColor: topicId === topic.id ? colors.accent : colors.line, backgroundColor: topicId === topic.id ? colors.accentSoft : colors.canvas }}><Text weight="semibold" className="text-xs" style={{ color: topicId === topic.id ? colors.accent : colors.muted }}>{topic.nameVi || topic.name}</Text></Pressable>)}
+            </ScrollView>
+            <Text className="text-xs" style={{ color: insufficientWords ? colors.danger : colors.muted }}>{availableWords ?? 0} từ phù hợp trong kho</Text>
+          </> : null}
+
           {gameType === 'WORDLY' ? <>
             <View className="mt-4 flex-row rounded-xl p-1" style={{ backgroundColor: colors.surfaceTint }}>{(['FINITE', 'ENDLESS'] as PlayMode[]).map((item) => <Pressable key={item} onPress={() => setPlayMode(item)} className="min-h-10 flex-1 items-center justify-center rounded-lg" style={{ backgroundColor: playMode === item ? colors.surface : 'transparent' }}><Text weight="bold" className="text-xs" style={{ color: playMode === item ? colors.accent : colors.muted }}>{item === 'FINITE' ? 'Số từ' : 'Vô hạn'}</Text></Pressable>)}</View>
             {playMode === 'FINITE' ? <View className="mt-3 flex-row items-center justify-between"><Text className="text-sm">Số từ (tối thiểu 5)</Text><TextInput value={wordLimit} onChangeText={setWordLimit} keyboardType="number-pad" className="h-11 w-24 rounded-xl border border-line bg-canvas px-3 text-center text-ink" accessibilityLabel="Số từ trong ván" /></View> : null}
@@ -120,7 +140,7 @@ export default function GameCatalogScreen() {
           </>}
 
           {error ? <Text accessibilityRole="alert" className="mt-3 text-sm text-danger">{error}</Text> : null}
-          <Button className="mt-4" label={create.isPending ? 'Đang tạo…' : mode === 'SOLO' ? 'Bắt đầu chơi' : 'Tạo phòng bạn bè'} loading={create.isPending} disabled={!currentGame || create.isPending || Boolean(active.data)} onPress={() => { setError(''); create.mutate(); }} />
+          <Button className="mt-4" label={create.isPending ? 'Đang tạo…' : mode === 'SOLO' ? 'Bắt đầu chơi' : 'Tạo phòng bạn bè'} loading={create.isPending} disabled={!currentGame || create.isPending || Boolean(active.data) || insufficientWords} onPress={() => { setError(''); create.mutate(); }} />
         </Card>
       </> : null}
 

@@ -95,6 +95,7 @@ export default function EditProfileScreen() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: profileQueryKeys.user }),
         queryClient.invalidateQueries({ queryKey: profileQueryKeys.learner }),
+        refreshCommunityAvatar(),
       ]);
       router.back();
     },

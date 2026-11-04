@@ -115,18 +115,18 @@ export function CommunityReactionControl({ selected, disabled = false, onSelect,
     >
       {open ? (
         <View
-          className="absolute bottom-12 left-0 z-20 flex-row items-center rounded-full border border-line bg-surface p-1.5"
-          style={{ shadowColor: colors.shadow, shadowOpacity: 0.16, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 12 }}
+          className="absolute bottom-14 left-0 z-20 flex-row items-center gap-1 rounded-full border border-line bg-surface px-2 py-2"
+          style={{ shadowColor: colors.shadow, shadowOpacity: 0.2, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 16 }}
           accessibilityLabel="Chọn cảm xúc"
           pointerEvents="none"
         >
           {reactions.map(({ type, label, Icon, color }) => {
             const isHovered = hovered === type;
             return (
-              <View key={type} ref={(node) => { if (node) reactionRefs.current.set(type, node); }} onLayout={() => requestAnimationFrame(() => measureReaction(type))} className="relative h-11 w-11 items-center justify-center">
+              <View key={type} ref={(node) => { if (node) reactionRefs.current.set(type, node); }} onLayout={() => requestAnimationFrame(() => measureReaction(type))} className="relative h-14 w-14 items-center justify-center">
                 {isHovered ? <View className="absolute -top-7 z-30 rounded-full px-2 py-1" style={{ backgroundColor: color }}><Text weight="bold" className="text-[10px] text-white">{label}</Text></View> : null}
-                <Animated.View className="h-11 w-11 items-center justify-center rounded-full" style={[{ backgroundColor: isHovered ? `${color}20` : 'transparent', transform: [{ scale: scales.get(type)! }] }]}>
-                  <Icon size={isHovered ? 27 : 22} color={color} fill={type === 'LOVE' && (isHovered || selected === type) ? color : 'transparent'} />
+                <Animated.View className="h-14 w-14 items-center justify-center rounded-full" style={[{ backgroundColor: isHovered ? `${color}20` : 'transparent', transform: [{ scale: scales.get(type)! }] }]}>
+                  <Icon size={isHovered ? 32 : 27} color={color} fill={type === 'LOVE' && (isHovered || selected === type) ? color : 'transparent'} />
                 </Animated.View>
               </View>
             );

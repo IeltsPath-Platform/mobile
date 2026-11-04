@@ -16,6 +16,7 @@ function cardsFromDue(items: Flashcard[]): StudyCard[] {
     id: card.id,
     front: card.front,
     back: [card.ipa, card.back, card.exampleSentence].filter(Boolean).join('\n\n'),
+    pronunciationAudioReference: card.pronunciationAudioReference,
     imageUrl: card.imageUrl,
   }));
 }

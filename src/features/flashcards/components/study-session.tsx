@@ -10,6 +10,7 @@ import { SoundToggle, useStudyMusic } from '@/src/features/session/components/so
 import { haptics } from '@/src/lib/haptics';
 import { sound } from '@/src/lib/sound';
 import { colors } from '@/src/theme';
+import { speakVocabularyPronunciation } from '@/src/features/vocab/pronunciation';
 import { FlipCard } from './flip-card';
 import type { SrsRating, StudyCard } from '../types';
 
@@ -36,9 +37,9 @@ export function StudySession({ cards, onReview, hasMoreCards, onLoadMore, onExit
   useStudyMusic(Boolean(current));
   // Hear each new card's word once as it appears; the speaker button replays it.
   useEffect(() => {
-    if (current?.front) void sound.speak(current.front);
+    if (current?.front) void speakVocabularyPronunciation(current.front, current.pronunciationAudioReference);
     return () => sound.stopSpeaking();
-  }, [current?.id]);
+  }, [current?.id, current?.pronunciationAudioReference]);
   useEffect(() => {
     if (!finished) return;
     haptics.success();
@@ -113,7 +114,7 @@ export function StudySession({ cards, onReview, hasMoreCards, onLoadMore, onExit
           Còn {queue.length} thẻ
         </Text>
         <View className="flex-row items-center gap-2">
-          <Pressable accessibilityRole="button" accessibilityLabel={`Nghe phát âm ${current.front}`} hitSlop={6} onPress={() => { haptics.tap(); void sound.speak(current.front); }} className="h-11 w-11 items-center justify-center rounded-full active:opacity-70" style={{ backgroundColor: colors.accentSoft }}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`Nghe phát âm ${current.front}`} hitSlop={6} onPress={() => { haptics.tap(); void speakVocabularyPronunciation(current.front, current.pronunciationAudioReference); }} className="h-11 w-11 items-center justify-center rounded-full active:opacity-70" style={{ backgroundColor: colors.accentSoft }}>
             <Volume2 size={19} color={colors.accentDeep} />
           </Pressable>
           <SoundToggle />

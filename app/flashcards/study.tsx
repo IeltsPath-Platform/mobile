@@ -9,7 +9,7 @@ import { StudySession } from '@/src/features/flashcards/components/study-session
 import type { StudyCard } from '@/src/features/flashcards/types';
 import { vocabApi, type Flashcard, type PageResponse } from '@/src/features/vocab/api';
 import { colors } from '@/src/theme';
-const toStudyCards = (items: Flashcard[]): StudyCard[] => items.filter((card) => card.status === 'ACTIVE').map((card) => ({ id: card.id, front: card.front, back: [card.ipa, card.back, card.exampleSentence].filter(Boolean).join('\n\n'), imageUrl: card.imageUrl }));
+const toStudyCards = (items: Flashcard[]): StudyCard[] => items.filter((card) => card.status === 'ACTIVE').map((card) => ({ id: card.id, front: card.front, back: [card.ipa, card.back, card.exampleSentence].filter(Boolean).join('\n\n'), pronunciationAudioReference: card.pronunciationAudioReference, imageUrl: card.imageUrl }));
 export default function AllCardsStudyScreen() {
   const client = useQueryClient(); const key = ['flashcards', 'due', 'all'];
   const due = useQuery({ queryKey: key, queryFn: () => vocabApi.dueCards(undefined, 0, 50), staleTime: 0 });

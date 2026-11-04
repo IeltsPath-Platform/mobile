@@ -147,7 +147,7 @@ function RootNavigator() {
           <Stack.Screen name="community/users/[userId]" options={{ headerShown: false }} />
           <Stack.Screen name="community/notifications" options={{ headerShown: false }} />
           <Stack.Screen name="community/notification-preferences" options={{ headerShown: false }} />
-          <Stack.Screen name="community/composer" options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }} />
+          <Stack.Screen name="community/composer" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         </Stack.Protected>
         <Stack.Screen
           name="+not-found"

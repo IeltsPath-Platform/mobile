@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronRight, Flame, Target } from 'lucide-react-native';
+import { Bookmark, ChevronRight, Flame, Target } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, View } from 'react-native';
 
@@ -103,9 +103,14 @@ export default function PublicProfileScreen() {
             <CommunityAvatar uri={p.avatarUrl} name={p.displayName} size={84} />
           </View>
           {own ? (
-            <Pressable onPress={() => router.push('/profile/edit' as never)} accessibilityRole="button" className="mb-1 min-h-11 justify-center rounded-full border border-line px-5 active:opacity-70">
-              <Text weight="bold" className="text-sm">Sửa hồ sơ</Text>
-            </Pressable>
+            <View className="mb-1 flex-row items-center gap-2">
+              <Pressable onPress={() => router.push('/community/bookmarked' as never)} accessibilityRole="button" accessibilityLabel="Bài viết đã lưu" className="h-11 w-11 items-center justify-center rounded-full border border-line active:opacity-70">
+                <Bookmark size={19} color={colors.ink} />
+              </Pressable>
+              <Pressable onPress={() => router.push('/profile/edit' as never)} accessibilityRole="button" className="min-h-11 justify-center rounded-full border border-line px-4 active:opacity-70">
+                <Text weight="bold" className="text-sm">Sửa hồ sơ</Text>
+              </Pressable>
+            </View>
           ) : (
             <Pressable
               disabled={followBusy || !relation.data}
@@ -164,7 +169,8 @@ export default function PublicProfileScreen() {
   let empty: React.ReactElement;
   if (list.isPending) empty = <ActivityIndicator className="py-10" color={colors.accent} />;
   else if (list.isError) empty = <View className="px-4 pt-6"><Text weight="bold">Không tải được danh sách.</Text><View className="mt-3"><Button label="Thử lại" onPress={() => void list.refetch()} /></View></View>;
-  else empty = <Text className="px-8 pt-12 text-center text-sm text-muted">{tab === 'posts' ? (own ? 'Bạn chưa đăng bài nào. Chia sẻ điều bạn đang học nhé.' : 'Người này chưa đăng bài nào.') : 'Chưa có ai ở đây.'}</Text>;
+  else if (tab === 'posts' && own) empty = <View className="items-center px-8 pt-12"><Text className="text-center text-sm text-muted">Bạn chưa đăng bài nào. Chia sẻ điều bạn đang học nhé.</Text><View className="mt-4"><Button label="Viết bài đầu tiên" onPress={() => router.push('/community/composer' as never)} /></View></View>;
+  else empty = <Text className="px-8 pt-12 text-center text-sm text-muted">{tab === 'posts' ? 'Người này chưa đăng bài nào.' : 'Chưa có ai ở đây.'}</Text>;
 
   return (
     <View className="flex-1 bg-canvas">

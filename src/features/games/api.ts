@@ -1,9 +1,10 @@
 import { apiRequest } from '@/src/lib/api-client';
-import type { ActiveGame, CreateRocketRoomInput, CreateRoomInput, CurrentWord, GameCatalog, GameMatch, GameRanking, WordlyResult, GameRoom, GameTicket, GuessInput, GuessResponse, PendingGuessResponse, RoomSettings, Hint, RocketAnswerAck, RocketCurrent, RocketResult, LeftGame } from './types';
+import type { ActiveGame, CreateRocketRoomInput, CreateRoomInput, CurrentWord, GameCatalog, GameMatch, GameRanking, WordlyResult, GameRoom, GameTicket, GuessInput, GuessResponse, PendingGuessResponse, RoomSettings, Hint, RocketAnswerAck, RocketCurrent, RocketResult, LeftGame, WordFilters, WordFilterSelection } from './types';
 const room = (id: string) => `/api/games/rooms/${encodeURIComponent(id)}`;
 const match = (id: string) => `/api/games/matches/${encodeURIComponent(id)}`;
 export const gameApi = {
   catalog: () => apiRequest<GameCatalog>('/api/games/catalog', { auth: true }),
+  wordFilters: () => apiRequest<WordFilters>('/api/games/word-filters', { auth: true }),
   activeGame: () => apiRequest<ActiveGame | null>('/api/games/me/active-game', { auth: true }),
   leaveActiveGame: () => apiRequest<void>('/api/games/me/active-game/leave', { method: 'POST', auth: true }),
   create: (input: CreateRoomInput) => apiRequest<GameRoom>('/api/games/wordly/rooms', { method: 'POST', body: input, auth: true }),
@@ -12,7 +13,7 @@ export const gameApi = {
   getRoomByCode: (code: string, signal?: AbortSignal) => apiRequest<GameRoom>(`/api/games/rooms/code/${encodeURIComponent(code.trim().toUpperCase())}`, { auth: true, signal }),
   join: (code: string) => apiRequest<GameRoom>(`/api/games/rooms/code/${encodeURIComponent(code)}/join`, { method: 'POST', auth: true }),
   ready: (id: string, ready: boolean) => apiRequest<GameRoom>(`${room(id)}/ready`, { method: 'POST', body: { ready }, auth: true }),
-  settings: (id: string, body: { initialLives: number; wordLimit?: number | null; timeEnabled?: boolean; questionCount?: number | null; secondsPerQuestion?: number | null }) => apiRequest<GameRoom>(`${room(id)}/settings`, { method: 'PUT', body, auth: true }),
+  settings: (id: string, body: { initialLives: number; wordLimit?: number | null; timeEnabled?: boolean; questionCount?: number | null; secondsPerQuestion?: number | null } & WordFilterSelection) => apiRequest<GameRoom>(`${room(id)}/settings`, { method: 'PUT', body, auth: true }),
   leaveRoom: (id: string) => apiRequest<GameRoom>(`${room(id)}/leave`, { method: 'POST', auth: true }),
   closeRoom: (id: string) => apiRequest<GameRoom>(`${room(id)}/close`, { method: 'POST', auth: true }),
   start: (id: string) => apiRequest<GameMatch>(`${room(id)}/start`, { method: 'POST', auth: true }),
