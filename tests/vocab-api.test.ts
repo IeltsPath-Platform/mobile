@@ -15,7 +15,7 @@ vi.mock('expo-file-system', () => ({
   },
 }));
 
-import { normalizeDeckList, vocabApi, type FlashcardDeck } from '@/src/features/vocab/api';
+import { listActiveDecks, normalizeDeckList, vocabApi, type FlashcardDeck } from '@/src/features/vocab/api';
 
 class FormDataStub {
   readonly fields: unknown[][] = [];
@@ -30,6 +30,37 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('vocabulary topic catalog API', () => {
+  it('keeps loading deck pages past the first 50 records', async () => {
+    const first = Array.from({ length: 50 }, (_, index) => ({ id: `deck-${index}` }));
+    apiRequestMock.mockResolvedValueOnce({ items: first, page: 0, size: 50, total: 51 })
+      .mockResolvedValueOnce({ items: [{ id: 'deck-50' }], page: 1, size: 50, total: 51 });
+    const decks = await listActiveDecks();
+    expect(decks).toHaveLength(51);
+    expect(decks[50].id).toBe('deck-50');
+    expect(apiRequestMock.mock.calls[1][0]).toContain('page=1');
+  });
+
+  it('stops paging if deletion makes a later page empty', async () => {
+    apiRequestMock.mockResolvedValueOnce({ items: [{ id: 'deck-1' }], page: 0, size: 50, total: 80 })
+      .mockResolvedValueOnce({ items: [], page: 1, size: 50, total: 80 });
+    expect(await listActiveDecks()).toEqual([{ id: 'deck-1' }]);
+    expect(apiRequestMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('propagates a later page failure rather than showing a truncated library as complete', async () => {
+    apiRequestMock.mockResolvedValueOnce({ items: [{ id: 'deck-1' }], page: 0, size: 50, total: 80 })
+      .mockRejectedValueOnce(new Error('Network unavailable'));
+    await expect(listActiveDecks()).rejects.toThrow('Network unavailable');
+  });
+
+  it('preserves the session and submission IDs when a review request is retried', async () => {
+    apiRequestMock.mockRejectedValueOnce(new Error('Timeout')).mockResolvedValueOnce({ id: 'card-1' });
+    await expect(vocabApi.reviewCard('card-1', false, 'request-1', 'session-1')).rejects.toThrow();
+    await vocabApi.reviewCard('card-1', false, 'request-1', 'session-1');
+    expect(apiRequestMock.mock.calls[0]).toEqual(apiRequestMock.mock.calls[1]);
+    expect(apiRequestMock.mock.calls[1][1].body).toEqual({ correct: false, requestId: 'request-1', sessionId: 'session-1' });
+  });
+
   it('loads the public vocabulary topic list', async () => {
     const signal = new AbortController().signal;
     await vocabApi.listTopics(signal);

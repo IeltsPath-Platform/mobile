@@ -55,6 +55,13 @@ export default function SessionScreen() {
   }, [runner.status, runner.lessonCompleted]);
 
   useEffect(() => {
+    if (runner.status !== 'summary' || !runner.lessonCompleted) return;
+    void queryClient.invalidateQueries({ queryKey: ['learning'] });
+    void queryClient.invalidateQueries({ queryKey: ['progress', 'summary'] });
+    void queryClient.invalidateQueries({ queryKey: ['streak'] });
+  }, [runner.status, runner.lessonCompleted, queryClient]);
+
+  useEffect(() => {
     if (runner.status === 'summary' && runner.lessonCompleted && lessonId) {
       queryClient.setQueryData(SESSION_DONE_KEY, {
         nodeId: lessonId,

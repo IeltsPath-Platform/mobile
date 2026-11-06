@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, AppState, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View, useWindowDimensions } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Award, Delete, Heart, Lightbulb, Sparkles, Timer, Wifi, WifiOff } from 'lucide-react-native';
+import { Award, Heart, Lightbulb, Sparkles, Timer, Wifi } from 'lucide-react-native';
 
 import { BackButton } from '@/src/components/navigation/back-header';
 import { Button } from '@/src/components/ui/button';
@@ -16,7 +16,6 @@ import { haptics } from '@/src/lib/haptics';
 import { sound } from '@/src/lib/sound';
 import { colors } from '@/src/theme';
 
-const keyRows = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
 function colorForStatus(status: LetterStatus) {
   if (status === 'CORRECT') return colors.success;
   if (status === 'PRESENT') return colors.warning;
@@ -24,25 +23,12 @@ function colorForStatus(status: LetterStatus) {
 }
 
 function StatusPill({ connected }: { connected: boolean }) {
-  const Icon = connected ? Wifi : WifiOff;
   return (
     <View className="flex-row items-center gap-1.5 rounded-full px-3 py-2" style={{ backgroundColor: connected ? colors.successSoft : colors.surfaceTint }}>
-      <Icon size={14} color={connected ? colors.success : colors.muted} />
+      <Wifi size={14} color={connected ? colors.success : colors.muted} />
       <Text weight="bold" className="text-xs" style={{ color: connected ? colors.success : colors.muted }}>
-        {connected ? 'Đã kết nối' : 'Đang kết nối'}
+        {connected ? 'Trực tiếp' : 'Đồng bộ tự động'}
       </Text>
-    </View>
-  );
-}
-
-function StatPill({ icon, value, label, tone }: { icon: React.ReactNode; value: string; label: string; tone: string }) {
-  return (
-    <View className="min-h-12 flex-1 flex-row items-center gap-2 rounded-2xl px-3" style={{ backgroundColor: colors.surface }}>
-      <View className="h-8 w-8 items-center justify-center rounded-xl" style={{ backgroundColor: `${tone}18` }}>{icon}</View>
-      <View>
-        <Text weight="black" className="text-sm">{value}</Text>
-        <Text className="text-[10px] text-muted">{label}</Text>
-      </View>
     </View>
   );
 }
@@ -96,6 +82,12 @@ export default function WordlyMatchScreen() {
   const myTurn = match.data?.playerMode === 'SOLO' || Boolean(match.data?.ownPlayer);
 
   useEffect(() => {
+    setGuess('');
+    setError('');
+    pendingGuess.current = null;
+  }, [word?.playerWordId]);
+
+  useEffect(() => {
     if (!word?.deadlineAt || !word.timeEnabled) {
       setSeconds(null);
       return;
@@ -124,7 +116,7 @@ export default function WordlyMatchScreen() {
   }, [match.data?.status, matchId, router]);
 
   const submit = async () => {
-    if (!word || busy || guess.length !== word.columns) return;
+    if (!word || busy || !myTurn || word.wordStatus !== 'ACTIVE' || guess.length !== word.columns) return;
     setBusy(true);
     setError('');
     const normalizedGuess = guess.toUpperCase();
@@ -147,10 +139,12 @@ export default function WordlyMatchScreen() {
         if (accepted.nextWord) qc.setQueryData(['games', 'current', matchId], accepted.nextWord);
         else void qc.invalidateQueries({ queryKey: ['games', 'current', matchId] });
         if (accepted.matchFinished) {
+          Keyboard.dismiss();
           router.replace({ pathname: '/games/results/[matchId]', params: { matchId, gameType: 'WORDLY' } } as never);
           return;
         }
         setGuess('');
+        Keyboard.dismiss();
       }
       void qc.invalidateQueries({ queryKey: ['games', 'match', matchId] });
       void qc.invalidateQueries({ queryKey: ['games', 'ranking', matchId] });
@@ -182,7 +176,7 @@ export default function WordlyMatchScreen() {
   };
 
   const guessedRows = useMemo(() => word?.guesses ?? [], [word]);
-  const tileSize = word ? Math.max(26, Math.min(56, Math.floor((width - 40 - (word.columns - 1) * 6) / word.columns))) : 48;
+  const tileSize = word ? Math.max(26, Math.min(54, Math.floor((width - 80 - (word.columns - 1) * 6) / word.columns))) : 48;
   const progress = word?.wordLimit ? Math.min(1, word.wordNumber / word.wordLimit) : 0;
   const timerColor = seconds !== null && seconds <= 5 ? colors.danger : colors.accentDeep;
 
@@ -232,15 +226,15 @@ export default function WordlyMatchScreen() {
   }
 
   return (
-    <View className="flex-1 bg-canvas">
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerClassName="px-5 pb-10 pt-3">
+    <KeyboardAvoidingView className="flex-1 bg-canvas" behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerClassName="px-5 pb-10 pt-3">
         <View className="flex-row items-center justify-between">
           <BackButton fallbackHref="/games" />
           <StatusPill connected={connected} />
         </View>
 
         {word ? <>
-          <View className="mt-5 overflow-hidden rounded-3xl p-5" style={{ backgroundColor: colors.heroStart }}>
+          <View className="mt-4 overflow-hidden rounded-3xl p-4" style={{ backgroundColor: colors.heroStart }}>
             <View className="absolute -right-8 -top-12 h-36 w-36 rounded-full" style={{ backgroundColor: colors.heroEnd, opacity: 0.55 }} />
             <View className="flex-row items-start justify-between">
               <View className="flex-1 pr-3">
@@ -250,8 +244,7 @@ export default function WordlyMatchScreen() {
                   </View>
                   <Text weight="bold" className="text-xs uppercase tracking-widest text-blue-100">Wordly · Từ {word.wordNumber}{word.wordLimit ? ` / ${word.wordLimit}` : ''}</Text>
                 </View>
-                <Text weight="black" className="mt-3 text-2xl text-white">Đoán từ bí mật</Text>
-                <Text className="mt-1 text-xs leading-5 text-blue-100">Đọc nghĩa, điền chữ và tìm từ tiếng Anh chính xác.</Text>
+                <Text weight="black" className="mt-2 text-xl text-white">Tìm từ tiếng Anh</Text>
               </View>
               <View className="items-center rounded-2xl px-3 py-2" style={{ backgroundColor: 'rgba(255,255,255,0.12)' }}>
                 <Heart size={17} color="#ff9c9c" fill="#ff9c9c" />
@@ -259,7 +252,7 @@ export default function WordlyMatchScreen() {
                 <Text className="text-[10px] text-blue-100">mạng</Text>
               </View>
             </View>
-            {word.wordLimit ? <View className="mt-5">
+            {word.wordLimit ? <View className="mt-3">
               <View className="mb-2 flex-row justify-between"><Text className="text-[10px] text-blue-100">TIẾN ĐỘ VÁN</Text><Text weight="bold" className="text-[10px] text-white">{word.wordNumber}/{word.wordLimit}</Text></View>
               <View className="h-2 overflow-hidden rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>
                 <View className="h-full rounded-full" style={{ width: `${progress * 100}%`, backgroundColor: colors.warning }} />
@@ -267,10 +260,9 @@ export default function WordlyMatchScreen() {
             </View> : null}
           </View>
 
-          <View className="mt-3 flex-row gap-2">
-            <StatPill icon={<Award size={16} color={colors.accent} />} value={`${word.player.totalScore}`} label="Điểm hiện tại" tone={colors.accent} />
-            <StatPill icon={<Sparkles size={16} color={colors.accentWarm} />} value={`${word.player.currentStreak}`} label="Chuỗi liên tiếp" tone={colors.accentWarm} />
-            <StatPill icon={<Timer size={16} color={timerColor} />} value={seconds === null ? `${word.attemptsUsed}/${word.maxAttempts}` : `${seconds}s`} label={seconds === null ? 'Lượt đoán' : 'Thời gian'} tone={timerColor} />
+          <View className="mt-3 flex-row items-center justify-between rounded-2xl border border-line bg-surface px-4 py-3">
+            <Text weight="semibold" className="text-xs text-muted">{word.player.totalScore} điểm · {word.player.currentStreak} đúng liên tiếp</Text>
+            <View className="flex-row items-center gap-1"><Timer size={15} color={timerColor} /><Text weight="bold" className="text-xs" style={{ color: timerColor }}>{seconds === null ? `${word.attemptsUsed}/${word.maxAttempts} lượt` : `${seconds}s`}</Text></View>
           </View>
 
           <View className="mt-4 rounded-3xl border border-line bg-surface p-4">
@@ -279,7 +271,7 @@ export default function WordlyMatchScreen() {
                 <View className="h-8 w-8 items-center justify-center rounded-xl" style={{ backgroundColor: colors.warmSoft }}>
                   <Lightbulb size={17} color={colors.accentWarm} />
                 </View>
-                <Text weight="bold" className="text-xs uppercase tracking-wider text-muted">Nghĩa của từ</Text>
+                <Text weight="bold" className="text-xs uppercase tracking-wider text-muted">Nghĩa tiếng Việt</Text>
               </View>
               <Pressable
                 accessibilityRole="button"
@@ -297,12 +289,46 @@ export default function WordlyMatchScreen() {
               </Pressable>
             </View>
             <Text weight="bold" className="mt-3 text-lg leading-7">{word.meaning}</Text>
+            <Text className="mt-2 text-xs leading-5 text-muted">Gõ từ tiếng Anh có nghĩa này. Bạn có {word.maxAttempts} lượt thử.</Text>
+          </View>
+
+          <View className="mt-3 rounded-3xl border border-line bg-surface p-4">
+            <Text weight="bold" className="text-sm">Câu trả lời của bạn</Text>
+            <View className="mt-2 flex-row items-center rounded-2xl border border-line bg-canvas px-4">
+              <TextInput
+                value={guess}
+                onChangeText={(value) => { setGuess(value.replace(/[^a-z]/gi, '').toUpperCase().slice(0, word.columns)); setError(''); }}
+                editable={myTurn && word.wordStatus === 'ACTIVE' && !busy}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                spellCheck={false}
+                autoComplete="off"
+                keyboardType={Platform.OS === 'ios' ? 'ascii-capable' : 'default'}
+                returnKeyType="done"
+                onSubmitEditing={() => void submit()}
+                placeholder="Chạm để gõ từ tiếng Anh"
+                placeholderTextColor={colors.muted}
+                accessibilityLabel={`Nhập từ tiếng Anh gồm ${word.columns} chữ cái`}
+                className="min-h-14 flex-1 text-lg text-ink"
+                style={{ letterSpacing: 1.5 }}
+              />
+              <Text weight="bold" className="ml-2 text-xs text-muted">{guess.length}/{word.columns}</Text>
+            </View>
+            {word.hint?.revealedCell ? <Text className="mt-2 text-xs text-accent-deep">Gợi ý: chữ thứ {word.hint.revealedCell.column + 1} là {word.hint.revealedCell.letter}.</Text> : null}
+            <Button
+              className="mt-3"
+              label={busy ? 'Đang kiểm tra…' : 'Kiểm tra từ'}
+              loading={busy}
+              disabled={guess.length !== word.columns || !myTurn || word.wordStatus !== 'ACTIVE'}
+              onPress={() => void submit()}
+            />
+            {myTurn && word.wordStatus === 'ACTIVE' && guess.length !== word.columns ? <Text className="mt-2 text-center text-xs text-muted">{guess.length === 0 ? `Nhập ${word.columns} chữ cái rồi kiểm tra.` : `Còn thiếu ${word.columns - guess.length} chữ cái.`}</Text> : null}
           </View>
 
           <View className="mt-4 rounded-3xl border border-line bg-surface px-3 py-4">
             <View className="mb-3 flex-row items-center justify-between px-1">
-              <Text weight="bold" className="text-sm">Bảng chữ cái</Text>
-              <Text className="text-xs text-muted">{word.columns} chữ cái</Text>
+              <Text weight="bold" className="text-sm">Các lần đoán</Text>
+              <Text className="text-xs text-muted">{word.attemptsUsed}/{word.maxAttempts} lượt</Text>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ alignItems: 'center' }}>
               <View className="items-center gap-1.5">
@@ -320,7 +346,7 @@ export default function WordlyMatchScreen() {
                         const border = statusColor ?? (hinted ? colors.accent : letter ? colors.accentWarm : colors.line);
                         return (
                           <View key={column} className="items-center justify-center rounded-xl border-2" style={{ width: tileSize, height: tileSize, backgroundColor: background, borderColor: border }}>
-                            <Text weight="black" className="text-xl" style={{ color: status ? colors.onAccent : colors.ink }}>
+                            <Text weight="black" className="text-xl" style={{ color: status && status !== 'PRESENT' ? colors.onAccent : colors.ink }}>
                               {letter || (hinted ? word.hint?.revealedCell.letter : '')}
                             </Text>
                           </View>
@@ -332,52 +358,15 @@ export default function WordlyMatchScreen() {
               </View>
             </ScrollView>
 
-            <View className="mt-4 gap-2">
-              {keyRows.map((row, rowIndex) => (
-                <View key={row} className="flex-row justify-center gap-1.5" style={{ paddingHorizontal: rowIndex === 1 ? 10 : 0 }}>
-                  {[...row].map((letter) => {
-                    const status = word.keyboard[letter];
-                    const disabled = !myTurn || busy || status === 'ABSENT' || word.wordStatus !== 'ACTIVE';
-                    return (
-                      <Pressable
-                        key={letter}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Chữ ${letter}`}
-                        accessibilityState={{ disabled }}
-                        disabled={disabled}
-                        onPress={() => { haptics.select(); setGuess((previous) => previous.length < word.columns ? previous + letter : previous); }}
-                        className="h-11 min-w-0 flex-1 items-center justify-center rounded-xl"
-                        style={{ backgroundColor: status ? colorForStatus(status) : colors.surfaceTint, opacity: disabled && !status ? 0.52 : 1 }}
-                      >
-                        <Text weight="bold" className="text-xs" style={{ color: status ? colors.onAccent : colors.ink }}>{letter}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              ))}
-              <View className="mt-1 flex-row gap-2">
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Xóa chữ cuối"
-                  disabled={!guess || busy}
-                  onPress={() => setGuess((previous) => previous.slice(0, -1))}
-                  className="min-h-12 flex-1 flex-row items-center justify-center gap-2 rounded-2xl border border-line bg-canvas"
-                >
-                  <Delete size={17} color={colors.ink} />
-                  <Text weight="bold" className="text-xs">Xóa</Text>
-                </Pressable>
-                <Button
-                  className="flex-[2]"
-                  label={busy ? 'Đang kiểm tra…' : 'Kiểm tra từ'}
-                  loading={busy}
-                  disabled={guess.length !== word.columns || !myTurn || word.wordStatus !== 'ACTIVE'}
-                  onPress={() => void submit()}
-                />
-              </View>
+            <View className="mt-4 flex-row flex-wrap gap-x-3 gap-y-2 px-1">
+              {([
+                ['CORRECT', 'Đúng vị trí'],
+                ['PRESENT', 'Có trong từ'],
+                ['ABSENT', 'Không có'],
+              ] as const).map(([status, label]) => <View key={status} className="flex-row items-center gap-1.5"><View className="h-3 w-3 rounded" style={{ backgroundColor: colorForStatus(status) }} /><Text className="text-xs text-muted">{label}</Text></View>)}
             </View>
           </View>
 
-          {myTurn && word.wordStatus === 'ACTIVE' && guess.length !== word.columns ? <Text className="mt-3 text-center text-xs text-muted">{guess.length === 0 ? `Nhập ${word.columns} chữ cái để kiểm tra từ.` : `Còn thiếu ${word.columns - guess.length} chữ cái.`}</Text> : null}
           {error ? <View className="mt-3 rounded-2xl border px-4 py-3" style={{ backgroundColor: colors.dangerSoft, borderColor: colors.danger }}>
             <Text accessibilityRole="alert" className="text-sm leading-5" style={{ color: colors.danger }}>{error}</Text>
           </View> : null}
@@ -399,6 +388,6 @@ export default function WordlyMatchScreen() {
           </View> : null}
         </> : null}
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }

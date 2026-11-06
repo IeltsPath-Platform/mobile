@@ -12,6 +12,24 @@ export type TopicSummaryDto = {
   sequenceOrder: number;
   status: TopicStatus;
   completedLessonCount: number;
+  accessLevel?: 'FREE' | 'PREMIUM';
+  skill?: string | null;
+  hasTopicTest?: boolean;
+  course?: {
+    courseId: string;
+    code: string;
+    name: string;
+    bandLevel: number | null;
+    coverImageUrl: string | null;
+    bannerImageUrl?: string | null;
+    description?: string | null;
+    skillUnlockPoints?: number;
+    comboUnlockPoints?: number;
+    availableSkills?: string[];
+  } | null;
+  skills?: string[];
+  totalLessonCount?: number;
+  description?: string | null;
 };
 
 export type LessonSummaryDto = {
@@ -20,6 +38,11 @@ export type LessonSummaryDto = {
   title: string;
   sortOrder: number;
   status: LessonStatus;
+  practiceStatus?: string;
+  estimatedMinutes?: number | null;
+  paywalled?: boolean;
+  freePreview?: boolean;
+  blockingReviewId?: string | null;
 };
 
 export type TopicLessonsDto = {
@@ -114,7 +137,16 @@ export type ReviewDetailDto = {
   reviewStatus: ReviewStatus;
   lessonId: string;
   theory: string[];
-  set: ReviewSetDto | null;
+  set: (ReviewSetDto & { audio?: { mediaUrl: string; durationSeconds: number | null } | null }) | null;
+  stage?: 'THEORY' | 'PRACTICE' | string;
+  theoryReason?: string | null;
+  theoryScope?: string | null;
+  failedSets?: number;
+  maxFailedSets?: number | null;
+  quickCheck?: QuestionDto[];
+  state?: 'ACTIVE' | 'DIAGNOSING' | 'WAITING_ON_PREREQUISITES' | string;
+  diagnosticSessionId?: string | null;
+  waitingOnReviewIds?: string[];
 };
 
 export type ReviewSubmissionRequest = {
@@ -128,10 +160,12 @@ export type ReviewSubmissionResultDto = {
   results: QuestionResultDto[];
 };
 
-export type TestAssignmentDto = {
-  assignmentId: string;
-  packageId: string;
-  packageVersionId: string;
+export type ReviewTheoryCheckResultDto = {
+  reviewId: string;
+  correct: number;
+  total: number;
+  results: QuestionResultDto[];
+  stage: string;
 };
 
 export type LearningErrorBody = {

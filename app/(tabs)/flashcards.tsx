@@ -1,87 +1,56 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { router, useFocusEffect } from 'expo-router';
-import { BookOpenCheck, ChevronRight, Layers3, Plus, RotateCcw, Sparkles } from 'lucide-react-native';
+import { BookOpen, ChartNoAxesColumn, ChevronRight, Layers3, Plus, RotateCcw } from 'lucide-react-native';
 import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, View, type ScrollViewInstance } from 'react-native';
-
+import { FlatList, Image, Pressable, View } from 'react-native';
 import { Button } from '@/src/components/ui/button';
-import { Card } from '@/src/components/ui/card';
 import { Text } from '@/src/components/ui/text';
-import { useAuth } from '@/src/features/auth/auth-provider';
-import { listActiveDecks, vocabApi, type FlashcardDeck } from '@/src/features/vocab/api';
-import { haptics } from '@/src/lib/haptics';
-import { sound } from '@/src/lib/sound';
+import { FlashcardSignIn, QueryState } from '@/src/features/flashcards/components/query-state';
+import { nextPage, useFlashcardAccess } from '@/src/features/flashcards/queries';
+import { vocabApi } from '@/src/features/vocab/api';
 import { colors } from '@/src/theme';
 
 type Tab = 'decks' | 'cards';
-const deckColors = [colors.listeningSoft, colors.warmSoft, colors.successSoft];
-const deckInk = [colors.skill.listening, colors.accentWarm, colors.success];
+type LibraryRow = { id: string; title: string; subtitle: string; imageUrl: string | null; detail: string };
 
 export default function FlashcardsScreen() {
-  const scrollRef = useRef<ScrollViewInstance>(null);
-  useFocusEffect(useCallback(() => () => scrollRef.current?.scrollTo({ y: 0, animated: false }), []));
-  const { authEnabled, status } = useAuth();
-  const enabled = authEnabled && status === 'authenticated';
+  const listRef = useRef<FlatList<LibraryRow>>(null);
+  useFocusEffect(useCallback(() => () => listRef.current?.scrollToOffset({ offset: 0, animated: false }), []));
+  const enabled = useFlashcardAccess();
   const [tab, setTab] = useState<Tab>('decks');
-  const client = useQueryClient();
-  const decks = useQuery({ queryKey: ['flashcards', 'decks'], queryFn: listActiveDecks, enabled, staleTime: 30_000 });
-  const cards = useQuery({ queryKey: ['flashcards', 'cards', 'ACTIVE'], queryFn: async () => (await vocabApi.listCards(0, 50)).items, enabled, staleTime: 30_000 });
-  const deckList = decks.data ?? [];
-  const cardList = cards.data ?? [];
-  const due = deckList.reduce((sum, deck) => sum + (deck.dueCount ?? 0), 0);
-  const currentQuery = tab === 'decks' ? decks : cards;
-  const openCreate = (kind: Tab = tab) => {
-    if (status === 'loading') return;
-    if (!enabled) { router.push('/(auth)/login' as never); return; }
-    haptics.tap();
-    void sound.play('tap');
-    router.push(kind === 'decks' ? '/flashcards/deck/edit' : '/flashcards/card/edit');
-  };
+  const decks = useInfiniteQuery({ queryKey: ['flashcards', 'deck-pages'], queryFn: ({ pageParam }) => vocabApi.listDecks(pageParam, 30), initialPageParam: 0, getNextPageParam: nextPage, enabled: enabled && tab === 'decks', staleTime: 30_000 });
+  const cards = useInfiniteQuery({ queryKey: ['flashcards', 'card-pages'], queryFn: ({ pageParam }) => vocabApi.listCards(pageParam, 30), initialPageParam: 0, getNextPageParam: nextPage, enabled: enabled && tab === 'cards', staleTime: 30_000 });
+  const due = useQuery({ queryKey: ['flashcards', 'due', 'count'], queryFn: () => vocabApi.dueCards(undefined, 0, 1), enabled, staleTime: 30_000 });
+  const active = tab === 'decks' ? decks : cards;
+  const rows: LibraryRow[] = tab === 'decks'
+    ? (decks.data?.pages.flatMap((page) => page.items) ?? []).map((deck) => ({ id: deck.id, title: deck.name, subtitle: deck.description || `${deck.cardCount} thẻ`, imageUrl: deck.coverImageUrl ?? null, detail: `${deck.dueCount} thẻ cần ôn` }))
+    : (cards.data?.pages.flatMap((page) => page.items) ?? []).map((card) => ({ id: card.id, title: card.front, subtitle: card.back, imageUrl: card.imageUrl ?? null, detail: `${card.reviewCount} lượt ôn` }));
+  const open = (route: '/flashcards/deck/edit' | '/flashcards/card/edit' | '/flashcards/notebook' | '/flashcards/progress') => router.push(enabled ? route : '/(auth)/login');
 
-  return (
-    <ScrollView ref={scrollRef} className="flex-1 bg-canvas" contentContainerClassName="px-5 pb-8 pt-3" showsVerticalScrollIndicator={false} refreshControl={enabled ? <RefreshControl refreshing={(decks.isRefetching || cards.isRefetching) && !decks.isPending} onRefresh={() => { void decks.refetch(); void cards.refetch(); }} tintColor={colors.accent} /> : undefined}>
-      <Text accessibilityRole="header" className="mb-4 text-[24px]" weight="black">Thẻ từ</Text>
-      <View className="flex-row items-center rounded-[20px] px-4 py-4" style={{ backgroundColor: colors.warmSoft }}>
-        <RotateCcw size={22} color={colors.accentWarm} />
-        <Text className="ml-3 flex-1 text-lg" weight="bold">{due} thẻ cần ôn</Text>
-        <Pressable accessibilityRole="button" onPress={() => { haptics.tap(); void sound.play('tap'); if (due > 0) router.push('/flashcards/study'); else setTab('decks'); }} className="min-h-11 flex-row items-center gap-1 px-2 active:opacity-70">
-          <Text weight="bold" className="text-accent-deep">{due > 0 ? 'Ôn ngay' : 'Xem bộ'}</Text><ChevronRight size={16} color={colors.accentDeep}/>
-        </Pressable>
+  return <View className="flex-1 bg-canvas"><FlatList ref={listRef} data={enabled ? rows : []} keyExtractor={(row) => row.id} contentContainerClassName="px-5 pb-10 pt-3" showsVerticalScrollIndicator={false}
+    refreshing={enabled && active.isRefetching && !active.isFetchingNextPage}
+    onRefresh={enabled ? () => { void active.refetch(); void due.refetch(); } : undefined}
+    ListHeaderComponent={<View className="gap-3 pb-4">
+      <Text accessibilityRole="header" className="text-[24px]" weight="black">Thẻ từ</Text>
+      {enabled ? <View className="rounded-2xl p-4" style={{ backgroundColor: colors.warmSoft }}>
+        <View className="flex-row items-center gap-3"><RotateCcw size={22} color={colors.accentWarm} /><Text className="flex-1 text-lg" weight="bold">{due.data ? `${due.data.total} thẻ cần ôn` : 'Thẻ đến hạn'}</Text>{due.data && due.data.total > 0 ? <Pressable accessibilityRole="button" onPress={() => router.push('/flashcards/study')} className="min-h-11 justify-center"><Text weight="bold" className="text-accent-deep">Ôn ngay →</Text></Pressable> : null}</View>
+        <QueryState pending={due.isPending} error={due.error} retry={() => void due.refetch()} />
+      </View> : <FlashcardSignIn />}
+      <View className="flex-row gap-3">
+        <Pressable accessibilityRole="button" onPress={() => open('/flashcards/notebook')} className="min-h-12 flex-1 flex-row items-center justify-center gap-2 rounded-2xl border border-line bg-surface"><BookOpen size={18} color={colors.accentDeep} /><Text weight="bold" className="text-sm">Sổ từ</Text></Pressable>
+        <Pressable accessibilityRole="button" onPress={() => open('/flashcards/progress')} className="min-h-12 flex-1 flex-row items-center justify-center gap-2 rounded-2xl border border-line bg-surface"><ChartNoAxesColumn size={18} color={colors.accentDeep} /><Text weight="bold" className="text-sm">Tiến độ</Text></Pressable>
       </View>
-      <View className="mt-2 flex-row">
-        <Pressable accessibilityRole="button" onPress={() => openCreate('decks')} className="min-h-11 flex-1 flex-row items-center justify-center gap-2 active:opacity-70">
-          <Layers3 size={17} color={colors.accentDeep}/><Text weight="semibold" className="text-sm">Tạo bộ</Text>
-        </Pressable>
-        <Pressable accessibilityRole="button" onPress={() => openCreate('cards')} className="min-h-11 flex-1 flex-row items-center justify-center gap-2 active:opacity-70">
-          <Plus size={17} color={colors.accentDeep}/><Text weight="semibold" className="text-sm">Thêm thẻ</Text>
-        </Pressable>
+      <View className="flex-row items-center border-b border-line">
+        {([{ id: 'decks', label: 'Bộ thẻ' }, { id: 'cards', label: 'Thẻ của tôi' }] as const).map((item) => <Pressable key={item.id} accessibilityRole="tab" accessibilityState={{ selected: tab === item.id }} onPress={() => { setTab(item.id); listRef.current?.scrollToOffset({ offset: 0, animated: false }); }} className="min-h-12 flex-1 items-center justify-center"><Text weight="bold" className={tab === item.id ? 'text-accent-deep' : 'text-muted'}>{item.label}</Text>{tab === item.id ? <View className="absolute bottom-0 h-[3px] w-10 rounded-full bg-accent" /> : null}</Pressable>)}
+        <Pressable accessibilityRole="button" accessibilityLabel={tab === 'decks' ? 'Tạo bộ thẻ' : 'Tạo thẻ'} onPress={() => open(tab === 'decks' ? '/flashcards/deck/edit' : '/flashcards/card/edit')} className="h-12 w-12 items-center justify-center"><Plus size={23} color={colors.accentDeep} /></Pressable>
       </View>
-      <View className="mb-4 mt-3 flex-row border-b" style={{ borderBottomColor: colors.line }}>
-        {([{ id: 'decks', label: 'Bộ thẻ' }, { id: 'cards', label: 'Thẻ của tôi' }] as const).map((item) => <Pressable key={item.id} accessibilityRole="tab" accessibilityState={{ selected: tab === item.id }} onPress={() => setTab(item.id)} className="min-h-12 flex-1 items-center justify-center"><Text weight="bold" className={tab === item.id ? 'text-accent-deep' : 'text-muted'}>{item.label}</Text>{tab === item.id ? <View className="absolute bottom-0 h-[3px] w-10 rounded-full" style={{ backgroundColor: colors.accent }} /> : null}</Pressable>)}
-      </View>
-
-      {!enabled ? <Card className="border-line bg-surface"><Text weight="bold">Đăng nhập để đồng bộ Flashcards</Text><Text className="mt-2 text-sm leading-5 text-muted">Bộ thẻ và tiến độ ôn tập được lưu trong tài khoản của bạn.</Text><Button className="mt-4" label="Đăng nhập" onPress={() => router.push('/(auth)/login' as never)}/></Card> : null}
-      {enabled && currentQuery.isPending ? <View className="items-center py-10"><ActivityIndicator color={colors.accent}/><Text className="mt-3 text-sm text-muted">Đang tải thư viện…</Text></View> : null}
-      {enabled && currentQuery.isError ? <Card className="border-line bg-surface"><Text weight="bold">Chưa tải được thư viện</Text><Text className="mt-2 text-sm text-danger">{currentQuery.error.message}</Text><Button variant="secondary" className="mt-4" label="Thử lại" onPress={() => void currentQuery.refetch()}/></Card> : null}
-
-      {enabled && tab === 'decks' && deckList.map((deck: FlashcardDeck, index) => <Pressable key={deck.id} accessibilityRole="button" onPress={() => router.push({ pathname: '/flashcards/deck/[deckId]', params: { deckId: deck.id } })} className="mb-3 active:opacity-80">
-        <Card className="flex-row items-center gap-3 border-line bg-surface p-4">
-          {deck.coverImageUrl ? <Image source={{ uri: deck.coverImageUrl }} accessibilityLabel={`Ảnh bìa ${deck.name}`} className="h-[58px] w-[58px] rounded-2xl" resizeMode="cover"/> : <View className="h-[58px] w-[58px] items-center justify-center rounded-2xl" style={{ backgroundColor: deckColors[index % deckColors.length] }}><Layers3 size={23} color={deckInk[index % deckInk.length]}/></View>}
-          <View className="flex-1"><Text numberOfLines={1} weight="bold" className="text-base">{deck.name}</Text><Text numberOfLines={1} className="mt-1 text-xs text-muted">{deck.description || `${deck.cardCount} thẻ trong bộ`}</Text><Text className="mt-2 text-xs text-accent-deep" weight="bold">{deck.dueCount} thẻ cần ôn</Text></View>
-          <View className="items-end"><Text className="text-sm" weight="black">{deck.cardCount}</Text><Text className="text-[10px] text-muted">thẻ</Text></View><ChevronRight size={18} color={colors.muted}/>
-        </Card>
-      </Pressable>)}
-      {enabled && tab === 'cards' && cardList.map((card) => <Pressable key={card.id} accessibilityRole="button" onPress={() => router.push({ pathname: '/flashcards/card/edit', params: { cardId: card.id } })} className="mb-3 active:opacity-80">
-        <Card className="flex-row items-center gap-3 border-line bg-surface p-4">{card.imageUrl ? <Image source={{ uri: card.imageUrl }} accessibilityLabel={`Ảnh minh họa ${card.front}`} className="h-12 w-12 rounded-xl" resizeMode="cover"/> : <View className="h-11 w-11 items-center justify-center rounded-xl" style={{ backgroundColor: colors.successSoft }}><BookOpenCheck size={19} color={colors.success}/></View>}<View className="flex-1"><Text numberOfLines={1} weight="bold">{card.front}</Text><Text numberOfLines={1} className="mt-1 text-sm text-muted">{card.back}</Text></View><ChevronRight size={18} color={colors.muted}/></Card>
-      </Pressable>)}
-
-      {enabled && currentQuery.isSuccess && !(tab === 'decks' ? deckList.length : cardList.length) ? <Card className="mt-1 items-center border-line bg-surface px-6 py-8">
-        <View className="h-14 w-14 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.accentSoft }}><Sparkles size={25} color={colors.accentDeep}/></View>
-        <Text className="mt-3 text-center" weight="bold">{tab === 'decks' ? 'Tạo bộ thẻ đầu tiên' : 'Thêm thẻ đầu tiên của bạn'}</Text>
-        <Text className="mt-2 text-center text-sm leading-5 text-muted">Lưu từ mới của riêng bạn rồi ôn tập theo lịch thông minh.</Text>
-        <Button className="mt-4" label={tab === 'decks' ? 'Tạo bộ thẻ' : 'Tạo thẻ mới'} onPress={() => openCreate()}/>
-      </Card> : null}
-      {enabled ? <Pressable onPress={() => { void client.invalidateQueries({ queryKey: ['flashcards'] }); }} className="mt-3 min-h-11 items-center justify-center"><Text className="text-xs text-muted">Làm mới thư viện</Text></Pressable> : null}
-    </ScrollView>
-  );
+      {enabled ? <QueryState pending={active.isPending} error={active.error} retry={() => void active.refetch()} /> : null}
+    </View>}
+    renderItem={({ item }) => <Pressable accessibilityRole="button" onPress={() => tab === 'decks' ? router.push({ pathname: '/flashcards/deck/[deckId]', params: { deckId: item.id } }) : router.push({ pathname: '/flashcards/card/edit', params: { cardId: item.id } })} className="mb-3 flex-row items-center gap-3 rounded-2xl border border-line bg-surface p-4">
+      {item.imageUrl ? <Image source={{ uri: item.imageUrl }} accessibilityLabel={item.title} className="h-14 w-14 rounded-xl" /> : <View className="h-14 w-14 items-center justify-center rounded-xl bg-accentSoft"><Layers3 size={22} color={colors.accentDeep} /></View>}
+      <View className="flex-1"><Text weight="bold" numberOfLines={2}>{item.title}</Text><Text className="mt-1 text-sm text-muted" numberOfLines={2}>{item.subtitle}</Text><Text className="mt-2 text-xs text-accent-deep">{item.detail}</Text></View><ChevronRight size={18} color={colors.muted} />
+    </Pressable>}
+    ListEmptyComponent={enabled && active.isSuccess ? <View className="gap-3 rounded-2xl bg-surface p-6"><Text weight="bold">{tab === 'decks' ? 'Tạo bộ thẻ đầu tiên' : 'Thêm thẻ đầu tiên của bạn'}</Text><Button label={tab === 'decks' ? 'Tạo bộ' : 'Tạo thẻ'} onPress={() => open(tab === 'decks' ? '/flashcards/deck/edit' : '/flashcards/card/edit')} /></View> : undefined}
+    ListFooterComponent={enabled && active.hasNextPage ? <Button variant="secondary" label="Tải thêm" loading={active.isFetchingNextPage} onPress={() => void active.fetchNextPage()} /> : undefined}
+  /></View>;
 }

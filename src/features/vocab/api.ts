@@ -93,7 +93,7 @@ export const vocabApi = {
   createCard: (draft: FlashcardDraft) => apiRequest<Flashcard>(cardsPath, { method: 'POST', body: draft, auth: true }),
   updateCard: (card: Pick<Flashcard, 'id' | 'sourceType' | 'vocabularySenseId' | 'sourceReferenceId' | 'highlightedText'>, draft: FlashcardContentDraft, status: LibraryStatus = 'ACTIVE') => apiRequest<Flashcard>(`${cardsPath}/${encodeURIComponent(card.id)}`, { method: 'PUT', body: { sourceType: card.sourceType, vocabularySenseId: card.vocabularySenseId, sourceReferenceId: card.sourceReferenceId, highlightedText: card.highlightedText, status, ...draft }, auth: true }),
   deleteCard: (cardId: string) => apiRequest<void>(`${cardsPath}/${encodeURIComponent(cardId)}`, { method: 'DELETE', auth: true }),
-  reviewCard: (cardId: string, correct: boolean, requestId: string) => apiRequest<Flashcard>(`${cardsPath}/${encodeURIComponent(cardId)}/reviews`, { method: 'POST', body: { correct, requestId }, auth: true }),
+  reviewCard: (cardId: string, correct: boolean, requestId: string, sessionId?: string) => apiRequest<Flashcard>(`${cardsPath}/${encodeURIComponent(cardId)}/reviews`, { method: 'POST', body: { correct, requestId, sessionId }, auth: true }),
   uploadImage: async (file: { uri: string; name: string; type: string }) => {
     const form = await imageUploadForm(file);
     return apiRequest<UploadedFlashcardImage>(`${cardsPath}/images`, { method: 'POST', body: form, auth: true });
@@ -110,7 +110,12 @@ export function normalizeDeckList(value: unknown): FlashcardDeck[] {
 }
 
 export async function listActiveDecks(): Promise<FlashcardDeck[]> {
-  return normalizeDeckList(await vocabApi.listDecks(0, 50));
+  const decks: FlashcardDeck[] = [];
+  for (let page = 0; ; page++) {
+    const response = await vocabApi.listDecks(page, 50);
+    decks.push(...response.items);
+    if (!response.items.length || decks.length >= response.total) return decks;
+  }
 }
 
 export async function listAllDeckItems(deckId: string, signal?: AbortSignal): Promise<DeckItem[]> {

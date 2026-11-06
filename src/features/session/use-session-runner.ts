@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { isLearningApiError, learningApi } from '@/src/features/learning';
 import type { LearningApiError } from '@/src/features/learning/api-error';
@@ -168,6 +169,7 @@ function friendly(error: LearningApiError): string {
 }
 
 export function useSessionRunner(lessonId: string) {
+  const queryClient = useQueryClient();
   const [state, dispatch] = useReducer(reducer, initialState);
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -252,6 +254,8 @@ export function useSessionRunner(lessonId: string) {
           answer: answers[item.id] ?? '',
         })),
       });
+      void queryClient.invalidateQueries({ queryKey: ['progress', 'summary'] });
+      void queryClient.invalidateQueries({ queryKey: ['streak'] });
       const graded: Record<string, Graded> = {};
       for (const row of result.results) {
         graded[row.questionVersionId] = {
@@ -275,7 +279,7 @@ export function useSessionRunner(lessonId: string) {
     } finally {
       busyRef.current = false;
     }
-  }, []);
+  }, [queryClient]);
 
   const continueNext = useCallback(() => {
     const current = stateRef.current;

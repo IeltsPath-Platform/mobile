@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 
@@ -25,8 +25,6 @@ function testLabel(status: TestStatus) {
 
 export default function TopicDetailScreen() {
   const { topicId } = useLocalSearchParams<{ topicId: string }>();
-  const queryClient = useQueryClient();
-
   const lessonsQuery = useQuery({
     queryKey: ['learning', 'topic-lessons', topicId],
     queryFn: () => learningApi.getTopicLessons(topicId!),
@@ -36,13 +34,6 @@ export default function TopicDetailScreen() {
   const pendingQuery = useQuery({
     queryKey: ['learning', 'pending-reviews'],
     queryFn: () => learningApi.getPendingReviews(),
-  });
-
-  const assignTest = useMutation({
-    mutationFn: () => learningApi.createTestAssignment(topicId!),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['learning'] });
-    },
   });
 
   if (lessonsQuery.isPending) {
@@ -111,7 +102,7 @@ export default function TopicDetailScreen() {
           <Pressable
             key={lesson.lessonId}
             disabled={locked}
-            onPress={() => router.push({ pathname: '/learn/lesson/[lessonId]', params: { lessonId: lesson.lessonId } })}
+            onPress={() => router.push({ pathname: '/learn/session/[lessonId]', params: { lessonId: lesson.lessonId } })}
             className={locked ? 'opacity-50' : ''}>
             <Card>
               <View className="flex-row items-center justify-between">
@@ -133,27 +124,11 @@ export default function TopicDetailScreen() {
       <Card>
         <Text weight="extrabold">Đề cuối chủ đề</Text>
         <Text className="mt-1 text-sm text-muted">{testLabel(data.testStatus)}</Text>
-        {assignTest.error ? (
-          <View className="mt-2">
-            <FormAlert
-              tone="error"
-              message={isLearningApiError(assignTest.error) ? assignTest.error.message : 'Không mở được đề.'}
-            />
-          </View>
-        ) : null}
-        {assignTest.isSuccess ? (
-          <Text className="mt-2 text-sm text-success">
-            Đề cuối đã được cấp. Chức năng làm đề chưa được hỗ trợ trên ứng dụng.
+        {data.testStatus === 'AVAILABLE' ? (
+          <Text className="mt-2 text-sm text-muted">
+            Bài kiểm tra cuối chủ đề hiện chưa có luồng làm bài trên ứng dụng.
           </Text>
         ) : null}
-        <View className="mt-3">
-          <Button
-            label="Nhận đề cuối"
-            loading={assignTest.isPending}
-            disabled={data.testStatus !== 'AVAILABLE'}
-            onPress={() => assignTest.mutate()}
-          />
-        </View>
       </Card>
     </ScrollView>
     </View>

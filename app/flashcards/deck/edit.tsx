@@ -9,6 +9,7 @@ import { Button } from '@/src/components/ui/button';
 import { FormAlert } from '@/src/components/ui/form-alert';
 import { Text } from '@/src/components/ui/text';
 import { vocabApi } from '@/src/features/vocab/api';
+import { invalidateFlashcards } from '@/src/features/flashcards/queries';
 import { colors } from '@/src/theme';
 
 const input = 'mt-2 min-h-12 rounded-2xl border border-line bg-surface px-4 py-3 text-base text-ink';
@@ -17,7 +18,7 @@ export default function EditDeckScreen() {
   const existing = useQuery({ queryKey: ['flashcards', 'deck', deckId], queryFn: () => vocabApi.getDeck(deckId!), enabled: !!deckId });
   const [name, setName] = useState(''); const [description, setDescription] = useState(''); const [coverKey, setCoverKey] = useState<string | null>(null); const [coverUrl, setCoverUrl] = useState(''); const [uploadingCover, setUploadingCover] = useState(false); const [error, setError] = useState('');
   useEffect(() => { if (existing.data) { setName(existing.data.name); setDescription(existing.data.description ?? ''); setCoverKey(existing.data.coverImageKey ?? null); setCoverUrl(existing.data.coverImageUrl ?? ''); } }, [existing.data]);
-  const mutation = useMutation({ mutationFn: () => deckId ? vocabApi.updateDeck(deckId, { name: name.trim(), description: description.trim() || null, coverImageKey: coverKey }) : vocabApi.createDeck({ name: name.trim(), description: description.trim() || null, coverImageKey: coverKey }), onSuccess: (deck) => { void client.invalidateQueries({ queryKey: ['flashcards'] }); router.replace({ pathname: '/flashcards/deck/[deckId]', params: { deckId: deck.id } }); }, onError: (e: Error) => setError(e.message) });
+  const mutation = useMutation({ mutationFn: () => deckId ? vocabApi.updateDeck(deckId, { name: name.trim(), description: description.trim() || null, coverImageKey: coverKey }) : vocabApi.createDeck({ name: name.trim(), description: description.trim() || null, coverImageKey: coverKey }), onSuccess: (deck) => { void invalidateFlashcards(client); router.replace({ pathname: '/flashcards/deck/[deckId]', params: { deckId: deck.id } }); }, onError: (e: Error) => setError(e.message) });
   const pickCover = async () => {
     try {
       setError('');
@@ -57,7 +58,7 @@ export default function EditDeckScreen() {
       <Text className="mt-5 text-sm" weight="bold">Ảnh bìa <Text className="text-muted">· không bắt buộc</Text></Text>
       {coverUrl ? <View className="mt-2 overflow-hidden rounded-2xl"><Image source={{ uri: coverUrl }} accessibilityLabel="Ảnh bìa bộ thẻ" className="h-40 w-full" resizeMode="cover"/><Pressable accessibilityRole="button" accessibilityLabel="Xóa ảnh bìa" onPress={() => { setCoverKey(null); setCoverUrl(''); }} className="absolute right-2 top-2 h-10 w-10 items-center justify-center rounded-full bg-black/60"><X color="white" size={19}/></Pressable></View> : <Pressable disabled={uploadingCover} onPress={() => void pickCover()} className="mt-2 min-h-[58px] flex-row items-center justify-center gap-2 rounded-2xl border border-dashed border-accent bg-accentSoft">{uploadingCover ? <ActivityIndicator color={colors.accent}/> : <ImagePlus size={19} color={colors.accent}/>}<Text weight="bold" className="text-accent">{uploadingCover ? 'Đang tải ảnh…' : 'Thêm ảnh bìa'}</Text></Pressable>}
       {error ? <View className="mt-4"><FormAlert tone="error" message={error}/></View> : null}
-      <Button className="mt-6" label={deckId ? 'Lưu bộ thẻ' : 'Tạo bộ thẻ'} loading={mutation.isPending || loadingDeck} disabled={!name.trim() || uploadingCover || loadingDeck} onPress={() => { setError(''); mutation.mutate(); }}/>
+      <Button className="mt-6" label={deckId ? 'Lưu bộ thẻ' : 'Tạo bộ thẻ'} loading={mutation.isPending || loadingDeck} disabled={!name.trim() || uploadingCover || loadingDeck || Boolean(deckId && !existing.data)} onPress={() => { setError(''); mutation.mutate(); }}/>
     </View>
   </ScrollView></KeyboardAvoidingView></View>;
 }

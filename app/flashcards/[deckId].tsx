@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { BackHeader } from '@/src/components/navigation/back-header';
@@ -8,7 +9,9 @@ import { FormAlert } from '@/src/components/ui/form-alert';
 import { Text } from '@/src/components/ui/text';
 import { StudySession } from '@/src/features/flashcards/components/study-session';
 import type { StudyCard } from '@/src/features/flashcards/types';
-import { vocabApi, type Flashcard, type FlashcardDeck, type PageResponse } from '@/src/features/vocab/api';
+import { vocabApi, type Flashcard } from '@/src/features/vocab/api';
+import { createRequestId } from '@/src/lib/request-id';
+import { invalidateFlashcards } from '@/src/features/flashcards/queries';
 import { colors } from '@/src/theme';
 
 function cardsFromDue(items: Flashcard[]): StudyCard[] {
@@ -22,6 +25,7 @@ function cardsFromDue(items: Flashcard[]): StudyCard[] {
 }
 
 export default function DeckStudyScreen() {
+  const [sessionId] = useState(createRequestId);
   const { deckId } = useLocalSearchParams<{ deckId: string }>();
   const queryClient = useQueryClient();
   const deckQuery = useQuery({ queryKey: ['flashcards', 'deck', deckId], queryFn: () => vocabApi.getDeck(deckId), enabled: Boolean(deckId) });
@@ -34,20 +38,12 @@ export default function DeckStudyScreen() {
 
   const deck = deckQuery.data;
   const review = async (cardId: string, correct: boolean, requestId: string) => {
-    const reviewed = await vocabApi.reviewCard(cardId, correct, requestId);
-    queryClient.setQueryData<PageResponse<Flashcard>>(['flashcards', 'due', deckId], (previous) => previous ? {
-      ...previous,
-      items: correct ? previous.items.filter((card) => card.id !== cardId) : previous.items.map((card) => card.id === cardId ? reviewed : card),
-      total: Math.max(0, previous.total - (correct ? 1 : 0)),
-    } : previous);
-    if (correct) {
-      queryClient.setQueryData<FlashcardDeck>(['flashcards', 'deck', deckId], (previous) => previous ? { ...previous, dueCount: Math.max(0, previous.dueCount - 1) } : previous);
-      queryClient.setQueryData<FlashcardDeck[]>(['flashcards', 'decks'], (previous) => previous?.map((item) => item.id === deckId ? { ...item, dueCount: Math.max(0, item.dueCount - 1) } : item));
-    }
+    await vocabApi.reviewCard(cardId, correct, requestId, sessionId);
+    await queryClient.invalidateQueries({ queryKey: ['flashcards'], refetchType: 'none' });
+    await queryClient.invalidateQueries({ queryKey: ['vocab', 'achievements'], refetchType: 'none' });
   };
   const exit = () => {
-    void queryClient.invalidateQueries({ queryKey: ['flashcards', 'due', deckId] });
-    void queryClient.invalidateQueries({ queryKey: ['flashcards', 'decks'] });
+    void invalidateFlashcards(queryClient);
     router.back();
   };
   const loadMore = async () => {

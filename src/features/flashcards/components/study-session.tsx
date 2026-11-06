@@ -29,6 +29,8 @@ export function StudySession({ cards, onReview, hasMoreCards, onLoadMore, onExit
   const [reviewing, setReviewing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
+  const [pendingRating, setPendingRating] = useState<SrsRating | null>(null);
+  const submitting = useRef(false);
   const requestIds = useRef(new Map<string, string>());
   const retried = useRef(new Set<string>());
   const current = queue[0];
@@ -70,6 +72,7 @@ export function StudySession({ cards, onReview, hasMoreCards, onLoadMore, onExit
           {cards.length === 0 ? 'Bạn đã ôn hết thẻ đến hạn trong bộ này.' : `Bạn đã gửi ${reviewed} lượt ôn lên tài khoản.`}
         </Text>
         <View className="mt-6">
+          {error ? <Text accessibilityRole="alert" className="mb-3 text-sm text-danger">{error}</Text> : null}
           {hasMoreCards ? <Button label={loadingMore ? 'Đang tải…' : 'Tiếp tục với thẻ còn lại'} loading={loadingMore} disabled={loadingMore} onPress={() => void loadMore()} /> : null}
           <Button label="Về Flashcards" onPress={onExit} />
         </View>
@@ -78,7 +81,9 @@ export function StudySession({ cards, onReview, hasMoreCards, onLoadMore, onExit
   }
 
   const grade = async (rating: SrsRating) => {
-    if (reviewing) return;
+    if (submitting.current || (pendingRating !== null && pendingRating !== rating)) return;
+    submitting.current = true;
+    setPendingRating(rating);
     let id = requestIds.current.get(current.id);
     if (!id) {
       id = createRequestId();
@@ -90,6 +95,7 @@ export function StudySession({ cards, onReview, hasMoreCards, onLoadMore, onExit
       await onReview(current.id, rating === 'good', id);
       if (rating === 'good') void sound.play('match');
       requestIds.current.delete(current.id);
+      setPendingRating(null);
       setReviewed((count) => count + 1);
       setFlipped(false);
       setQueue((items) => {
@@ -103,6 +109,7 @@ export function StudySession({ cards, onReview, hasMoreCards, onLoadMore, onExit
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Chưa lưu được lượt ôn. Hãy thử lại.');
     } finally {
+      submitting.current = false;
       setReviewing(false);
     }
   };
@@ -134,13 +141,13 @@ export function StudySession({ cards, onReview, hasMoreCards, onLoadMore, onExit
         {error ? <Text accessibilityRole="alert" className="rounded-xl bg-danger-soft p-3 text-sm text-danger">{error}</Text> : null}
         {flipped ? (
           <>
-            <Button label={reviewing ? 'Đang lưu…' : 'Chưa thuộc'} loading={reviewing} disabled={reviewing} variant="secondary" onPress={() => void grade('again')} />
-            <Button label={reviewing ? 'Đang lưu…' : 'Đã thuộc'} loading={reviewing} disabled={reviewing} onPress={() => void grade('good')} />
+            <Button label={reviewing ? 'Đang lưu…' : pendingRating === 'again' ? 'Gửi lại: Chưa thuộc' : 'Chưa thuộc'} loading={reviewing} disabled={reviewing || pendingRating === 'good'} variant="secondary" onPress={() => void grade('again')} />
+            <Button label={reviewing ? 'Đang lưu…' : pendingRating === 'good' ? 'Gửi lại: Đã thuộc' : 'Đã thuộc'} loading={reviewing} disabled={reviewing || pendingRating === 'again'} onPress={() => void grade('good')} />
           </>
         ) : (
           <Button label="Lật thẻ" onPress={() => { haptics.tap(); void sound.play('tap'); setFlipped(true); }} />
         )}
-        <Button variant="ghost" label="Kết thúc" onPress={onExit} />
+        <Button variant="ghost" label="Kết thúc" disabled={reviewing} onPress={onExit} />
       </View>
     </View>
   );

@@ -7,7 +7,7 @@ import type {
   ReviewRefDto,
   ReviewSubmissionRequest,
   ReviewSubmissionResultDto,
-  TestAssignmentDto,
+  ReviewTheoryCheckResultDto,
   TopicLessonsDto,
   TopicSummaryDto,
 } from './types';
@@ -26,5 +26,5 @@ export interface LearningApi {
   getPendingReviews(): Promise<ReviewRefDto[]>;
   getReview(reviewId: string): Promise<ReviewDetailDto>;
   submitReview(reviewId: string, request: ReviewSubmissionRequest): Promise<ReviewSubmissionResultDto>;
-  createTestAssignment(topicId: string): Promise<TestAssignmentDto>;
+  submitReviewTheoryCheck(reviewId: string, request: ExerciseSubmissionRequest): Promise<ReviewTheoryCheckResultDto>;
 }

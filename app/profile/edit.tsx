@@ -14,6 +14,7 @@ import { Text } from '@/src/components/ui/text';
 import { TextField } from '@/src/components/ui/text-field';
 import { useCurrentUser } from '@/src/features/auth/auth-provider';
 import { profileApi, profileQueryKeys } from '@/src/features/profile/api';
+import { gamificationApi } from '@/src/features/progress/gamification-api';
 import { colors, fonts } from '@/src/theme';
 
 const MAX_SOURCE_AVATAR_BYTES = 20 * 1024 * 1024;
@@ -23,6 +24,12 @@ export default function EditProfileScreen() {
   const insets = useSafeAreaInsets();
   const user = useCurrentUser();
   const learner = useQuery({ queryKey: profileQueryKeys.learner, queryFn: profileApi.getLearnerProfile });
+  const gamificationSettings = useQuery({
+    queryKey: ['gamification', 'settings'],
+    queryFn: gamificationApi.settings,
+    enabled: Boolean(user.data),
+    staleTime: 5 * 60_000,
+  });
   const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -59,6 +66,10 @@ export default function EditProfileScreen() {
     }
   }, [learner.data, user.data?.fullName]);
 
+  useEffect(() => {
+    if (gamificationSettings.data?.timezone) setTimezone(gamificationSettings.data.timezone);
+  }, [gamificationSettings.data?.timezone]);
+
   const avatarMutation = useMutation({
     mutationFn: profileApi.deleteAvatar,
     onSuccess: async (profile) => {
@@ -78,23 +89,30 @@ export default function EditProfileScreen() {
       if (!timezone.trim()) throw new Error('Vui lòng nhập múi giờ.');
 
       await profileApi.updateAccount({ fullName: fullName.trim(), phoneNumber: phoneNumber.trim() || null });
-      try {
-        return await profileApi.updateLearnerProfile({
+      const profile = await profileApi.updateLearnerProfile({
           displayName: (displayName.trim() || fullName.trim()),
           bio: bio.trim() || null,
           selfReportedBand: parsedBand,
           timezone: timezone.trim(),
           visibility,
+        }).catch((error: unknown) => {
+          throw new Error(`Thông tin tài khoản đã lưu, nhưng hồ sơ học viên chưa lưu được: ${error instanceof Error ? error.message : 'Vui lòng thử lại.'}`);
         });
+      try {
+        await gamificationApi.updateSettings(timezone.trim());
       } catch (error) {
-        throw new Error(`Thông tin tài khoản đã lưu, nhưng hồ sơ học viên chưa lưu được: ${error instanceof Error ? error.message : 'Vui lòng thử lại.'}`);
+        throw new Error(`Hồ sơ đã lưu nhưng múi giờ XP và chuỗi học chưa đồng bộ: ${error instanceof Error ? error.message : 'Vui lòng thử lại.'}`);
       }
+      return profile;
     },
     onSuccess: async (profile) => {
       queryClient.setQueryData(profileQueryKeys.learner, profile);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: profileQueryKeys.user }),
         queryClient.invalidateQueries({ queryKey: profileQueryKeys.learner }),
+        queryClient.invalidateQueries({ queryKey: ['gamification', 'settings'] }),
+        queryClient.invalidateQueries({ queryKey: ['progress', 'summary'] }),
+        queryClient.invalidateQueries({ queryKey: ['streak'] }),
         refreshCommunityAvatar(),
       ]);
       router.back();

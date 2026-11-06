@@ -5,14 +5,13 @@ import { Pressable, View } from 'react-native';
 import { Text } from '@/src/components/ui/text';
 import { Button } from '@/src/components/ui/button';
 import { useAuth } from '@/src/features/auth/auth-provider';
-import { apiRequest } from '@/src/lib/api-client';
+import { gamificationApi } from './gamification-api';
 import { colors } from '@/src/theme';
 import { useStreak } from './use-streak';
 
-type Progress = { totalXp: number; level: number; nextLevelAt: number; xpToNextLevel: number; xpToday: number; dailyCap: number };
 export function useProgress() {
   const { status } = useAuth();
-  return useQuery({ queryKey: ['progress', 'summary'], queryFn: () => apiRequest<Progress>('/api/learning/me/progress', { auth: true }), enabled: status === 'authenticated', staleTime: 30000, retry: 1 });
+  return useQuery({ queryKey: ['progress', 'summary'], queryFn: gamificationApi.progress, enabled: status === 'authenticated', staleTime: 30000, retry: 1 });
 }
 export function ProgressSummary({ compact = false }: { compact?: boolean }) {
   const router = useRouter();

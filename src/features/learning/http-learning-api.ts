@@ -11,7 +11,7 @@ import type {
   ReviewRefDto,
   ReviewSubmissionRequest,
   ReviewSubmissionResultDto,
-  TestAssignmentDto,
+  ReviewTheoryCheckResultDto,
   TopicLessonsDto,
   TopicSummaryDto,
 } from './types';
@@ -45,14 +45,17 @@ export function createHttpLearningApi(): LearningApi {
       }),
     completeLesson: (lessonId) =>
       learningRequest<LessonCompletionDto>(`/lessons/${lessonId}/complete`, { method: 'POST', body: {} }),
-    getPendingReviews: () => learningRequest<ReviewRefDto[]>('/reviews/pending'),
+    getPendingReviews: () => learningRequest<ReviewRefDto[]>('/reviews?status=PENDING&limit=100'),
     getReview: (reviewId) => learningRequest<ReviewDetailDto>(`/reviews/${reviewId}`),
     submitReview: (reviewId, request: ReviewSubmissionRequest) =>
       learningRequest<ReviewSubmissionResultDto>(`/reviews/${reviewId}/submissions`, {
         method: 'POST',
         body: request,
       }),
-    createTestAssignment: (topicId) =>
-      learningRequest<TestAssignmentDto>(`/topics/${topicId}/test-assignments`, { method: 'POST', body: {} }),
+    submitReviewTheoryCheck: (reviewId, request: ExerciseSubmissionRequest) =>
+      learningRequest<ReviewTheoryCheckResultDto>(`/reviews/${reviewId}/theory-check`, {
+        method: 'POST',
+        body: request,
+      }),
   };
 }

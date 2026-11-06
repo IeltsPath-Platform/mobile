@@ -9,6 +9,7 @@ import { Button } from '@/src/components/ui/button';
 import { FormAlert } from '@/src/components/ui/form-alert';
 import { Text } from '@/src/components/ui/text';
 import { vocabApi } from '@/src/features/vocab/api';
+import { invalidateFlashcards, useDebouncedSearch } from '@/src/features/flashcards/queries';
 import { colors } from '@/src/theme';
 
 const field = 'mt-2 min-h-12 rounded-2xl border border-line bg-surface px-4 py-3 text-base text-ink';
@@ -16,15 +17,17 @@ export default function EditCardScreen() {
   const { cardId, deckId } = useLocalSearchParams<{ cardId?: string; deckId?: string }>(); const client = useQueryClient();
   const card = useQuery({ queryKey: ['flashcards', 'card', cardId], queryFn: () => vocabApi.getCard(cardId!), enabled: !!cardId });
   const [front, setFront] = useState(''); const [back, setBack] = useState(''); const [example, setExample] = useState(''); const [imageKey, setImageKey] = useState<string | null>(null); const [imageUrl, setImageUrl] = useState(''); const [uploadingImage, setUploadingImage] = useState(false); const [wordQuery, setWordQuery] = useState(''); const [sense, setSense] = useState<{ id: string; lemma: string; meaning: string; example: string | null } | null>(null); const [error, setError] = useState(''); const [showExtra, setShowExtra] = useState(false);
-  const search = useQuery({ queryKey: ['vocabulary', 'search', wordQuery.trim()], queryFn: ({ signal }) => vocabApi.search(wordQuery.trim(), signal), enabled: wordQuery.trim().length >= 2 && !cardId, staleTime: 60_000 });
+  const debouncedWordQuery = useDebouncedSearch(wordQuery);
+  const search = useQuery({ queryKey: ['vocabulary', 'search', debouncedWordQuery], queryFn: ({ signal }) => vocabApi.search(debouncedWordQuery, signal), enabled: debouncedWordQuery.length >= 2 && !cardId, staleTime: 60_000 });
   useEffect(() => { if (card.data) { setFront(card.data.front); setBack(card.data.back); setExample(card.data.exampleSentence ?? ''); setImageUrl(card.data.imageUrl ?? ''); setImageKey(card.data.imageKey ?? null); } }, [card.data]);
   const mutation = useMutation({ mutationFn: async () => {
+    if (cardId && !card.data) throw new Error('Chưa tải được thẻ cần sửa. Hãy tải lại trước khi lưu.');
     const draft = { front: front.trim(), back: back.trim(), exampleSentence: example.trim() || null, imageKey };
     if (card.data) return { card: await vocabApi.updateCard(card.data, draft), deckAddFailed: false };
     const created = await vocabApi.createCard({ sourceType: sense ? 'VOCABULARY_SENSE' : 'MANUAL', vocabularySenseId: sense?.id, front: draft.front, back: draft.back, exampleSentence: draft.exampleSentence, imageKey });
     if (deckId) { try { await vocabApi.addDeckItem(deckId, created.id); } catch { return { card: created, deckAddFailed: true }; } }
     return { card: created, deckAddFailed: false };
-  }, onSuccess: (result) => { void client.invalidateQueries({ queryKey: ['flashcards'] }); if (result.deckAddFailed) Alert.alert('Đã tạo thẻ', 'Thẻ đã được lưu trong thư viện nhưng chưa thêm được vào bộ. Bạn có thể thêm lại từ màn chi tiết bộ thẻ.'); router.back(); }, onError: (e: Error) => setError(e.message) });
+  }, onSuccess: (result) => { void invalidateFlashcards(client); if (result.deckAddFailed) Alert.alert('Đã tạo thẻ', 'Thẻ đã được lưu trong thư viện nhưng chưa thêm được vào bộ. Bạn có thể thêm lại từ màn chi tiết bộ thẻ.'); router.back(); }, onError: (e: Error) => setError(e.message) });
   const pickImage = async () => {
     try {
       setError('');
@@ -48,7 +51,7 @@ export default function EditCardScreen() {
       setUploadingImage(false);
     }
   };
-  const remove = () => Alert.alert('Xóa thẻ?', 'Thẻ sẽ bị xóa khỏi thư viện của bạn.', [{ text: 'Hủy', style: 'cancel' }, { text: 'Xóa thẻ', style: 'destructive', onPress: async () => { try { await vocabApi.deleteCard(cardId!); await client.invalidateQueries({ queryKey: ['flashcards'] }); router.back(); } catch (e) { Alert.alert('Không thể xóa thẻ', e instanceof Error ? e.message : 'Vui lòng thử lại.'); } } }]);
+  const remove = () => Alert.alert('Xóa thẻ?', 'Thẻ sẽ bị xóa khỏi thư viện của bạn.', [{ text: 'Hủy', style: 'cancel' }, { text: 'Xóa thẻ', style: 'destructive', onPress: async () => { try { await vocabApi.deleteCard(cardId!); await invalidateFlashcards(client); router.back(); } catch (e) { Alert.alert('Không thể xóa thẻ', e instanceof Error ? e.message : 'Vui lòng thử lại.'); } } }]);
   const loadingCard = Boolean(cardId && card.isPending);
   return <View className="flex-1 bg-canvas"><BackHeader title={cardId ? 'Chỉnh sửa thẻ' : 'Tạo thẻ mới'} fallbackHref="/(tabs)/flashcards" /><KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}><ScrollView className="flex-1" keyboardShouldPersistTaps="handled" contentContainerClassName="px-5 pb-12 pt-3" showsVerticalScrollIndicator={false}>
     
@@ -84,7 +87,7 @@ export default function EditCardScreen() {
       {imageUrl ? <View className="mt-2 overflow-hidden rounded-2xl"><Image source={{ uri: imageUrl }} accessibilityLabel="Ảnh minh họa thẻ" className="h-48 w-full" resizeMode="cover"/><Pressable accessibilityRole="button" accessibilityLabel="Xóa ảnh minh họa" onPress={() => { setImageKey(null); setImageUrl(''); }} className="absolute right-2 top-2 h-10 w-10 items-center justify-center rounded-full bg-black/60"><X color="white" size={19}/></Pressable></View> : <Pressable disabled={uploadingImage} onPress={() => void pickImage()} className="mt-2 min-h-14 flex-row items-center justify-center gap-2 rounded-2xl border border-dashed border-accent bg-accentSoft">{uploadingImage ? <ActivityIndicator color={colors.accent}/>: <ImagePlus size={19} color={colors.accent}/>}<Text weight="bold" className="text-accent">{uploadingImage ? 'Đang tải ảnh…' : 'Chọn ảnh (tối đa 2 MB)'}</Text></Pressable>}
     </View> : null}
     {error ? <View className="mt-4"><FormAlert tone="error" message={error}/></View> : null}
-    <Button className="mt-5" label={cardId ? 'Lưu thẻ' : deckId ? 'Tạo và thêm vào bộ' : 'Tạo thẻ'} loading={mutation.isPending || loadingCard} disabled={!front.trim() || !back.trim() || uploadingImage || loadingCard} onPress={() => { setError(''); mutation.mutate();}}/>
+    <Button className="mt-5" label={cardId ? 'Lưu thẻ' : deckId ? 'Tạo và thêm vào bộ' : 'Tạo thẻ'} loading={mutation.isPending || loadingCard} disabled={!front.trim() || !back.trim() || uploadingImage || loadingCard || Boolean(cardId && !card.data)} onPress={() => { setError(''); mutation.mutate();}}/>
     {cardId ? <Pressable onPress={remove} className="mt-3 min-h-12 items-center justify-center"><Text className="text-danger" weight="bold">Xóa thẻ</Text></Pressable> : null}
   </ScrollView></KeyboardAvoidingView></View>;
 }
