@@ -13,11 +13,13 @@ type Props = {
   count?: number;
   selected?: ReactionType | null;
   disabled?: boolean;
+  trayOffset?: number;
+  onOpenChange?: (open: boolean) => void;
   onSelect: (reaction: ReactionType) => void;
 };
 
 /** Quick tap applies/removes the current reaction; holding opens the reaction tray. */
-export function CommunityReactionControl({ selected, disabled = false, onSelect, compact = false, count = 0 }: Props) {
+export function CommunityReactionControl({ selected, disabled = false, onSelect, compact = false, count = 0, trayOffset = 0, onOpenChange }: Props) {
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState<ReactionType | null>(null);
   const hoveredRef = useRef<ReactionType | null>(null);
@@ -32,6 +34,7 @@ export function CommunityReactionControl({ selected, disabled = false, onSelect,
   const ActiveIcon = active?.Icon ?? ThumbsUp;
 
   useEffect(() => () => clearTimeout(clearSuppressTimer.current), []);
+  useEffect(() => { onOpenChange?.(open); }, [open, onOpenChange]);
   useEffect(() => {
     for (const { type } of reactions) {
       Animated.spring(scales.get(type)!, {
@@ -116,7 +119,7 @@ export function CommunityReactionControl({ selected, disabled = false, onSelect,
       {open ? (
         <View
           className="absolute bottom-14 left-0 z-20 flex-row items-center gap-1 rounded-full border border-line bg-surface px-2 py-2"
-          style={{ shadowColor: colors.shadow, shadowOpacity: 0.2, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 16 }}
+          style={{ left: trayOffset, shadowColor: colors.shadow, shadowOpacity: 0.2, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 16 }}
           accessibilityLabel="Chọn cảm xúc"
           pointerEvents="none"
         >
@@ -142,8 +145,14 @@ export function CommunityReactionControl({ selected, disabled = false, onSelect,
           delayLongPress={350}
           className={compact ? 'min-h-11 min-w-11 flex-row items-center justify-center gap-1.5 rounded-full px-2.5 active:opacity-60' : 'min-h-11 flex-1 flex-row items-center justify-center gap-2 rounded-lg active:opacity-60'}
           accessibilityRole="button"
+          accessibilityState={{ disabled, selected: Boolean(selected) }}
           accessibilityLabel={`${active?.label ?? 'Thích'}${count > 0 ? `, ${count} lượt` : ''}`}
           accessibilityHint="Nhấn nhanh để thích; nhấn giữ, trượt tới cảm xúc rồi thả tay để chọn"
+          accessibilityActions={reactions.map(({ type, label }) => ({ name: type, label: selected === type ? `Bỏ ${label}` : label }))}
+          onAccessibilityAction={({ nativeEvent }) => {
+            const reaction = reactions.find(({ type }) => type === nativeEvent.actionName);
+            if (!disabled && reaction) onSelect(reaction.type);
+          }}
         >
           <ActiveIcon
             size={compact ? 21 : 18}

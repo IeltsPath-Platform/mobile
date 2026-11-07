@@ -1,6 +1,6 @@
 # Hợp đồng API học từ vựng cho mobile
 
-Cập nhật: 07/11/2026. Đối chiếu với code library-service trên nhánh `feat/mobile-vocabulary-study` (PR backend #155, chưa merge vào `main`) và community-service trên nhánh `feat/comment-reactions` (PR backend #154, chưa merge). Phần cảm xúc bình luận ở mục 5.12. Tên trường, kiểu dữ liệu và mã lỗi trong tài liệu này lấy trực tiếp từ các record và exception trong code. Ví dụ JSON dùng giá trị minh họa.
+Cập nhật: 07/11/2026. Đối chiếu với code library-service từ PR backend #155 và community-service từ PR backend #154; cả hai đã được merge vào `main` trong source backend được rà soát. Điều này không xác nhận phiên bản container đang chạy. Phần cảm xúc bình luận ở mục 5.12. Tên trường, kiểu dữ liệu và mã lỗi trong tài liệu này lấy trực tiếp từ các record và exception trong code. Ví dụ JSON dùng giá trị minh họa.
 
 Nếu tài liệu và code lệch nhau, code là nguồn đúng. Báo lại cho dev backend để sửa tài liệu.
 
@@ -580,3 +580,14 @@ Lỗi của community-service (bình luận và cảm xúc) không có `code`. M
 - Thông báo cho tác giả bình luận khi có người thả cảm xúc, danh sách người đã thả, emoji tự chọn.
 - Nhập tiến độ cũ trên máy thành XP hoặc streak. Không làm.
 - Màn `learn`, `practice` cũ của mobile vẫn dùng dữ liệu web và không đổi trong đợt này.
+
+## 10. Tích hợp mobile — 07/11/2026
+
+- Đã nối các endpoint học và nội dung unit qua `src/features/vocab/study-api.ts`. Màn Hôm nay và trang chủ đề dùng unit, trạng thái mở khóa và tiến độ server khi đăng nhập; khách giữ luồng học thử trên máy.
+- Bài học hỗ trợ WORD, CHOICE, MATCH và FILL bằng bàn phím, tiếp tục phiên, ôn lại bài hoàn thành, phản hồi đáp án và kết quả do server trả về. Không tự chấm hoặc tự cộng XP/tim/streak.
+- Có bảng chỉ số, đổi sang múi giờ thiết bị, xác nhận hồi tim/mua bảo vệ chuỗi bằng Points. Sau ôn flashcard, mobile làm mới summary.
+- Cảm xúc dùng được cho bình luận gốc và phản hồi: chọn, đổi hoặc bỏ cảm xúc; cập nhật giao diện ngay, hoàn tác nếu request lỗi và tải lại đúng luồng bình luận.
+- Tiến độ được tải theo nhóm tối đa 100 chủ đề. Kéo tải lại làm mới cả catalog unit; lỗi tải tiến độ không chuyển sang tiến độ tài khoản giả lập trên máy.
+- Request ghi chưa rõ kết quả được gửi lại cùng mã và body. Giao dịch Points đang chờ được chia sẻ giữa các panel trong phiên ứng dụng, tránh đổi mã khi đóng màn học rồi mở Hôm nay. Trạng thái này nằm trong bộ nhớ, chưa hỗ trợ giữ mã qua đóng hẳn ứng dụng hoặc đăng xuất.
+
+Kiểm tra tự động: TypeScript và 88 test trong 13 file đã qua, bao gồm kiểm thử giao dịch dùng chung. Expo web export thành công với 54 route tại `.expo/verification-vocabulary-study`. Kiểm tra chỉ đọc tới `localhost:8080/api/content/vocabulary/topics` không kết nối được; không có browser/app trong CUA để kiểm tra giao diện trực tiếp. Vì vậy chưa chạy E2E với tài khoản/backend thật hoặc kiểm tra trên iPhone; bàn phím, modal lồng nhau, thao tác giữ/trượt chọn cảm xúc và media vẫn cần được kiểm chứng trên thiết bị.

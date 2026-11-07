@@ -14,7 +14,7 @@ export type CommunityPost = {
 };
 export type CursorPage<T> = { content: T[]; nextCursor: string | null; hasNext: boolean; size: number };
 export type OffsetPage<T> = { content: T[]; page: number; size: number; totalElements: number; totalPages: number; last: boolean };
-export type Comment = { id: string; authorId: string; parentCommentId: string | null; body: string; createdAt?: string; updatedAt?: string; replyCount: number; author?: PublicProfile | null; myComment?: boolean };
+export type Comment = { id: string; authorId: string; parentCommentId: string | null; body: string; createdAt?: string; updatedAt?: string; replyCount: number; author?: PublicProfile | null; myComment?: boolean; reactionCounts: Record<ReactionType, number>; myReaction: ReactionType | null };
 export type Notification = { id: string; actorId: string; actor?: PublicProfile | null; eventType: string; postId?: string | null; commentId?: string | null; createdAt: string; readAt?: string | null };
 export type NotificationPreference = { eventType: string; enabled: boolean };
 export type PostInput = { category: PostCategory; title?: string; body: string; imageUrls: string[]; videoUrl?: string | null; targetBand?: number | null; background?: string | null };
@@ -73,6 +73,8 @@ export const communityApi = {
   comment: (id: string, body: string, parentCommentId?: string) => apiRequest<Comment>(`/api/community/posts/${id}/comments`, { method: 'POST', body: { body, parentCommentId }, auth: true }),
   updateComment: (id: string, body: string) => apiRequest<Comment>(`/api/community/comments/${id}`, { method: 'PUT', body: { body }, auth: true }),
   deleteComment: (id: string) => apiRequest<void>(`/api/community/comments/${id}`, { method: 'DELETE', auth: true }),
+  reactToComment: (id: string, type: ReactionType) => apiRequest<void>(`/api/community/comments/${encodeURIComponent(id)}/reactions/${type}`, { method: 'PUT', auth: true }),
+  removeCommentReaction: (id: string, type: ReactionType) => apiRequest<void>(`/api/community/comments/${encodeURIComponent(id)}/reactions/${type}`, { method: 'DELETE', auth: true }),
   follow: (id: string, active: boolean) => apiRequest<void>(`/api/community/users/${id}/follow`, { method: active ? 'DELETE' : 'POST', auth: true }),
   relationship: (id: string) => apiRequest<{ following: boolean; followerCount: number; followingCount: number }>(`/api/community/users/${id}/relationship`, { auth: true }),
   followers: (id: string, cursor?: string) => profilePage(`/api/community/users/${id}/followers?${query({ size: '10', cursor })}`),

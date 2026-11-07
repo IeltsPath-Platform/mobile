@@ -283,7 +283,7 @@ export default function PostDetailScreen() {
         data={rows}
         keyExtractor={(row) => row.id}
         renderItem={({ item: comment }) => (
-          <CommentItem comment={comment} highlighted={comment.id === targetCommentId} onReply={startReply} onMenu={setCommentMenu} onProfile={openProfile} />
+          <CommentItem postId={postId} comment={comment} highlighted={comment.id === targetCommentId} onReply={startReply} onMenu={setCommentMenu} onProfile={openProfile} />
         )}
         ListHeaderComponent={header}
         ListFooterComponent={comments.hasNextPage ? (
