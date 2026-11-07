@@ -336,7 +336,7 @@ export default function PostDetailScreen() {
             maxLength={5000}
             textAlignVertical="center"
             accessibilityLabel={replyTo ? 'Viết câu trả lời' : 'Viết bình luận'}
-            className="max-h-28 min-h-11 flex-1 rounded-3xl bg-surfaceTint px-4 py-2.5 text-base text-ink"
+            className="max-h-28 min-h-11 flex-1 rounded-3xl bg-tint px-4 py-2.5 text-base text-ink"
           />
           <Pressable
             disabled={!draft.trim() || sending}
@@ -372,7 +372,7 @@ export default function PostDetailScreen() {
               placeholder="Nội dung bình luận"
               placeholderTextColor={colors.muted}
               accessibilityLabel="Nội dung bình luận"
-              className="mt-4 min-h-24 rounded-2xl bg-surfaceTint p-3 text-base text-ink"
+              className="mt-4 min-h-24 rounded-2xl bg-tint p-3 text-base text-ink"
               textAlignVertical="top"
             />
             <View className="mt-4 flex-row gap-3">

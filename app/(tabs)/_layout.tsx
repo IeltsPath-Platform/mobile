@@ -1,8 +1,10 @@
 ﻿import { Tabs } from 'expo-router';
 import { ColorfulTabBar } from '@/src/components/navigation/colorful-tab-bar';
 import { colors } from '@/src/theme';
+import { useTheme } from '@/src/theme/app-theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 export default function TabLayout() {
+  useTheme();
   const insets = useSafeAreaInsets();
   return <Tabs tabBar={(props) => <ColorfulTabBar {...props} />} screenOptions={{
     sceneStyle: { backgroundColor: colors.canvas, paddingTop: insets.top }, headerShown: false,

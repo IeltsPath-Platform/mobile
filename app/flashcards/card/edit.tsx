@@ -393,7 +393,7 @@ export default function EditCardScreen() {
                 <Pressable
                   disabled={uploadingImage}
                   onPress={() => void pickImage()}
-                  className="mt-2 min-h-14 flex-row items-center justify-center gap-2 rounded-2xl border border-dashed border-accent bg-accentSoft"
+                  className="mt-2 min-h-14 flex-row items-center justify-center gap-2 rounded-2xl border border-dashed border-accent bg-accent-soft"
                 >
                   {uploadingImage ? (
                     <ActivityIndicator color={colors.accent} />

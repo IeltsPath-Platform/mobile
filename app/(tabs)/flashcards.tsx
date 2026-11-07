@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import {
   BookMarked,
@@ -8,9 +8,12 @@ import {
   Layers3,
   Plus,
   RotateCcw,
+  Search,
+  Sparkles,
+  X,
 } from 'lucide-react-native';
 import { useMemo, useRef, useState } from 'react';
-import { FlatList, Image, Pressable, View } from 'react-native';
+import { FlatList, Image, Pressable, TextInput, View } from 'react-native';
 import { Button } from '@/src/components/ui/button';
 import { Text } from '@/src/components/ui/text';
 import {
@@ -22,9 +25,11 @@ import {
   nextPage,
   useFlashcardAccess,
   useStudyTimezone,
+  useDebouncedSearch,
 } from '@/src/features/flashcards/queries';
 import { vocabApi } from '@/src/features/vocab/api';
 import { colors } from '@/src/theme';
+import { useTheme } from '@/src/theme/app-theme';
 
 type Tab = 'decks' | 'cards';
 type LibraryRow = {
@@ -36,10 +41,15 @@ type LibraryRow = {
 };
 
 export default function FlashcardsScreen() {
+  useTheme();
   const listRef = useRef<FlatList<LibraryRow>>(null);
   const enabled = useFlashcardAccess();
+  const queryClient = useQueryClient();
   const timezone = useStudyTimezone();
   const [tab, setTab] = useState<Tab>('decks');
+  const [dictionaryOpen, setDictionaryOpen] = useState(false);
+  const [dictionaryInput, setDictionaryInput] = useState('');
+  const dictionaryQuery = useDebouncedSearch(dictionaryInput);
 
   const decks = useInfiniteQuery({
     queryKey: ['flashcards', 'deck-pages'],
@@ -70,6 +80,33 @@ export default function FlashcardsScreen() {
     queryFn: () => notebookApi.summary(timezone),
     enabled,
     staleTime: 60_000,
+  });
+  const dictionary = useQuery({
+    queryKey: ['vocabulary', 'search', dictionaryQuery],
+    queryFn: ({ signal }) => vocabApi.search(dictionaryQuery, signal),
+    enabled: enabled && dictionaryOpen && dictionaryQuery.length >= 2,
+    staleTime: 60_000,
+    retry: 1,
+  });
+  const dictionarySenses = useMemo(
+    () => (dictionary.data ?? []).flatMap((word) => word.senses.slice(0, 1).map((sense) => ({ ...sense, lemma: word.lemma, ipa: word.ipa }))).slice(0, 5),
+    [dictionary.data],
+  );
+  const dictionarySenseIds = useMemo(() => dictionarySenses.map((sense) => sense.id), [dictionarySenses]);
+  const savedDictionarySenses = useQuery({
+    queryKey: ['flashcards', 'notebook', 'saved', dictionarySenseIds],
+    queryFn: ({ signal }) => notebookApi.saved(dictionarySenseIds, signal),
+    enabled: enabled && dictionaryOpen && dictionarySenseIds.length > 0,
+    staleTime: 60_000,
+  });
+  const addDictionarySense = useMutation({
+    mutationFn: notebookApi.add,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['flashcards'] }),
+        queryClient.invalidateQueries({ queryKey: ['vocabulary', 'search', dictionaryQuery] }),
+      ]);
+    },
   });
 
   const active = tab === 'decks' ? decks : cards;
@@ -116,6 +153,8 @@ export default function FlashcardsScreen() {
         keyExtractor={(row) => row.id}
         contentContainerClassName="px-5 pb-10 pt-3"
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         refreshing={
           enabled && active.isRefetching && !active.isFetchingNextPage
         }
@@ -137,6 +176,59 @@ export default function FlashcardsScreen() {
             >
               Thẻ từ
             </Text>
+
+            <View className="overflow-hidden rounded-2xl border border-line bg-surface">
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: dictionaryOpen }}
+                onPress={() => {
+                  if (!enabled) router.push('/(auth)/login');
+                  else setDictionaryOpen((open) => !open);
+                }}
+                className="min-h-14 flex-row items-center gap-3 px-4"
+              >
+                <View className="h-9 w-9 items-center justify-center rounded-xl bg-accent-soft"><Search size={19} color={colors.accentDeep} /></View>
+                <View className="flex-1"><Text weight="bold">Tra từ điển</Text><Text className="text-xs text-muted">Tìm nghĩa và lưu từ để học</Text></View>
+                {dictionaryOpen ? <X size={19} color={colors.muted} /> : <ChevronRight size={19} color={colors.muted} />}
+              </Pressable>
+              {dictionaryOpen ? <View className="gap-3 border-t border-line p-3">
+                <TextInput
+                  value={dictionaryInput}
+                  onChangeText={setDictionaryInput}
+                  autoFocus
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  maxLength={100}
+                  returnKeyType="search"
+                  placeholder="Nhập từ tiếng Anh, ví dụ: achieve"
+                  placeholderTextColor={colors.muted}
+                  accessibilityLabel="Tra từ trong từ điển"
+                  className="min-h-12 rounded-xl border border-line bg-canvas px-3 text-base text-ink"
+                />
+                {dictionaryQuery.length < 2 ? <Text className="text-xs text-muted">Nhập ít nhất 2 ký tự để tìm từ.</Text> : null}
+                {dictionary.isFetching ? <QueryState pending error={null} retry={() => void dictionary.refetch()} /> : null}
+                {dictionary.isError ? <QueryState pending={false} error={dictionary.error} retry={() => void dictionary.refetch()} /> : null}
+                {dictionary.isSuccess && dictionary.data.length === 0 ? <View className="items-center py-3"><Sparkles size={20} color={colors.muted} /><Text className="mt-1 text-sm text-muted">Chưa tìm thấy từ phù hợp.</Text></View> : null}
+                {dictionarySenses.length > 0 && (savedDictionarySenses.isPending || savedDictionarySenses.isError) ? <QueryState pending={savedDictionarySenses.isPending} error={savedDictionarySenses.error} retry={() => void savedDictionarySenses.refetch()} /> : null}
+                {dictionarySenses.map((sense) => {
+                  const saved = savedDictionarySenses.data?.includes(sense.id) ?? false;
+                  return <View key={sense.id} className="gap-2 rounded-xl bg-canvas p-3">
+                    <View className="flex-row items-center justify-between gap-2"><Text weight="black" className="flex-1 text-base text-accent-deep">{sense.lemma}</Text>{sense.ipa ? <Text className="text-xs text-muted">{sense.ipa}</Text> : null}</View>
+                    {sense.vietnameseMeaning ? <Text weight="semibold" className="text-sm">{sense.vietnameseMeaning}</Text> : null}
+                    {sense.englishDefinition ? <Text className="text-sm leading-5 text-muted">{sense.englishDefinition}</Text> : null}
+                    {sense.exampleSentence ? <Text className="text-xs italic leading-5 text-muted">{sense.exampleSentence}</Text> : null}
+                    <Button
+                      variant={saved ? 'secondary' : 'primary'}
+                      label={saved ? 'Đã lưu vào sổ từ' : 'Lưu nghĩa này vào sổ từ'}
+                      disabled={saved || !savedDictionarySenses.isSuccess || addDictionarySense.isPending}
+                      loading={addDictionarySense.isPending && addDictionarySense.variables === sense.id}
+                      onPress={() => addDictionarySense.mutate(sense.id)}
+                    />
+                  </View>;
+                })}
+                {addDictionarySense.error ? <Text accessibilityRole="alert" className="text-sm text-danger">{addDictionarySense.error.message}</Text> : null}
+              </View> : null}
+            </View>
 
             {/* Notebook card — entry point chính */}
             {hasNotebook ? (

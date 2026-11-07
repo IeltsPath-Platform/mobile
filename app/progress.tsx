@@ -6,8 +6,10 @@ import { Button } from '@/src/components/ui/button';
 import { Text } from '@/src/components/ui/text';
 import { ProgressSummary } from '@/src/features/progress/progress-summary';
 import { colors } from '@/src/theme';
+import { useTheme } from '@/src/theme/app-theme';
 
 export default function ProgressScreen() {
+  useTheme();
   const router = useRouter();
   return (
     <SafeAreaView className="flex-1 bg-canvas">

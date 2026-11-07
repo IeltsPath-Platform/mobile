@@ -21,7 +21,7 @@ import { AuthProvider, useAuth } from "@/src/features/auth/auth-provider";
 import { useOnboarding } from "@/src/features/onboarding/use-onboarding";
 import { AUTH_ENABLED } from "@/src/lib/env";
 import { queryClient } from "@/src/lib/query-client";
-import { AppThemeProvider } from "@/src/theme/app-theme";
+import { AppThemeProvider, useTheme } from "@/src/theme/app-theme";
 import { colors } from "@/src/theme";
 
 const SPLASH = colors.accent;
@@ -88,6 +88,7 @@ export default function RootLayout() {
 }
 
 function RootNavigator() {
+  const { isDark } = useTheme();
   const { status } = useAuth();
   const { ready, onboarded } = useOnboarding();
   const isAuthenticated = status === "authenticated";
@@ -121,7 +122,7 @@ function RootNavigator() {
 
   return (
     <>
-      <StatusBar style={enterApp ? "dark" : "light"} />
+      <StatusBar style={enterApp && !isDark ? "dark" : "light"} />
       <Stack
         screenOptions={{
           headerShown: false,
@@ -137,6 +138,7 @@ function RootNavigator() {
         <Stack.Protected guard={enterApp}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="progress" />
+          <Stack.Screen name="achievements" />
           <Stack.Screen name="profile/edit" options={{ headerShown: false }} />
           <Stack.Screen name="profile/change-password" options={{ headerShown: false }} />
           <Stack.Screen name="games" />

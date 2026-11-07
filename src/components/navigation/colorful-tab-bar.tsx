@@ -6,6 +6,7 @@ import type { BottomTabBarProps } from 'expo-router/build/react-navigation/botto
 import { Text } from '@/src/components/ui/text';
 import { haptics } from '@/src/lib/haptics';
 import { colors, spacing, touchTarget } from '@/src/theme';
+import { useTheme } from '@/src/theme/app-theme';
 
 const tabs = {
   index: { label: 'Hôm nay', Icon: House },
@@ -16,6 +17,7 @@ const tabs = {
 };
 
 export function ColorfulTabBar({ state, emitter, navigateToTab }: BottomTabBarProps) {
+  useTheme();
   const insets = useSafeAreaInsets();
   return (
     <View

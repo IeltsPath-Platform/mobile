@@ -1,39 +1,168 @@
-import { Lock, Trophy } from 'lucide-react-native';
+import { Check, Lock, Trophy } from 'lucide-react-native';
 import { Pressable, ScrollView, View } from 'react-native';
 
 import { Text } from '@/src/components/ui/text';
 import type { VocabularyAchievement } from '@/src/features/vocab/api';
 import { colors } from '@/src/theme';
+import { useTheme } from '@/src/theme/app-theme';
 
-const ACHIEVEMENT_COPY: Record<string, { title: string; detail: string; color: string; tint: string }> = {
-  REVIEW_STREAK_7: { title: 'B\u1ec1n b\u1ec9 7 ng\u00e0y', detail: '\u00d4n t\u1eeb li\u00ean t\u1ee5c m\u1ed9t tu\u1ea7n', color: '#218fda', tint: '#e7f5ff' },
-  TOPIC_COMPLETED: { title: 'Chinh ph\u1ee5c ch\u1ee7 \u0111\u1ec1', detail: 'Ho\u00e0n th\u00e0nh m\u1ed9t ch\u1ee7 \u0111\u1ec1', color: '#e59524', tint: '#fff4da' },
-  MASTERED_300: { title: 'B\u1eadc th\u1ea7y t\u1eeb v\u1ef1ng', detail: 'Th\u00e0nh th\u1ea1o 300 t\u1eeb', color: '#14a27b', tint: '#e3f8f0' },
+type AchievementTone = 'accent' | 'warm' | 'success';
+
+const ACHIEVEMENT_COPY: Record<string, { title: string; detail: string; tone: AchievementTone }> = {
+  REVIEW_STREAK_7: {
+    title: 'Bền bỉ 7 ngày',
+    detail: 'Ôn từ liên tục một tuần',
+    tone: 'accent',
+  },
+  TOPIC_COMPLETED: {
+    title: 'Chinh phục chủ đề',
+    detail: 'Hoàn thành 1 chủ đề từ vựng',
+    tone: 'warm',
+  },
+  MASTERED_300: {
+    title: 'Bậc thầy từ vựng',
+    detail: 'Thành thạo 300 từ vựng',
+    tone: 'success',
+  },
 };
 
-export function ProfileAchievements({ items, loading, error, onRetry }: { items?: VocabularyAchievement[]; loading: boolean; error: boolean; onRetry: () => void }) {
+function achievementColors(tone: AchievementTone) {
+  if (tone === 'warm') return { foreground: colors.xpDeep, background: colors.warmSoft };
+  if (tone === 'success') return { foreground: colors.success, background: colors.successSoft };
+  return { foreground: colors.accentDeep, background: colors.accentSoft };
+}
+
+export function ProfileAchievements({
+  items,
+  loading,
+  error,
+  onRetry,
+}: {
+  items?: VocabularyAchievement[];
+  loading: boolean;
+  error: boolean;
+  onRetry: () => void;
+}) {
+  useTheme();
   return (
-    <View className="mb-5 overflow-hidden rounded-[26px] border border-line bg-surface p-4">
-      <View className="mb-3 flex-row items-center justify-between">
-        <View><Text weight="black" className="text-lg">{'Gi\u1ea3i th\u01b0\u1edfng'}</Text><Text className="mt-1 text-xs text-muted">{'Huy hi\u1ec7u ti\u1ebfn \u0111\u1ed9 t\u1eeb t\u00e0i kho\u1ea3n'}</Text></View>
-        <Trophy size={20} color={colors.accentWarm} />
+    <View
+      className="mb-5 overflow-hidden rounded-3xl border border-line bg-surface p-4"
+      style={{
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+        elevation: 2,
+      }}
+    >
+      <View className="mb-3.5 flex-row items-center justify-between">
+        <View>
+          <Text weight="black" className="text-base text-ink">
+            Thành tích & Huy hiệu
+          </Text>
+          <Text className="mt-0.5 text-xs text-muted">
+            Các mốc chinh phục học tập của bạn
+          </Text>
+        </View>
+        <View className="h-9 w-9 items-center justify-center rounded-xl" style={{ backgroundColor: colors.warmSoft }}>
+          <Trophy size={18} color={colors.xpDeep} />
+        </View>
       </View>
-      {loading ? <Text className="py-4 text-center text-sm text-muted">{'\u0110ang t\u1ea3i huy hi\u1ec7u...'}</Text> : null}
-      {error ? <Pressable accessibilityRole="button" onPress={onRetry} className="rounded-2xl bg-canvas p-4"><Text weight="bold" className="text-sm">{'Ch\u01b0a t\u1ea3i \u0111\u01b0\u1ee3c huy hi\u1ec7u - ch\u1ea1m \u0111\u1ec3 th\u1eed l\u1ea1i'}</Text></Pressable> : null}
-      {items?.length ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-3 pb-1">
-        {items.map((item) => {
-          const design = ACHIEVEMENT_COPY[item.code] ?? { title: item.code, detail: 'Th\u00e0nh t\u1ef1u h\u1ecdc t\u1eadp', color: colors.accentDeep, tint: colors.accentSoft };
-          const Icon = item.achieved ? Trophy : Lock;
-          const percentage = Math.max(0, Math.min(100, item.target ? item.progress / item.target * 100 : 0));
-          return <View key={item.code} className="w-[142px] rounded-2xl border border-line p-3" style={{ backgroundColor: design.tint }}>
-            <View className="mb-2 h-10 w-10 items-center justify-center rounded-full" style={{ backgroundColor: `${design.color}20` }}><Icon size={19} color={design.color} /></View>
-            <Text weight="black" className="text-xs leading-4" numberOfLines={2}>{design.title}</Text>
-            <Text className="mt-1 min-h-8 text-[10px] leading-4 text-muted" numberOfLines={2}>{design.detail}</Text>
-            <View className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/70"><View className="h-full rounded-full" style={{ width: `${percentage}%`, backgroundColor: design.color }} /></View>
-            <Text className="mt-1 text-[10px] text-muted">{item.progress}/{item.target}{item.achieved ? ' \u00b7 \u0110\u00e3 nh\u1eadn' : ''}</Text>
-          </View>;
-        })}
-      </ScrollView> : null}
+
+      {loading ? (
+        <Text className="py-4 text-center text-xs text-muted">
+          Đang tải danh sách huy hiệu…
+        </Text>
+      ) : null}
+
+      {error ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={onRetry}
+          className="rounded-2xl border border-line bg-canvas p-3"
+        >
+          <Text weight="bold" className="text-center text-xs text-accent-deep">
+            Chưa tải được huy hiệu · Chạm để thử lại
+          </Text>
+        </Pressable>
+      ) : null}
+
+      {items?.length ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerClassName="gap-3 pb-1"
+        >
+          {items.map((item) => {
+            const design = ACHIEVEMENT_COPY[item.code] ?? {
+              title: item.code,
+              detail: 'Thành tựu học tập',
+              tone: 'accent' as const,
+            };
+            const palette = achievementColors(design.tone);
+            const Icon = item.achieved ? Trophy : Lock;
+            const percentage = Math.max(
+              0,
+              Math.min(100, item.target ? (item.progress / item.target) * 100 : 0),
+            );
+
+            return (
+              <View
+                key={item.code}
+                className="w-[148px] rounded-2xl border border-line bg-canvas p-3.5 justify-between"
+              >
+                <View>
+                  <View
+                    className="mb-2.5 h-10 w-10 items-center justify-center rounded-full"
+                    style={{
+                      backgroundColor: item.achieved ? palette.background : colors.surfaceTint,
+                    }}
+                  >
+                    <Icon size={19} color={item.achieved ? palette.foreground : colors.muted} />
+                  </View>
+                  <Text weight="black" className="text-xs leading-4 text-ink" numberOfLines={2}>
+                    {design.title}
+                  </Text>
+                  <Text className="mt-1 min-h-[32px] text-[10px] leading-4 text-muted" numberOfLines={2}>
+                    {design.detail}
+                  </Text>
+                </View>
+
+                <View className="mt-3">
+                  <View className="h-1.5 w-full overflow-hidden rounded-full bg-line">
+                    <View
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${percentage}%`,
+                        backgroundColor: item.achieved ? colors.success : palette.foreground,
+                      }}
+                    />
+                  </View>
+                  <View className="mt-1.5 flex-row items-center justify-between">
+                    <Text className="text-[10px] text-muted">
+                      {item.progress}/{item.target}
+                    </Text>
+                    {item.achieved ? (
+                      <View className="flex-row items-center gap-0.5">
+                        <Check size={10} color={colors.success} strokeWidth={3} />
+                        <Text weight="bold" className="text-[10px] text-success">
+                          Đã nhận
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+        </ScrollView>
+      ) : null}
+
+      {!loading && !error && !items?.length ? (
+        <Text className="rounded-2xl bg-canvas px-4 py-6 text-center text-sm text-muted">
+          Chưa có huy hiệu nào. Tiếp tục học và ôn từ để mở khóa các cột mốc đầu tiên.
+        </Text>
+      ) : null}
     </View>
   );
 }

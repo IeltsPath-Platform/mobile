@@ -190,7 +190,7 @@ export default function EditDeckScreen() {
               <Pressable
                 disabled={uploadingCover}
                 onPress={() => void pickCover()}
-                className="mt-2 min-h-[58px] flex-row items-center justify-center gap-2 rounded-2xl border border-dashed border-accent bg-accentSoft"
+                className="mt-2 min-h-[58px] flex-row items-center justify-center gap-2 rounded-2xl border border-dashed border-accent bg-accent-soft"
               >
                 {uploadingCover ? (
                   <ActivityIndicator color={colors.accent} />

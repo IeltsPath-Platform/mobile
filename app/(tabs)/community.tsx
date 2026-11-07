@@ -163,7 +163,7 @@ export default function CommunityScreen() {
         ) : null}
       </View>
       {searching ? (
-        <View className="mx-4 mb-2 mt-1 min-h-11 flex-row items-center rounded-full bg-surfaceTint px-4">
+        <View className="mx-4 mb-2 mt-1 min-h-11 flex-row items-center rounded-full bg-tint px-4">
           <Search size={17} color={colors.muted} />
           <TextInput
             value={search}

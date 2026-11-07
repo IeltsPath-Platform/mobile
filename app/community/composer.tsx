@@ -496,17 +496,17 @@ export default function ComposerScreen() {
             <Text weight="extrabold" className="text-lg">Tùy chọn thêm</Text>
             <ScrollView keyboardShouldPersistTaps="handled" className="max-h-[420px]" style={{ flexShrink: 1 }} showsVerticalScrollIndicator={false}>
               <Field label="Tiêu đề" hint="Không bắt buộc">
-                <TextInput value={title} onChangeText={(value) => { markDirty(); setTitle(value); }} placeholder="Ví dụ: Cách mình tăng Writing 0,5 band" placeholderTextColor={colors.muted} maxLength={200} className="min-h-12 rounded-xl bg-surfaceTint px-4 text-base text-ink" accessibilityLabel="Tiêu đề bài viết" />
+                <TextInput value={title} onChangeText={(value) => { markDirty(); setTitle(value); }} placeholder="Ví dụ: Cách mình tăng Writing 0,5 band" placeholderTextColor={colors.muted} maxLength={200} className="min-h-12 rounded-xl bg-tint px-4 text-base text-ink" accessibilityLabel="Tiêu đề bài viết" />
               </Field>
               <Field label="Band mục tiêu" hint="Từ 0 đến 9, bước 0,5">
-                <TextInput value={targetBand} onChangeText={(value) => { markDirty(); setTargetBand(value); }} placeholder="6.5" placeholderTextColor={colors.muted} keyboardType="decimal-pad" className="min-h-12 rounded-xl bg-surfaceTint px-4 text-base text-ink" accessibilityLabel="Band mục tiêu" />
+                <TextInput value={targetBand} onChangeText={(value) => { markDirty(); setTargetBand(value); }} placeholder="6.5" placeholderTextColor={colors.muted} keyboardType="decimal-pad" className="min-h-12 rounded-xl bg-tint px-4 text-base text-ink" accessibilityLabel="Band mục tiêu" />
               </Field>
               <Field label="Link video" hint="YouTube, Loom hoặc Google Drive (HTTPS)">
-                <TextInput value={videoUrl} onChangeText={(value) => { markDirty(); setVideoUrl(value); if (value.trim()) setBackground(undefined); }} placeholder="https://youtu.be/…" placeholderTextColor={colors.muted} autoCapitalize="none" keyboardType="url" className="min-h-12 rounded-xl bg-surfaceTint px-4 text-base text-ink" accessibilityLabel="Link video" />
+                <TextInput value={videoUrl} onChangeText={(value) => { markDirty(); setVideoUrl(value); if (value.trim()) setBackground(undefined); }} placeholder="https://youtu.be/…" placeholderTextColor={colors.muted} autoCapitalize="none" keyboardType="url" className="min-h-12 rounded-xl bg-tint px-4 text-base text-ink" accessibilityLabel="Link video" />
               </Field>
               <Field label="Thêm ảnh từ link" hint="images.unsplash.com, i.imgur.com hoặc kho ảnh Supabase">
                 <View className="flex-row items-center gap-2">
-                  <TextInput value={imageUrlInput} onChangeText={setImageUrlInput} placeholder="https://…" placeholderTextColor={colors.muted} autoCapitalize="none" keyboardType="url" className="min-h-12 flex-1 rounded-xl bg-surfaceTint px-4 text-base text-ink" accessibilityLabel="Link ảnh" />
+                  <TextInput value={imageUrlInput} onChangeText={setImageUrlInput} placeholder="https://…" placeholderTextColor={colors.muted} autoCapitalize="none" keyboardType="url" className="min-h-12 flex-1 rounded-xl bg-tint px-4 text-base text-ink" accessibilityLabel="Link ảnh" />
                   <Pressable onPress={addImageUrl} disabled={!imageUrlInput.trim()} accessibilityRole="button" className="min-h-12 justify-center rounded-xl px-4 active:opacity-80" style={{ backgroundColor: imageUrlInput.trim() ? colors.accent : colors.surfaceTint }}>
                     <Text weight="bold" className="text-sm" style={{ color: imageUrlInput.trim() ? colors.onAccent : colors.muted }}>Thêm</Text>
                   </Pressable>

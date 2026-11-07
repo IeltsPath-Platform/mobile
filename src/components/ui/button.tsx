@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSpring } from 'react-native-reanimated';
 
 import { colors } from '@/src/theme';
+import { useTheme } from '@/src/theme/app-theme';
 
 import { Text } from './text';
 
@@ -55,6 +56,8 @@ export function Button({
   className,
   ...props
 }: ButtonProps) {
+  const { isDark } = useTheme();
+  const primaryForeground = isDark ? colors.canvas : '#ffffff';
   const style = variantStyles[variant];
   const isDisabled = disabled || loading;
   const { style: customStyle, onPressIn, onPressOut, ...pressableProps } = props;
@@ -77,11 +80,11 @@ export function Button({
         onPressOut?.(event);
       }}
       className={`min-h-12 flex-row items-center justify-center gap-2 rounded-2xl px-5 ${style.container} ${isDisabled ? 'opacity-60' : ''} ${className ?? ''}`}
-      style={[variant === 'primary' ? primaryShadow : undefined, customStyle, pressStyle]}
+      style={[variant === 'primary' ? { ...primaryShadow, shadowColor: colors.accent } : undefined, customStyle, pressStyle]}
       {...pressableProps}>
-      {loading ? <ActivityIndicator size="small" color={spinnerColor(variant)} /> : icon}
+      {loading ? <ActivityIndicator size="small" color={variant === 'primary' ? primaryForeground : spinnerColor(variant)} /> : icon}
       <View>
-        <Text weight="bold" className={`text-base ${style.text}`}>
+        <Text weight="bold" className={`text-base ${style.text}`} style={variant === 'primary' ? { color: primaryForeground } : undefined}>
           {loading && loadingLabel ? loadingLabel : label}
         </Text>
       </View>
@@ -90,7 +93,6 @@ export function Button({
 }
 
 const primaryShadow = {
-  shadowColor: colors.accent,
   shadowOpacity: 0.35,
   shadowRadius: 12,
   shadowOffset: { width: 0, height: 4 },

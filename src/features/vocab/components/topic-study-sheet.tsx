@@ -7,6 +7,7 @@ import { haptics } from '@/src/lib/haptics';
 import { sound } from '@/src/lib/sound';
 import { loadVocabularyPronunciations, speakVocabularyPronunciation } from '@/src/features/vocab/pronunciation';
 import { ActivityIndicator, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Share, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/src/components/ui/button';
 import { AnswerFeedback } from '@/src/features/session/components/answer-feedback';
@@ -234,9 +235,13 @@ export function TopicStudySheet({ topic, setId, setTitle, topicPage, topicPageSi
     return { label: fillIndex + 1 < practiceWords.length ? 'Câu tiếp theo' : 'Xem kết quả', disabled: false, onPress: advanceFill };
   })();
 
+  const insets = useSafeAreaInsets();
+  const topInset = Math.max(insets.top, Platform.OS === 'ios' ? 52 : 16);
+  const bottomInset = Math.max(insets.bottom, 16);
+
   return (
     <Modal visible={visible} transparent={false} animationType="fade" presentationStyle="fullScreen" onRequestClose={onClose}>
-      <KeyboardAvoidingView className="flex-1 bg-canvas px-5 pt-12" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView className="flex-1 bg-canvas px-5" style={{ paddingTop: topInset, paddingBottom: bottomInset }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View className="mb-2 h-10 flex-row items-center justify-between">
           <Pressable accessibilityRole="button" accessibilityLabel="Đóng bài học" onPress={() => { sound.stopSpeaking(); onClose(); }} className="h-10 w-10 items-center justify-center rounded-full"><X size={29} color={colors.ink} /></Pressable>
           <Text weight="black" className="text-sm tracking-[1.3px] text-accent-deep">IELTSPATH</Text>
