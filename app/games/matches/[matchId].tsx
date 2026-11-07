@@ -8,6 +8,7 @@ import { BackButton } from '@/src/components/navigation/back-header';
 import { Button } from '@/src/components/ui/button';
 import { Text } from '@/src/components/ui/text';
 import { gameApi } from '@/src/features/games/api';
+import { applyWordHint, hintUnavailableReason } from '@/src/features/games/wordly-hint';
 import { useGameSocket } from '@/src/features/games/use-game-socket';
 import type { CurrentWord, GameEvent, LetterStatus } from '@/src/features/games/types';
 import { dueAt } from '@/src/features/games/types';
@@ -45,6 +46,7 @@ export default function WordlyMatchScreen() {
   const [seconds, setSeconds] = useState<number | null>(null);
   const pendingGuess = useRef<{ wordId: string; guess: string; requestId: string } | null>(null);
   const hintRequest = useRef<{ wordId: string; requestId: string } | null>(null);
+  const hintInFlight = useRef(false);
 
   const match = useQuery({
     queryKey: ['games', 'match', matchId],
@@ -54,7 +56,7 @@ export default function WordlyMatchScreen() {
   });
   const current = useQuery({
     queryKey: ['games', 'current', matchId],
-    queryFn: () => gameApi.current(matchId),
+    queryFn: ({ signal }) => gameApi.current(matchId, signal),
     enabled: Boolean(matchId),
     refetchInterval: (query) => query.state.data?.wordStatus === 'ACTIVE' ? 5_000 : false,
     retry: (count, cause) => count < 2 && !(cause instanceof Error && /403|404|not active/i.test(cause.message)),
@@ -80,6 +82,8 @@ export default function WordlyMatchScreen() {
   const connected = useGameSocket(match.data?.roomId ?? null, matchId, onEvent);
   const word = current.data;
   const myTurn = match.data?.playerMode === 'SOLO' || Boolean(match.data?.ownPlayer);
+  const hintReason = word ? hintUnavailableReason(word) : null;
+  const hintDisabled = hintBusy || busy || !myTurn || Boolean(word?.hint?.hintUsed) || Boolean(hintReason);
 
   useEffect(() => {
     setGuess('');
@@ -116,7 +120,7 @@ export default function WordlyMatchScreen() {
   }, [match.data?.status, matchId, router]);
 
   const submit = async () => {
-    if (!word || busy || !myTurn || word.wordStatus !== 'ACTIVE' || guess.length !== word.columns) return;
+    if (!word || busy || hintInFlight.current || !myTurn || word.wordStatus !== 'ACTIVE' || guess.length !== word.columns) return;
     setBusy(true);
     setError('');
     const normalizedGuess = guess.toUpperCase();
@@ -158,19 +162,25 @@ export default function WordlyMatchScreen() {
   };
 
   const useHint = async () => {
-    if (!word || hintBusy || word.hint?.hintUsed) return;
+    if (!word || hintInFlight.current || hintDisabled) return;
+    hintInFlight.current = true;
+    Keyboard.dismiss();
     if (hintRequest.current?.wordId !== word.playerWordId) {
       hintRequest.current = { wordId: word.playerWordId, requestId: createRequestId() };
     }
     setHintBusy(true);
     setError('');
     try {
+      await qc.cancelQueries({ queryKey: ['games', 'current', matchId] });
       const hint = await gameApi.hint(matchId, word.playerWordId, hintRequest.current.requestId);
       hintRequest.current = null;
-      qc.setQueryData<CurrentWord>(['games', 'current', matchId], (previous) => previous ? { ...previous, hint } : previous);
+      await qc.cancelQueries({ queryKey: ['games', 'current', matchId] });
+      qc.setQueryData<CurrentWord>(['games', 'current', matchId], (previous) => applyWordHint(previous, hint));
+      haptics.tap();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Không tải được gợi ý.');
     } finally {
+      hintInFlight.current = false;
       setHintBusy(false);
     }
   };
@@ -276,8 +286,8 @@ export default function WordlyMatchScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={word.hint?.hintUsed ? 'Đã dùng gợi ý' : 'Dùng gợi ý'}
-                accessibilityState={{ disabled: hintBusy || Boolean(word.hint?.hintUsed) }}
-                disabled={hintBusy || Boolean(word.hint?.hintUsed)}
+                accessibilityState={{ disabled: hintDisabled }}
+                disabled={hintDisabled}
                 onPress={() => void useHint()}
                 className="min-h-11 flex-row items-center gap-1.5 rounded-xl px-3"
                 style={{ backgroundColor: word.hint?.hintUsed ? colors.surfaceTint : colors.accentSoft }}
@@ -290,6 +300,11 @@ export default function WordlyMatchScreen() {
             </View>
             <Text weight="bold" className="mt-3 text-lg leading-7">{word.meaning}</Text>
             <Text className="mt-2 text-xs leading-5 text-muted">Gõ từ tiếng Anh có nghĩa này. Bạn có {word.maxAttempts} lượt thử.</Text>
+            {word.hint?.revealedCell ? <View accessibilityLiveRegion="polite" className="mt-3 rounded-2xl p-3" style={{ backgroundColor: colors.accentSoft }}>
+              <Text weight="bold" style={{ color: colors.accentDeep }}>Chữ thứ {word.hint.revealedCell.column + 1} là “{word.hint.revealedCell.letter.toUpperCase()}”</Text>
+              <Text className="mt-1 text-xs text-muted">Dùng chữ này đúng vị trí trong lần đoán tiếp theo.</Text>
+            </View> : hintReason ? <Text className="mt-2 text-sm text-muted">{hintReason}</Text> : null}
+            {error ? <Text accessibilityRole="alert" className="mt-3 text-sm text-danger">{error}</Text> : null}
           </View>
 
           <View className="mt-3 rounded-3xl border border-line bg-surface p-4">
@@ -298,7 +313,7 @@ export default function WordlyMatchScreen() {
               <TextInput
                 value={guess}
                 onChangeText={(value) => { setGuess(value.replace(/[^a-z]/gi, '').toUpperCase().slice(0, word.columns)); setError(''); }}
-                editable={myTurn && word.wordStatus === 'ACTIVE' && !busy}
+                editable={myTurn && word.wordStatus === 'ACTIVE' && !busy && !hintBusy}
                 autoCapitalize="characters"
                 autoCorrect={false}
                 spellCheck={false}
@@ -314,12 +329,11 @@ export default function WordlyMatchScreen() {
               />
               <Text weight="bold" className="ml-2 text-xs text-muted">{guess.length}/{word.columns}</Text>
             </View>
-            {word.hint?.revealedCell ? <Text className="mt-2 text-xs text-accent-deep">Gợi ý: chữ thứ {word.hint.revealedCell.column + 1} là {word.hint.revealedCell.letter}.</Text> : null}
             <Button
               className="mt-3"
               label={busy ? 'Đang kiểm tra…' : 'Kiểm tra từ'}
               loading={busy}
-              disabled={guess.length !== word.columns || !myTurn || word.wordStatus !== 'ACTIVE'}
+              disabled={guess.length !== word.columns || !myTurn || word.wordStatus !== 'ACTIVE' || hintBusy}
               onPress={() => void submit()}
             />
             {myTurn && word.wordStatus === 'ACTIVE' && guess.length !== word.columns ? <Text className="mt-2 text-center text-xs text-muted">{guess.length === 0 ? `Nhập ${word.columns} chữ cái rồi kiểm tra.` : `Còn thiếu ${word.columns - guess.length} chữ cái.`}</Text> : null}
@@ -340,7 +354,7 @@ export default function WordlyMatchScreen() {
                       {Array.from({ length: word.columns }, (_, column) => {
                         const letter = past?.guess[column] ?? (activeRow ? guess[column] : '');
                         const status = past?.letters[column];
-                        const hinted = word.hint?.revealedCell.column === column;
+                        const hinted = activeRow && word.hint?.revealedCell?.column === column;
                         const statusColor = status ? colorForStatus(status) : undefined;
                         const background = statusColor ?? (hinted ? colors.accentSoft : colors.canvas);
                         const border = statusColor ?? (hinted ? colors.accent : letter ? colors.accentWarm : colors.line);
@@ -367,9 +381,6 @@ export default function WordlyMatchScreen() {
             </View>
           </View>
 
-          {error ? <View className="mt-3 rounded-2xl border px-4 py-3" style={{ backgroundColor: colors.dangerSoft, borderColor: colors.danger }}>
-            <Text accessibilityRole="alert" className="text-sm leading-5" style={{ color: colors.danger }}>{error}</Text>
-          </View> : null}
           {!myTurn ? <View className="mt-3 rounded-2xl px-4 py-3" style={{ backgroundColor: colors.accentSoft }}>
             <Text className="text-center text-sm" style={{ color: colors.accentDeep }}>Đang chờ đến lượt của bạn.</Text>
           </View> : null}

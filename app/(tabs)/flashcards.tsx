@@ -1,28 +1,50 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { router, useFocusEffect } from 'expo-router';
-import { BookMarked, BookOpen, ChartNoAxesColumn, ChevronRight, Layers3, Plus, RotateCcw } from 'lucide-react-native';
-import { useCallback, useRef, useState } from 'react';
+import { router } from 'expo-router';
+import {
+  BookMarked,
+  BookOpen,
+  ChartNoAxesColumn,
+  ChevronRight,
+  Layers3,
+  Plus,
+  RotateCcw,
+} from 'lucide-react-native';
+import { useMemo, useRef, useState } from 'react';
 import { FlatList, Image, Pressable, View } from 'react-native';
 import { Button } from '@/src/components/ui/button';
 import { Text } from '@/src/components/ui/text';
-import { FlashcardSignIn, QueryState } from '@/src/features/flashcards/components/query-state';
+import {
+  FlashcardSignIn,
+  QueryState,
+} from '@/src/features/flashcards/components/query-state';
 import { notebookApi } from '@/src/features/flashcards/notebook-api';
-import { nextPage, useFlashcardAccess } from '@/src/features/flashcards/queries';
+import {
+  nextPage,
+  useFlashcardAccess,
+  useStudyTimezone,
+} from '@/src/features/flashcards/queries';
 import { vocabApi } from '@/src/features/vocab/api';
 import { colors } from '@/src/theme';
 
 type Tab = 'decks' | 'cards';
-type LibraryRow = { id: string; title: string; subtitle: string; imageUrl: string | null; detail: string };
+type LibraryRow = {
+  id: string;
+  title: string;
+  subtitle: string;
+  imageUrl: string | null;
+  detail: string;
+};
 
 export default function FlashcardsScreen() {
   const listRef = useRef<FlatList<LibraryRow>>(null);
-  useFocusEffect(useCallback(() => () => listRef.current?.scrollToOffset({ offset: 0, animated: false }), []));
   const enabled = useFlashcardAccess();
+  const timezone = useStudyTimezone();
   const [tab, setTab] = useState<Tab>('decks');
 
   const decks = useInfiniteQuery({
     queryKey: ['flashcards', 'deck-pages'],
-    queryFn: ({ pageParam }) => vocabApi.listDecks(pageParam, 30),
+    queryFn: ({ pageParam, signal }) =>
+      vocabApi.listDecks(pageParam, 30, 'ACTIVE', signal),
     initialPageParam: 0,
     getNextPageParam: nextPage,
     enabled: enabled && tab === 'decks',
@@ -30,7 +52,8 @@ export default function FlashcardsScreen() {
   });
   const cards = useInfiniteQuery({
     queryKey: ['flashcards', 'card-pages'],
-    queryFn: ({ pageParam }) => vocabApi.listCards(pageParam, 30),
+    queryFn: ({ pageParam, signal }) =>
+      vocabApi.listCards(pageParam, 30, 'ACTIVE', signal),
     initialPageParam: 0,
     getNextPageParam: nextPage,
     enabled: enabled && tab === 'cards',
@@ -43,33 +66,46 @@ export default function FlashcardsScreen() {
     staleTime: 30_000,
   });
   const notebookSummary = useQuery({
-    queryKey: ['flashcards', 'notebook', 'summary-brief'],
-    queryFn: () => notebookApi.summary(Intl.DateTimeFormat().resolvedOptions().timeZone),
+    queryKey: ['flashcards', 'notebook', 'summary', timezone],
+    queryFn: () => notebookApi.summary(timezone),
     enabled,
     staleTime: 60_000,
   });
 
   const active = tab === 'decks' ? decks : cards;
-  const rows: LibraryRow[] =
-    tab === 'decks'
-      ? (decks.data?.pages.flatMap((page) => page.items) ?? []).map((deck) => ({
-          id: deck.id,
-          title: deck.name,
-          subtitle: deck.description || `${deck.cardCount} thẻ`,
-          imageUrl: deck.coverImageUrl ?? null,
-          detail: `${deck.dueCount} thẻ cần ôn`,
-        }))
-      : (cards.data?.pages.flatMap((page) => page.items) ?? []).map((card) => ({
-          id: card.id,
-          title: card.front,
-          subtitle: card.back,
-          imageUrl: card.imageUrl ?? null,
-          detail: `${card.reviewCount} lượt ôn`,
-        }));
-  const open = (route: '/flashcards/deck/edit' | '/flashcards/card/edit' | '/flashcards/notebook' | '/flashcards/progress') =>
-    router.push(enabled ? route : '/(auth)/login');
+  const rows = useMemo<LibraryRow[]>(
+    () =>
+      tab === 'decks'
+        ? (decks.data?.pages.flatMap((page) => page.items) ?? []).map(
+            (deck) => ({
+              id: deck.id,
+              title: deck.name,
+              subtitle: deck.description || `${deck.cardCount} thẻ`,
+              imageUrl: deck.coverImageUrl ?? null,
+              detail: `${deck.dueCount} thẻ cần ôn`,
+            }),
+          )
+        : (cards.data?.pages.flatMap((page) => page.items) ?? []).map(
+            (card) => ({
+              id: card.id,
+              title: card.front,
+              subtitle: card.back,
+              imageUrl: card.imageUrl ?? null,
+              detail: `${card.reviewCount} lượt ôn`,
+            }),
+          ),
+    [tab, decks.data, cards.data],
+  );
+  const open = (
+    route:
+      | '/flashcards/deck/edit'
+      | '/flashcards/card/edit'
+      | '/flashcards/notebook'
+      | '/flashcards/progress',
+  ) => router.push(enabled ? route : '/(auth)/login');
 
-  const hasNotebook = enabled && notebookSummary.data && notebookSummary.data.total > 0;
+  const hasNotebook =
+    enabled && notebookSummary.data && notebookSummary.data.total > 0;
   const notebookDue = notebookSummary.data?.dueNow ?? 0;
 
   return (
@@ -80,7 +116,9 @@ export default function FlashcardsScreen() {
         keyExtractor={(row) => row.id}
         contentContainerClassName="px-5 pb-10 pt-3"
         showsVerticalScrollIndicator={false}
-        refreshing={enabled && active.isRefetching && !active.isFetchingNextPage}
+        refreshing={
+          enabled && active.isRefetching && !active.isFetchingNextPage
+        }
         onRefresh={
           enabled
             ? () => {
@@ -92,7 +130,11 @@ export default function FlashcardsScreen() {
         }
         ListHeaderComponent={
           <View className="gap-3 pb-4">
-            <Text accessibilityRole="header" className="text-[24px]" weight="black">
+            <Text
+              accessibilityRole="header"
+              className="text-[24px]"
+              weight="black"
+            >
               Thẻ từ
             </Text>
 
@@ -116,34 +158,26 @@ export default function FlashcardsScreen() {
                     </Text>
                     <Text className="mt-0.5 text-sm text-muted">
                       {notebookSummary.data!.total} từ đã lưu
-                      {notebookDue > 0 ? ` · ${notebookDue} từ cần ôn` : ' · Đã ôn hết'}
+                      {notebookDue > 0
+                        ? ` · ${notebookDue} từ cần ôn`
+                        : ' · Đã ôn hết'}
                     </Text>
                   </View>
                   <ChevronRight size={18} color={colors.muted} />
                 </View>
-                {notebookDue > 0 ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`Ôn ${notebookDue} từ ngay`}
-                    onPress={() => router.push('/flashcards/study')}
-                    className="mx-4 mb-4 h-11 items-center justify-center rounded-2xl"
-                    style={{ backgroundColor: colors.accent }}
-                  >
-                    <Text weight="extrabold" className="text-sm" style={{ color: '#ffffff' }}>
-                      Ôn {notebookDue} từ ngay →
-                    </Text>
-                  </Pressable>
-                ) : null}
               </Pressable>
             ) : null}
 
             {/* Banner thẻ deck đến hạn */}
             {enabled ? (
-              <View className="rounded-3xl p-4" style={{ backgroundColor: colors.warmSoft }}>
+              <View
+                className="rounded-3xl p-4"
+                style={{ backgroundColor: colors.warmSoft }}
+              >
                 <View className="flex-row items-center gap-3">
                   <RotateCcw size={22} color={colors.accentWarm} />
                   <Text className="flex-1 text-base" weight="bold">
-                    {due.data ? `${due.data.total} thẻ trong bộ cần ôn` : 'Thẻ bộ đến hạn'}
+                    {due.data ? `${due.data.total} thẻ đến hạn` : 'Thẻ đến hạn'}
                   </Text>
                   {due.data && due.data.total > 0 ? (
                     <Pressable
@@ -157,12 +191,23 @@ export default function FlashcardsScreen() {
                     </Pressable>
                   ) : null}
                 </View>
-                <QueryState pending={due.isPending} error={due.error} retry={() => void due.refetch()} />
+                <QueryState
+                  pending={due.isPending}
+                  error={due.error}
+                  retry={() => void due.refetch()}
+                />
               </View>
             ) : (
               <FlashcardSignIn />
             )}
 
+            {enabled && notebookSummary.isError ? (
+              <QueryState
+                pending={false}
+                error={notebookSummary.error}
+                retry={() => void notebookSummary.refetch()}
+              />
+            ) : null}
             {/* Nút nhanh */}
             <View className="flex-row gap-3">
               <Pressable
@@ -189,36 +234,60 @@ export default function FlashcardsScreen() {
 
             {/* Tab Bộ thẻ / Thẻ của tôi */}
             <View className="flex-row items-center border-b border-line">
-              {([
-                { id: 'decks', label: 'Bộ thẻ' },
-                { id: 'cards', label: 'Thẻ của tôi' },
-              ] as const).map((item) => (
+              {(
+                [
+                  { id: 'decks', label: 'Bộ thẻ' },
+                  { id: 'cards', label: 'Thẻ của tôi' },
+                ] as const
+              ).map((item) => (
                 <Pressable
                   key={item.id}
                   accessibilityRole="tab"
                   accessibilityState={{ selected: tab === item.id }}
                   onPress={() => {
                     setTab(item.id);
-                    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+                    listRef.current?.scrollToOffset({
+                      offset: 0,
+                      animated: false,
+                    });
                   }}
                   className="min-h-12 flex-1 items-center justify-center"
                 >
-                  <Text weight="bold" className={tab === item.id ? 'text-accent-deep' : 'text-muted'}>
+                  <Text
+                    weight="bold"
+                    className={
+                      tab === item.id ? 'text-accent-deep' : 'text-muted'
+                    }
+                  >
                     {item.label}
                   </Text>
-                  {tab === item.id ? <View className="absolute bottom-0 h-[3px] w-10 rounded-full bg-accent" /> : null}
+                  {tab === item.id ? (
+                    <View className="absolute bottom-0 h-[3px] w-10 rounded-full bg-accent" />
+                  ) : null}
                 </Pressable>
               ))}
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={tab === 'decks' ? 'Tạo bộ thẻ' : 'Tạo thẻ'}
-                onPress={() => open(tab === 'decks' ? '/flashcards/deck/edit' : '/flashcards/card/edit')}
+                onPress={() =>
+                  open(
+                    tab === 'decks'
+                      ? '/flashcards/deck/edit'
+                      : '/flashcards/card/edit',
+                  )
+                }
                 className="h-12 w-12 items-center justify-center"
               >
                 <Plus size={23} color={colors.accentDeep} />
               </Pressable>
             </View>
-            {enabled ? <QueryState pending={active.isPending} error={active.error} retry={() => void active.refetch()} /> : null}
+            {enabled ? (
+              <QueryState
+                pending={active.isPending}
+                error={active.error}
+                retry={() => void active.refetch()}
+              />
+            ) : null}
           </View>
         }
         renderItem={({ item }) => (
@@ -226,15 +295,28 @@ export default function FlashcardsScreen() {
             accessibilityRole="button"
             onPress={() =>
               tab === 'decks'
-                ? router.push({ pathname: '/flashcards/deck/[deckId]', params: { deckId: item.id } })
-                : router.push({ pathname: '/flashcards/card/edit', params: { cardId: item.id } })
+                ? router.push({
+                    pathname: '/flashcards/deck/[deckId]',
+                    params: { deckId: item.id },
+                  })
+                : router.push({
+                    pathname: '/flashcards/card/edit',
+                    params: { cardId: item.id },
+                  })
             }
             className="mb-3 flex-row items-center gap-3 rounded-3xl border border-line bg-surface p-4"
           >
             {item.imageUrl ? (
-              <Image source={{ uri: item.imageUrl }} accessibilityLabel={item.title} className="h-14 w-14 rounded-xl" />
+              <Image
+                source={{ uri: item.imageUrl }}
+                accessibilityLabel={item.title}
+                className="h-14 w-14 rounded-xl"
+              />
             ) : (
-              <View className="h-14 w-14 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.accentSoft }}>
+              <View
+                className="h-14 w-14 items-center justify-center rounded-2xl"
+                style={{ backgroundColor: colors.accentSoft }}
+              >
                 <Layers3 size={22} color={colors.accentDeep} />
               </View>
             )}
@@ -245,7 +327,9 @@ export default function FlashcardsScreen() {
               <Text className="mt-1 text-sm text-muted" numberOfLines={2}>
                 {item.subtitle}
               </Text>
-              <Text className="mt-2 text-xs text-accent-deep">{item.detail}</Text>
+              <Text className="mt-2 text-xs text-accent-deep">
+                {item.detail}
+              </Text>
             </View>
             <ChevronRight size={18} color={colors.muted} />
           </Pressable>
@@ -253,10 +337,20 @@ export default function FlashcardsScreen() {
         ListEmptyComponent={
           enabled && active.isSuccess ? (
             <View className="gap-3 rounded-3xl bg-surface p-6">
-              <Text weight="bold">{tab === 'decks' ? 'Tạo bộ thẻ đầu tiên' : 'Thêm thẻ đầu tiên của bạn'}</Text>
+              <Text weight="bold">
+                {tab === 'decks'
+                  ? 'Tạo bộ thẻ đầu tiên'
+                  : 'Thêm thẻ đầu tiên của bạn'}
+              </Text>
               <Button
                 label={tab === 'decks' ? 'Tạo bộ' : 'Tạo thẻ'}
-                onPress={() => open(tab === 'decks' ? '/flashcards/deck/edit' : '/flashcards/card/edit')}
+                onPress={() =>
+                  open(
+                    tab === 'decks'
+                      ? '/flashcards/deck/edit'
+                      : '/flashcards/card/edit',
+                  )
+                }
               />
             </View>
           ) : undefined

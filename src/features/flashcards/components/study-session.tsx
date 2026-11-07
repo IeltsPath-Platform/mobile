@@ -1,12 +1,15 @@
 import { Volume2 } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 
 import { Button } from '@/src/components/ui/button';
 import { Text } from '@/src/components/ui/text';
 import { createRequestId } from '@/src/lib/request-id';
 
-import { SoundToggle, useStudyMusic } from '@/src/features/session/components/sound-toggle';
+import {
+  SoundToggle,
+  useStudyMusic,
+} from '@/src/features/session/components/sound-toggle';
 import { haptics } from '@/src/lib/haptics';
 import { sound } from '@/src/lib/sound';
 import { colors } from '@/src/theme';
@@ -16,13 +19,23 @@ import type { SrsRating, StudyCard } from '../types';
 
 type StudySessionProps = {
   cards: StudyCard[];
-  onReview: (cardId: string, correct: boolean, requestId: string) => Promise<void>;
+  onReview: (
+    cardId: string,
+    correct: boolean,
+    requestId: string,
+  ) => Promise<void>;
   hasMoreCards: boolean;
   onLoadMore: () => Promise<StudyCard[]>;
   onExit: () => void;
 };
 
-export function StudySession({ cards, onReview, hasMoreCards, onLoadMore, onExit }: StudySessionProps) {
+export function StudySession({
+  cards,
+  onReview,
+  hasMoreCards,
+  onLoadMore,
+  onExit,
+}: StudySessionProps) {
   const [queue, setQueue] = useState(cards);
   const [flipped, setFlipped] = useState(false);
   const [reviewed, setReviewed] = useState(0);
@@ -39,7 +52,11 @@ export function StudySession({ cards, onReview, hasMoreCards, onLoadMore, onExit
   useStudyMusic(Boolean(current));
   // Hear each new card's word once as it appears; the speaker button replays it.
   useEffect(() => {
-    if (current?.front) void speakVocabularyPronunciation(current.front, current.pronunciationAudioReference);
+    if (current?.front)
+      void speakVocabularyPronunciation(
+        current.front,
+        current.pronunciationAudioReference,
+      );
     return () => sound.stopSpeaking();
   }, [current?.id, current?.pronunciationAudioReference]);
   useEffect(() => {
@@ -50,16 +67,26 @@ export function StudySession({ cards, onReview, hasMoreCards, onLoadMore, onExit
 
   const loadMore = async () => {
     if (loadingMore) return;
-    setLoadingMore(true); setError('');
+    setLoadingMore(true);
+    setError('');
     try {
       const nextCards = await onLoadMore();
-      if (!nextCards.length) { setError('Không còn thẻ nào đến hạn trong bộ này.'); return; }
+      if (!nextCards.length) {
+        setError('Không còn thẻ nào đến hạn trong bộ này.');
+        return;
+      }
       retried.current.clear();
       setFlipped(false);
       setQueue(nextCards);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Không tải thêm được thẻ. Hãy thử lại.');
-    } finally { setLoadingMore(false); }
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : 'Không tải thêm được thẻ. Hãy thử lại.',
+      );
+    } finally {
+      setLoadingMore(false);
+    }
   };
 
   if (!current) {
@@ -69,19 +96,39 @@ export function StudySession({ cards, onReview, hasMoreCards, onLoadMore, onExit
           {cards.length === 0 ? 'Chưa có thẻ đến hạn' : 'Hoàn thành lượt ôn'}
         </Text>
         <Text className="mt-2 text-base leading-6 text-muted">
-          {cards.length === 0 ? 'Bạn đã ôn hết thẻ đến hạn trong bộ này.' : `Bạn đã gửi ${reviewed} lượt ôn lên tài khoản.`}
+          {cards.length === 0
+            ? 'Bạn đã ôn hết thẻ đến hạn trong bộ này.'
+            : `Bạn đã gửi ${reviewed} lượt ôn lên tài khoản.`}
         </Text>
         <View className="mt-6">
-          {error ? <Text accessibilityRole="alert" className="mb-3 text-sm text-danger">{error}</Text> : null}
-          {hasMoreCards ? <Button label={loadingMore ? 'Đang tải…' : 'Tiếp tục với thẻ còn lại'} loading={loadingMore} disabled={loadingMore} onPress={() => void loadMore()} /> : null}
-          <Button label="Về Flashcards" onPress={onExit} />
+          {error ? (
+            <Text
+              accessibilityRole="alert"
+              className="mb-3 text-sm text-danger"
+            >
+              {error}
+            </Text>
+          ) : null}
+          {hasMoreCards ? (
+            <Button
+              label={loadingMore ? 'Đang tải…' : 'Tiếp tục với thẻ còn lại'}
+              loading={loadingMore}
+              disabled={loadingMore}
+              onPress={() => void loadMore()}
+            />
+          ) : null}
+          <Button label="Về thẻ từ" onPress={onExit} />
         </View>
       </View>
     );
   }
 
   const grade = async (rating: SrsRating) => {
-    if (submitting.current || (pendingRating !== null && pendingRating !== rating)) return;
+    if (
+      submitting.current ||
+      (pendingRating !== null && pendingRating !== rating)
+    )
+      return;
     submitting.current = true;
     setPendingRating(rating);
     let id = requestIds.current.get(current.id);
@@ -107,7 +154,11 @@ export function StudySession({ cards, onReview, hasMoreCards, onLoadMore, onExit
         return rest;
       });
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Chưa lưu được lượt ôn. Hãy thử lại.');
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : 'Chưa lưu được lượt ôn. Hãy thử lại.',
+      );
     } finally {
       submitting.current = false;
       setReviewing(false);
@@ -115,13 +166,29 @@ export function StudySession({ cards, onReview, hasMoreCards, onLoadMore, onExit
   };
 
   return (
-    <View className="flex-1 px-5 pt-4">
+    <ScrollView className="flex-1" contentContainerClassName="px-5 pt-4 pb-10">
       <View className="flex-row items-center justify-between">
-        <Text weight="bold" className="text-xs uppercase tracking-wide text-muted">
+        <Text
+          weight="bold"
+          className="text-xs uppercase tracking-wide text-muted"
+        >
           Còn {queue.length} thẻ
         </Text>
         <View className="flex-row items-center gap-2">
-          <Pressable accessibilityRole="button" accessibilityLabel={`Nghe phát âm ${current.front}`} hitSlop={6} onPress={() => { haptics.tap(); void speakVocabularyPronunciation(current.front, current.pronunciationAudioReference); }} className="h-11 w-11 items-center justify-center rounded-full active:opacity-70" style={{ backgroundColor: colors.accentSoft }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Nghe phát âm ${current.front}`}
+            hitSlop={6}
+            onPress={() => {
+              haptics.tap();
+              void speakVocabularyPronunciation(
+                current.front,
+                current.pronunciationAudioReference,
+              );
+            }}
+            className="h-11 w-11 items-center justify-center rounded-full active:opacity-70"
+            style={{ backgroundColor: colors.accentSoft }}
+          >
             <Volume2 size={19} color={colors.accentDeep} />
           </Pressable>
           <SoundToggle />
@@ -138,17 +205,59 @@ export function StudySession({ cards, onReview, hasMoreCards, onLoadMore, onExit
         />
       </View>
       <View className="mt-6 gap-3">
-        {error ? <Text accessibilityRole="alert" className="rounded-xl bg-danger-soft p-3 text-sm text-danger">{error}</Text> : null}
+        {error ? (
+          <Text
+            accessibilityRole="alert"
+            className="rounded-xl bg-danger-soft p-3 text-sm text-danger"
+          >
+            {error}
+          </Text>
+        ) : null}
         {flipped ? (
           <>
-            <Button label={reviewing ? 'Đang lưu…' : pendingRating === 'again' ? 'Gửi lại: Chưa thuộc' : 'Chưa thuộc'} loading={reviewing} disabled={reviewing || pendingRating === 'good'} variant="secondary" onPress={() => void grade('again')} />
-            <Button label={reviewing ? 'Đang lưu…' : pendingRating === 'good' ? 'Gửi lại: Đã thuộc' : 'Đã thuộc'} loading={reviewing} disabled={reviewing || pendingRating === 'again'} onPress={() => void grade('good')} />
+            <Button
+              label={
+                reviewing
+                  ? 'Đang lưu…'
+                  : pendingRating === 'again'
+                    ? 'Gửi lại: Chưa thuộc'
+                    : 'Chưa thuộc'
+              }
+              loading={reviewing}
+              disabled={reviewing || pendingRating === 'good'}
+              variant="secondary"
+              onPress={() => void grade('again')}
+            />
+            <Button
+              label={
+                reviewing
+                  ? 'Đang lưu…'
+                  : pendingRating === 'good'
+                    ? 'Gửi lại: Đã thuộc'
+                    : 'Đã thuộc'
+              }
+              loading={reviewing}
+              disabled={reviewing || pendingRating === 'again'}
+              onPress={() => void grade('good')}
+            />
           </>
         ) : (
-          <Button label="Lật thẻ" onPress={() => { haptics.tap(); void sound.play('tap'); setFlipped(true); }} />
+          <Button
+            label="Lật thẻ"
+            onPress={() => {
+              haptics.tap();
+              void sound.play('tap');
+              setFlipped(true);
+            }}
+          />
         )}
-        <Button variant="ghost" label="Kết thúc" disabled={reviewing} onPress={onExit} />
+        <Button
+          variant="ghost"
+          label="Kết thúc"
+          disabled={reviewing}
+          onPress={onExit}
+        />
       </View>
-    </View>
+    </ScrollView>
   );
 }

@@ -1,6 +1,17 @@
 import { useEffect } from 'react';
-import { Image, Pressable, View, type ViewStyle } from 'react-native';
-import Animated, { interpolate, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import {
+  Image,
+  Pressable,
+  ScrollView,
+  View,
+  type ViewStyle,
+} from 'react-native';
+import Animated, {
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { Text } from '@/src/components/ui/text';
 import { colors } from '@/src/theme';
@@ -29,7 +40,13 @@ const cardFace: ViewStyle = {
   backfaceVisibility: 'hidden',
 };
 
-export function FlipCard({ front, back, imageUrl, flipped, onFlip }: FlipCardProps) {
+export function FlipCard({
+  front,
+  back,
+  imageUrl,
+  flipped,
+  onFlip,
+}: FlipCardProps) {
   const spin = useSharedValue(0);
 
   useEffect(() => {
@@ -47,27 +64,80 @@ export function FlipCard({ front, back, imageUrl, flipped, onFlip }: FlipCardPro
   }));
 
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={flipped ? back : front} onPress={onFlip}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={flipped ? back : front}
+      onPress={onFlip}
+    >
       <View style={{ minHeight: 240 }}>
-        <Animated.View style={[cardFace, { backgroundColor: colors.surface, borderColor: colors.line }, frontStyle]}>
-          <Text weight="bold" className="text-xs uppercase tracking-wide text-muted">
+        <Animated.View
+          pointerEvents={flipped ? 'none' : 'auto'}
+          accessibilityElementsHidden={flipped}
+          importantForAccessibility={flipped ? 'no-hide-descendants' : 'auto'}
+          style={[
+            cardFace,
+            { backgroundColor: colors.surface, borderColor: colors.line },
+            frontStyle,
+          ]}
+        >
+          <Text
+            weight="bold"
+            className="text-xs uppercase tracking-wide text-muted"
+          >
             Mặt trước
           </Text>
-          <Text weight="black" className="mt-3 text-center text-3xl leading-9">
-            {front}
-          </Text>
+          <ScrollView
+            style={{ flexGrow: 0, maxHeight: 150 }}
+            nestedScrollEnabled
+          >
+            <Text
+              weight="black"
+              className="mt-3 text-center text-3xl leading-9"
+            >
+              {front}
+            </Text>
+          </ScrollView>
           <Text className="mt-4 text-sm text-muted">Chạm để lật</Text>
         </Animated.View>
         <Animated.View
-          pointerEvents="none"
-          style={[cardFace, { backgroundColor: colors.accentSoft, borderColor: colors.accent }, backStyle]}>
-          <Text weight="bold" className="text-xs uppercase tracking-wide text-accent-deep">
-            Nghĩa
-          </Text>
-          {imageUrl ? <Image source={{ uri: imageUrl }} resizeMode="contain" className="mt-3 h-20 w-full" accessibilityLabel="Ảnh minh họa của thẻ" /> : null}
-          <Text weight="extrabold" className="mt-3 text-center text-2xl leading-8 text-accent-deep">
-            {back}
-          </Text>
+          pointerEvents={flipped ? 'auto' : 'none'}
+          accessibilityElementsHidden={!flipped}
+          importantForAccessibility={flipped ? 'auto' : 'no-hide-descendants'}
+          style={[
+            cardFace,
+            { backgroundColor: colors.accentSoft, borderColor: colors.accent },
+            backStyle,
+          ]}
+        >
+          <ScrollView
+            style={{ width: '100%' }}
+            contentContainerStyle={{
+              alignItems: 'center',
+              paddingVertical: 20,
+            }}
+            nestedScrollEnabled
+          >
+            <Text
+              weight="bold"
+              className="text-xs uppercase tracking-wide text-accent-deep"
+            >
+              Nghĩa
+            </Text>
+            {imageUrl ? (
+              <Image
+                source={{ uri: imageUrl }}
+                resizeMode="contain"
+                className="mt-3 h-20 w-full"
+                accessibilityLabel="Ảnh minh họa của thẻ"
+              />
+            ) : null}
+            <Text
+              weight="extrabold"
+              className="mt-3 text-center text-2xl leading-8 text-accent-deep"
+            >
+              {back}
+            </Text>
+          </ScrollView>
         </Animated.View>
       </View>
     </Pressable>

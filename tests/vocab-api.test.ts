@@ -30,6 +30,23 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('vocabulary topic catalog API', () => {
+  it('paginates deck contents and forwards cancellation instead of loading the whole deck', async () => {
+    const signal = new AbortController().signal;
+    await vocabApi.listDeckItems('deck/1', 2, 30, signal);
+    expect(apiRequestMock).toHaveBeenCalledWith('/api/learning-support/decks/deck%2F1/items?page=2&size=30', { auth: true, signal });
+  });
+
+  it('scopes due cards to the selected deck and uses the backend limit parameter', async () => {
+    await vocabApi.dueCards('deck-1', 0, 50);
+    expect(apiRequestMock.mock.calls[0][0]).toBe('/api/learning-support/flashcards/due?deckId=deck-1&page=0&limit=50');
+    expect(apiRequestMock.mock.calls[0][1].auth).toBe(true);
+  });
+
+  it('removes deck membership without deleting the flashcard itself', async () => {
+    await vocabApi.removeDeckItem('deck-1', 'card-1');
+    expect(apiRequestMock).toHaveBeenCalledWith('/api/learning-support/decks/deck-1/items/card-1', { method: 'DELETE', auth: true });
+  });
+
   it('keeps loading deck pages past the first 50 records', async () => {
     const first = Array.from({ length: 50 }, (_, index) => ({ id: `deck-${index}` }));
     apiRequestMock.mockResolvedValueOnce({ items: first, page: 0, size: 50, total: 51 })
