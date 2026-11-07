@@ -70,6 +70,8 @@ Không có API GET riêng cho múi giờ. Múi giờ hiện tại nằm trong `S
 
 Mobile không gọi các API biên soạn `/api/content/admin/vocabulary/...`. Chỉ vai trò `CONTENT_AUTHOR` được dùng, và `ADMIN` cũng không có quyền.
 
+Cảm xúc bình luận (community-service, không liên quan XP/streak/tim) là hai API riêng, xem mục 3 dòng 13–14 và mục 5.12.
+
 ## 4. Luồng sử dụng
 
 ### 4.1. Màn Hôm nay
@@ -125,7 +127,7 @@ Gọi `complete` lần hai (cùng attempt) trả lại kết quả đã lưu, kh
 
 ### 4.5. Ôn flashcard (để giữ streak)
 
-Gọi `POST /api/learning-support/flashcards/{id}/reviews` như hiện tại. Phản hồi không đổi. Sau đó gọi `GET me/summary` để cập nhật streak trên header. Ôn flashcard không cộng XP và không ảnh hưởng tim.
+Gọi `POST /api/learning-support/flashcards/{id}/reviews` như hiện tại. Phản hồi không đổi. Lưu ý: endpoint này dùng chung cho mọi client, nên một lượt ôn từ web cũng giữ streak mobile (xem mục 7). Sau đó gọi `GET me/summary` để cập nhật streak trên header. Ôn flashcard không cộng XP và không ảnh hưởng tim.
 
 ### 4.6. Thả cảm xúc bình luận
 
@@ -558,6 +560,8 @@ Lỗi của community-service (bình luận và cảm xúc) không có `code`. M
 **Khách chưa đăng nhập.** Xem danh sách chủ đề và nội dung unit (mục 5.1, 5.2) không cần đăng nhập. Mọi API còn lại cần đăng nhập. Mobile quyết định cách hiển thị cho khách (hiện tại giữ cách học thử trên máy).
 
 **Đồng thời.** Không gửi hai lần hồi tim hoặc hai lần mua freeze cùng lúc. Khóa nút đến khi có phản hồi.
+
+**Những thứ dùng chung với web.** Ví điểm (hồi tim và freeze trừ điểm dùng chung với web), gói Premium (quyết định tim tối đa), và endpoint ôn flashcard (lượt ôn từ web cũng giữ streak mobile, không cộng XP). XP, cấp độ, tim và streak mobile không đọc hay ghi dữ liệu của web.
 
 **Cảm xúc bình luận.** Không ảnh hưởng XP, streak hay tim. Không có thông báo cho tác giả bình luận khi được thả cảm xúc.
 
