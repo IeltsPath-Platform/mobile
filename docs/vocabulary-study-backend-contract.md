@@ -1,376 +1,582 @@
-# Bàn giao BE: học từ vựng theo chủ đề trên mobile
+# Hợp đồng API học từ vựng cho mobile
 
-Ngày đối chiếu mã nguồn: 06/11/2026.
+Cập nhật: 07/11/2026. Đối chiếu với code library-service trên nhánh `feat/mobile-vocabulary-study` (PR backend #155, chưa merge vào `main`) và community-service trên nhánh `feat/comment-reactions` (PR backend #154, chưa merge). Phần cảm xúc bình luận ở mục 5.12. Tên trường, kiểu dữ liệu và mã lỗi trong tài liệu này lấy trực tiếp từ các record và exception trong code. Ví dụ JSON dùng giá trị minh họa.
 
-Đây là **đề xuất hợp đồng API**, chưa phải các endpoint đã được triển khai. Các URL mới bên dưới là tên đề xuất; đội BE có thể đổi tên nếu cung cấp OpenAPI và thống nhất mapping. Không có thay đổi mã BE trong tài liệu này.
+Nếu tài liệu và code lệch nhau, code là nguồn đúng. Báo lại cho dev backend để sửa tài liệu.
 
-## 1. Phạm vi sản phẩm đã chốt
+## 1. Tóm tắt
 
-- Màn Hôm nay là danh sách chủ đề từ vựng cuộn dọc.
-- Mỗi chủ đề có ảnh bìa, tên ở giữa ảnh, số từ, nhiều nút bài học nhỏ.
-- Mỗi bài nhỏ có các bước: học từ → trắc nghiệm → ghép từ/nghĩa → điền từ → kết quả.
-- Hoàn thành bài hiện tại mới mở bài tiếp theo **trong cùng chủ đề**; bài đã hoàn thành được học lại.
-- Đề xuất cho bản đầu: bài đầu của mọi chủ đề được mở, không bắt buộc hoàn thành chủ đề trước để học chủ đề khác.
-- Gọi bài nhỏ là `vocabulary unit` trong hợp đồng này. Không dùng ID hay API của lesson IELTS/luyện đề/assessment thay cho bài từ vựng.
-- Flashcard là chức năng lưu và ôn từ bên cạnh luồng này. Hoàn thành unit không tự động có nghĩa là đã lưu mọi từ vào flashcard hoặc đã ghi nhớ từ lâu dài.
-- Quy tắc thưởng XP cụ thể chưa được người dùng chốt. Phần 7 là đề xuất để BE và sản phẩm thống nhất; mobile không tự gán điểm.
+- Mobile học theo **unit** (bài nhỏ) trong một chủ đề. Server sinh các bước, chấm đáp án, mở khóa unit kế tiếp và lưu tiến độ. Mobile chỉ hiển thị và gửi đáp án.
+- Mobile **không** tự tính XP, tim hay streak. Mọi số đó đến từ server.
+- XP, cấp độ, streak và tim của mobile **tách biệt** với web. Làm bài trên web không đổi số trên mobile và ngược lại.
+- Hồi tim và mua freeze trả bằng **Points** (ví điểm dùng chung với web).
+- Gói Premium tăng số tim tối đa từ 5 lên 7.
+- Ôn một flashcard cũng giữ streak mobile, nhưng không cộng XP.
 
-## 2. Hiện trạng đã kiểm tra
+## 2. Quy ước chung
 
-| Phần | Hiện tại |
-|---|---|
-| Chủ đề/từ | Đọc từ `/api/content/vocabulary/topics` và `/api/content/vocabulary?topicId=...` |
-| Phát âm | Có dữ liệu IPA/audio trong catalog và `/api/content/vocabulary/lookup?forms=...` |
-| Chia bài | Mobile tự đặt tiêu đề, chia danh sách từ theo page/size, sinh ID `${topicId}:lesson:${index}` |
-| Bài tập | Mobile tự tạo quiz/ghép/điền và chấm trên thiết bị |
-| Hoàn thành/mở khóa | AsyncStorage, phân theo userId/topicId; chưa đồng bộ sang máy khác |
-| XP/streak | Mobile đọc số tài khoản từ Learning service; hoàn thành unit từ vựng chưa gửi sự kiện để tính thưởng |
-| Lưu từ | Mobile tạo flashcard và thêm vào bộ. BE đã có API notebook có thể tái sử dụng |
+**Gọi API:** tất cả qua gateway, cùng tiền tố `/api/...`.
 
-Điểm cần sửa về dữ liệu: tên bài như “Môn học”, “Trong lớp học” phải gắn đúng tập từ; không chỉ lấy trang kế tiếp rồi đặt tên. Chia 12 từ thành 9 trang với size=2 như logic hiện tại có thể tạo trang rỗng ở cuối. Thêm từ vào catalog cũng có thể làm nội dung trang thay đổi trong khi ID bài cũ vẫn giữ nguyên. BE cần trả cấu trúc unit rõ ràng để loại bỏ vấn đề này.
+**Xác thực:** các API học và `me/*` cần `Authorization: Bearer <access token>`. Hai API đọc nội dung unit là công khai, gọi không cần token.
 
-Mã mobile liên quan: `src/features/vocab/topic-lessons.ts`, `components/topic-study-sheet.tsx`, `use-topic-lesson-progress.ts`, `api.ts`.
+**requestId:** mỗi thao tác ghi (bắt đầu attempt, nộp đáp án, complete, hồi tim, mua freeze) cần một `requestId` là UUID do mobile sinh.
+- Gửi lại vì lỗi mạng: dùng **cùng** `requestId` và **cùng** body. Server trả lại kết quả đã lưu, không ghi thêm.
+- Cùng `requestId` nhưng body khác: `409 IDEMPOTENCY_CONFLICT`. Không tự đổi sang `requestId` mới để thử lại.
+- Đáp án mới (ví dụ sau khi trả lời sai): dùng `requestId` **mới**.
 
-## 3. API BE đã có: tái sử dụng, không yêu cầu viết lại
+**Thời gian:** ISO-8601 UTC (ví dụ `2026-11-07T15:02:11Z`). Ngày (`lastQualifiedDate`) là `YYYY-MM-DD` theo múi giờ của người học.
 
-| API hiện có | Công dụng/ghi chú |
-|---|---|
-| `GET /api/content/vocabulary/topics` | Chủ đề: id, slug, name, nameVi, coverKey, coverUrl, sortOrder, wordCount |
-| `GET /api/content/vocabulary?topicId={id}&page=0&size=20` | Catalog từ; size hiện tối đa 50; có senses |
-| `GET /api/content/vocabulary/{id}` | Chi tiết từ, IPA và audio UK/US, các nghĩa |
-| `GET /api/content/vocabulary/lookup?forms=...` | Tra phát âm/từ; hiện yêu cầu quyền đăng nhập, tối đa 10 forms/request |
-| `POST /api/learning-support/flashcards/notebook/entries` | Lưu nghĩa từ với body `{vocabularySenseId}`; controller trả 201 khi tạo, 200 khi đã có |
-| `GET /api/learning-support/flashcards/notebook/saved?senseIds=...` | Lấy senseId đã lưu; tối đa 100 IDs |
-| `GET /api/learning-support/flashcards/notebook/entries` | Sổ từ: tìm kiếm/lọc/phân trang, lọc topicId/setId |
-| `GET /api/learning-support/flashcards/notebook/summary` | Tổng quan sổ từ |
-| `GET, PUT /api/learning-support/flashcards/notebook/weekly-goal` | Mục tiêu tuần |
-| `GET /api/learning-support/flashcards/notebook/topics-progress` | Tiến độ từ vựng/notebook theo chủ đề; KHÔNG đồng nghĩa tiến độ hoàn thành các unit mới |
-| `GET /api/learning-support/flashcards/notebook/sets/{setId}/progress` | Tiến độ bộ từ |
-| `GET /api/learning-support/flashcards/notebook/recent-result` | Kết quả hiện có của notebook; cần đọc đúng semantics khi tích hợp |
-| `GET /api/learning-support/flashcards/notebook/achievements` | Thành tích ôn từ; không đồng nhất mặc định với streak tài khoản Learning service |
-| `POST /api/learning-support/flashcards/{id}/reviews` | Gửi kết quả ôn một flashcard; không dùng giả lập hoàn thành unit |
-| `GET /api/learning/me/progress` | totalXp, level, nextLevelAt, xpToNextLevel, xpToday, dailyCap |
-| `GET /api/learning/me/streak` | Streak tài khoản |
-| `GET, PUT /api/learning/me/settings` | Múi giờ gamification |
+**Múi giờ:** IANA, mặc định `Asia/Ho_Chi_Minh`. Đổi bằng `PUT me/settings`.
 
-Các endpoint notebook đã có trong BE nhưng nhiều màn mobile chưa tích hợp. Đây là việc phía mobile cần làm thêm, không phải BE viết lại API.
-
-## 4. API mới cần bổ sung — mức tối thiểu để học và đồng bộ
-
-Các API public chỉ chứa nội dung. Tiến độ, phiên học và kết quả bắt buộc xác thực; userId lấy từ token, không nhận userId do mobile gửi. Không cache public response có dữ liệu cá nhân.
-
-| # | Endpoint đề xuất | Request | Response bắt buộc |
-|---|---|---|---|
-| 1 | `GET /api/content/vocabulary/topics/{topicId}/units` | topicId | `TopicUnits`: danh sách unit đúng thứ tự và phiên bản |
-| 2 | `GET /api/content/vocabulary/units/{unitId}` | unitId | `UnitContent`: nội dung học từ, đúng sense được chọn |
-| 3 | `GET /api/learning-support/vocabulary-study/progress?topicIds=...` | Tối đa 100 topicId/lần; mobile chia batch nếu nhiều hơn | `TopicProgress[]`: trạng thái từng unit, bài tiếp theo, attempt đang học |
-| 4 | `POST /api/learning-support/vocabulary-study/units/{unitId}/attempts` | `{requestId, mode: RESUME_OR_START hoặc REPLAY}` | `Attempt`: phiên mới hoặc phiên chưa hoàn thành hiện có, snapshot bài tập |
-| 5 | `GET /api/learning-support/vocabulary-study/attempts/{attemptId}` | attemptId | `Attempt`: bước hiện tại, kết quả đã ghi nhận, hoặc kết quả hoàn thành |
-| 6 | `POST /api/learning-support/vocabulary-study/attempts/{attemptId}/steps/{stepId}/answers` | `{requestId, answer}` theo dạng bài | `StepResult`: đúng/sai, giải thích, bước tiếp theo, tiến độ |
-| 7 | `POST /api/learning-support/vocabulary-study/attempts/{attemptId}/complete` | `{requestId}` | `Completion`: kết quả BE tính, tiến độ mới, unit vừa mở, trạng thái XP/streak |
-
-Có thể gộp API 1 và 2 hoặc trả content cùng attempt nếu cần, nhưng phải giữ đủ dữ liệu và bảo đảm không tải toàn bộ bài tập của tất cả chủ đề mỗi lần mở Hôm nay. Có thể bổ sung abandon attempt sau; bản đầu cho phép thoát màn rồi tiếp tục bằng attempt đã lưu.
-
-## 5. Response chi tiết cho chủ đề, unit và tiến độ
-
-Các mẫu dùng TypeScript để mô tả JSON. `Id` là string ID ổn định do BE sinh, `Instant` là ISO-8601 UTC. URL media là HTTPS dùng được từ điện thoại; trường thiếu nội dung trả null. Số đếm luôn là số không âm. Không dùng thứ tự hoặc số trang làm ID.
-
-```ts
-type Id = string;
-type Instant = string;
-
-type UnitSummary = {
-  unitId: Id;
-  topicId: Id;
-  revision: number;
-  title: string;                 // Ví dụ: Trong lớp học; phải đúng tập từ
-  description: string | null;
-  sortOrder: number;
-  kind: 'LEARN' | 'REVIEW';
-  wordCount: number;             // Số từ riêng biệt trong unit
-  estimatedMinutes: number;
-  exerciseTypes: ('CHOICE' | 'MATCH' | 'FILL')[];
-};
-
-type TopicUnits = {
-  topicId: Id;
-  curriculumVersion: number;
-  totalUnits: number;
-  uniqueWordCount: number;       // Không cộng trùng từ ở unit ôn tập
-  items: UnitSummary[];
-};
-
-type StudyWord = {
-  vocabularyItemId: Id;
-  vocabularySenseId: Id;         // Bắt buộc chọn nghĩa cụ thể
-  sortOrder: number;
-  lemma: string;
-  partOfSpeech: string | null;
-  vietnameseMeaning: string;     // Bắt buộc cho bài EN–VI
-  englishDefinition: string | null;
-  ipaUk: string | null;
-  ipaUs: string | null;
-  audioUkUrl: string | null;
-  audioUsUrl: string | null;
-  imageUrl: string | null;
-  exampleSentence: string | null;
-  exampleTranslationVi: string | null;
-};
-
-type UnitContent = {
-  unit: UnitSummary;
-  introductionVi: string;
-  words: StudyWord[];
-};
-
-type UnitProgress = {
-  unitId: Id;
-  status: 'LOCKED' | 'AVAILABLE' | 'IN_PROGRESS' | 'COMPLETED';
-  prerequisiteUnitId: Id | null;
-  currentAttemptId: Id | null;
-  completedStepCount: number;
-  totalStepCount: number;
-  firstCompletedAt: Instant | null;
-  lastCompletedAt: Instant | null;
-  bestAccuracyPercent: number | null;
-};
-
-type TopicProgress = {
-  topicId: Id;
-  curriculumVersion: number;
-  totalUnits: number;
-  completedUnits: number;
-  currentUnitId: Id | null;       // Bài đang học hoặc bài tiếp theo; null nếu xong
-  units: UnitProgress[];
-  updatedAt: Instant;
-};
-```
-
-Yêu cầu nội dung:
-
-- Mỗi unit LEARN có tập từ/nghĩa được biên soạn và sắp xếp rõ ràng. Không ép mọi chủ đề phải có đúng 9 unit.
-- Unit ôn tập có thể dùng lại từ trước; tổng từ chủ đề không tính lặp.
-- Không publish unit rỗng, từ không có nghĩa phù hợp, câu hỏi thiếu đáp án hoặc loại bài mobile chưa hỗ trợ.
-- Catalog hiện đã có nhiều trường IPA/audio và senses. BE nên tái sử dụng dữ liệu này; lớp response có thể map tên trường theo hợp đồng mới.
-- Audio/ảnh có thể thiếu; mobile dùng placeholder/TTS. Không chặn học chỉ vì media không tải được.
-- Nếu dùng URL ký có hạn, trả `expiresAt` và hỗ trợ lấy URL mới qua GET content/attempt, không bắt mobile giữ URL hết hạn.
-
-## 6. Phiên học, bài tập và nộp đáp án
-
-```ts
-type StepBase = {
-  stepId: Id;
-  order: number;
-  instructionVi: string;
-  imageUrl: string | null;
-  audioUrl: string | null;
-};
-
-type StudyStep = StepBase & (
-  | { type: 'WORD'; word: StudyWord }
-  | { type: 'CHOICE'; prompt: string;
-      options: { optionId: Id; text: string; imageUrl: string | null }[] }
-  | { type: 'MATCH';
-      left: { optionId: Id; text: string }[];
-      right: { optionId: Id; text: string }[] }
-  | { type: 'FILL'; prompt: string; sentenceBefore: string | null;
-      sentenceAfter: string | null; inputMode: 'TEXT' | 'WORD_BANK';
-      options: { optionId: Id; text: string }[] | null }
-);
-
-type Attempt = {
-  attemptId: Id;
-  topicId: Id;
-  unitId: Id;
-  revision: number;
-  status: 'IN_PROGRESS' | 'COMPLETED' | 'EXPIRED';
-  mode: 'FIRST_COMPLETION' | 'REPLAY';
-  startedAt: Instant;
-  expiresAt: Instant | null;
-  currentStepId: Id | null;
-  completedStepIds: Id[];
-  steps: StudyStep[];            // Snapshot, thứ tự/optionId ổn định trong attempt
-  completion: Completion | null;
-};
-
-type Answer =
-  | { type: 'WORD'; acknowledged: true }
-  | { type: 'CHOICE'; optionId: Id }
-  | { type: 'MATCH'; pairs: { leftOptionId: Id; rightOptionId: Id }[] }
-  | { type: 'FILL'; text: string }
-  | { type: 'FILL'; optionId: Id };
-
-type StepResult = {
-  attemptId: Id;
-  stepId: Id;
-  submissionId: Id;
-  outcome: 'ACKNOWLEDGED' | 'CORRECT' | 'INCORRECT';
-  correctAnswer: Answer | null;  // Feedback sau khi trả lời; WORD trả null
-  explanationVi: string | null;
-  stepCompleted: boolean;
-  completedStepCount: number;
-  totalStepCount: number;
-  nextStepId: Id | null;         // Sai: giữ step hiện tại; đúng: sang step tiếp
-  canComplete: boolean;
-};
-```
-
-Quy tắc chấm và resume:
-
-1. BE sinh hoặc tải câu hỏi từ nội dung đã duyệt, gắn với đúng unit/revision. Bản đầu không cần AI sinh theo từng request.
-2. API bắt đầu trả lại attempt đang học nếu tồn tại; bấm đúp/retry không tạo nhiều phiên. REPLAY chỉ hợp lệ sau khi unit đã hoàn thành, mỗi lần replay có attemptId mới.
-3. GET attempt trả bước đã lưu để đổi máy hoặc đóng app vẫn tiếp tục được. BE xác thực quyền sở hữu và trạng thái khóa khi bắt đầu/nộp bài.
-4. WORD được xác nhận là đã xem; đây không phải câu trả lời chấm đúng/sai. Mobile vẫn cho nghe/đọc lại các từ đã xem.
-5. CHOICE có 2–4 phương án hợp lệ, không có hai phương án hiển thị giống nhau nhưng bị chấm khác. Nếu unit ít từ, lấy distractor phù hợp từ nguồn khác hoặc dùng loại bài khác.
-6. MATCH dùng ID độc lập cho hai cột, không để cùng ID bộc lộ cặp đúng. Mỗi câu MATCH gửi trọn bộ cặp; hoàn thành khi tất cả đúng. Nếu ít hơn 2 cặp thì không tạo bước MATCH.
-7. FILL bản đầu là một chỗ trống. TEXT chuẩn hóa trim/Unicode/case/khoảng trắng; các biến thể đúng do BE khai báo. Không tự bỏ mọi dấu câu vì có thể đổi nghĩa; WORD_BANK gửi optionId. Điền nhiều ô/sắp xếp câu là mở rộng sau.
-8. Cho làm lại câu sai; bước bắt buộc hoàn thành khi đúng. Accuracy tính trên lần trả lời đầu của mỗi bước có chấm điểm; mỗi MATCH tính một bước. WORD không nằm trong mẫu số. Nếu không có bước chấm điểm thì không publish unit có thưởng.
-9. Không nhận `correct`, `score`, `xp`, `streak`, `unlockedUnitId` do client tự quyết định. Client chỉ gửi lựa chọn/câu trả lời và requestId.
-10. Không trả cờ đáp án đúng trong câu hỏi CHOICE/MATCH/FILL trước khi nộp. Trang học từ vốn hiển thị nghĩa là chủ đích học tập; việc giấu đáp án không thay thế xác thực và chống gửi trùng phía server.
-11. `requestId` là UUID do mobile sinh cho mỗi lần gửi logic. Retry dùng lại cùng ID và cùng body. Cùng ID khác body trả 409. Cùng ID cùng body trả kết quả ban đầu, kể cả khi attempt đã hoàn thành. Lần sửa đáp án dùng ID mới.
-12. Cập nhật step, attempt và completion phải có kiểm soát đồng thời. Hai thiết bị hoàn thành cùng unit không mở khóa hoặc thưởng hai lần.
-
-## 7. Kết quả hoàn thành, XP và streak
-
-```ts
-type Completion = {
-  attemptId: Id;
-  unitId: Id;
-  topicId: Id;
-  completedAt: Instant;
-  durationSeconds: number;
-  gradedStepCount: number;
-  firstTryCorrectCount: number;
-  accuracyPercent: number;
-  studiedWordCount: number;
-  firstCompletion: boolean;
-  topicProgress: TopicProgress;
-  unlockedUnitIds: Id[];
-  nextUnitId: Id | null;
-  reward: {
-    eventId: Id | null;
-    status: 'APPLIED' | 'PENDING' | 'DISABLED';
-    reason: 'FIRST_COMPLETION' | 'REPLAY' | 'DAILY_CAP' | null;
-    xpEarned: number | null;
-    xpCapped: boolean | null;
-    totalXp: number | null;
-    level: number | null;
-    nextLevelAt: number | null;
-    xpToNextLevel: number | null;
-    xpToday: number | null;
-    dailyCap: number | null;
-    streakQualified: boolean | null;
-    currentDays: number | null;
-    longestDays: number | null;
-    lastQualifiedDate: string | null; // YYYY-MM-DD
-    timezone: string | null;         // IANA, ví dụ Asia/Ho_Chi_Minh
-  };
-};
-```
-
-BE chỉ cho complete khi tất cả bước bắt buộc đã hoàn thành. Gửi complete lần hai trả cùng kết quả gốc, không ghi thêm hoàn thành/XP/ngày streak. `durationSeconds` cần định nghĩa là thời gian phiên hoặc thời gian học thực; bản đầu đề xuất thời gian phiên theo mốc server, không dùng để tính thưởng và không gọi là thời gian học tích cực. Nếu cần thời gian học tích cực phải có cơ chế heartbeat/pause riêng.
-
-**Đề xuất policy, cần BE/sản phẩm xác nhận trước khi bật thưởng:**
-
-- Thưởng XP khi hoàn thành unit hợp lệ lần đầu; số XP là cấu hình BE, không hardcode mobile.
-- Không trả thưởng mới khi replay, retry mạng hoặc chỉ xem từ. Chống trùng theo userId + unitId + loại thưởng; không tự reset quyền nhận thưởng khi sửa revision hoặc đổi thứ tự bài.
-- Một attempt replay thực sự làm đủ bài có thể tính ngày streak, nhưng hoàn tất lại cùng attempt cũ không được tính cho ngày mới.
-- Nếu áp dụng daily cap chung, phải xác định XP từ vựng có cùng nằm trong `xpToday/dailyCap` hiện có hay không; không chỉ cập nhật totalXp mà quên thống kê ngày/level.
-- Streak dùng ngày hoàn thành hợp lệ theo múi giờ tài khoản. Nhiều bài cùng ngày chỉ tăng chuỗi một lần. Retry, xử lý sự kiện muộn và đổi thiết bị không đổi ngày sự kiện gốc.
-- Phải có policy đổi múi giờ để không lợi dụng nhận nhiều ngày/thưởng. Múi giờ và ngày đủ điều kiện được xác định/lưu ở server.
-- `studiedWordCount` chỉ là số từ đã học trong attempt; không tự coi đó là số từ mới đã thành thạo SRS.
-
-**Tích hợp với Learning service đang có:**
-
-- `GamificationRecorder.recordCorrectAnswers` hiện nhận questionVersionId từ Learning content. VocabularySenseId và unitId không phải questionVersionId; không gửi giả vào luồng đó.
-- `StreakRecorder` hiện lắng nghe `QuestionEventsAppended` ở Learning service. Hoàn thành bài mobile hoặc ghi review flashcard không mặc nhiên phát đúng sự kiện này.
-- Cần handler/hàm nghiệp vụ riêng nhận hoàn thành vocabulary unit và gọi cơ chế ledger, level, streak hiện có. Đội BE quyết định service sở hữu dữ liệu; không cần tạo thêm microservice.
-- Nếu tách Library/Learning service, đề xuất transactional outbox phát `VocabularyUnitCompleted` sau khi lưu kết quả; Learning consumer chống trùng bằng eventId và khóa thưởng bền vững.
-- Event tối thiểu: eventId, schemaVersion, userId, topicId, unitId, revision, attemptId, occurredAt, gradedStepCount, firstTryCorrectCount, studiedWordCount, firstCompletion. Quyết định thưởng do Learning xác minh theo policy và ledger.
-- Nếu xử lý đồng bộ xong: `reward.status=APPLIED`, trả số thực. Nếu đang chờ: `PENDING`, các số chưa biết trả null; mobile không cộng tạm. GET attempt phải cập nhật phần reward sau xử lý để mobile tải lại. Có retry/dead-letter/đối soát nếu event thất bại.
-- Có thể phát hành đồng bộ tiến độ trước, để reward `DISABLED`; giao diện chỉ hiển thị thưởng sau khi tích hợp hoàn tất.
-
-## 8. Lưu từ vào flashcard và thống kê
-
-- Giữ thao tác lưu từ do người dùng chọn. Ưu tiên API notebook/entries với vocabularySenseId để tái sử dụng flashcard đã có, tránh tạo nhiều thẻ cho cùng nghĩa.
-- Nếu vẫn tổ chức theo bộ của chủ đề, mobile có thể gọi API deck hiện có sau khi lấy flashcardId từ notebook. Nếu cần tự động tạo/gắn bộ một cách atomic, BE có thể bổ sung thao tác riêng; không phải điều kiện bắt buộc để hoàn thành unit.
-- Không gửi review flashcard giả cho mọi từ vừa học để tạo số liệu hoặc thưởng. Ôn SRS và hoàn thành unit là hai sự kiện khác nhau.
-- Thống kê notebook và tiến độ unit cần tên/semantics riêng. “3/9 bài hoàn thành” không tương đương “33% từ đã ghi nhớ”.
-- API catalog công khai không chứa cờ `saved` theo user; lấy trạng thái đã lưu bằng API saved hoặc response xác thực riêng.
-
-## 9. Phiên bản nội dung và dữ liệu lưu
-
-Các dữ liệu logic cần có (tên bảng do BE quyết định):
-
-- Unit: ID ổn định, topicId, thứ tự, title, kind, trạng thái draft/published, revision.
-- Unit revision: tập vocabularySenseId có thứ tự; mẫu bài tập và đáp án chuẩn. Snapshot revision đã dùng không bị sửa tại chỗ.
-- User unit progress: userId, unitId, trạng thái/hoàn thành, attempt hiện tại, thời điểm, kết quả tốt nhất. Unique userId + unitId.
-- Attempt + step submissions: userId, unit/revision, trạng thái, thứ tự, đáp án đã nộp, kết quả server, requestId và payload hash để idempotency.
-- Completion/outbox/reward linkage: attemptId, eventId, xử lý thưởng, kết quả; đủ dữ liệu đối soát.
-- Revision mới không làm mất lịch sử. Attempt đang làm dùng snapshot cũ; nếu bắt buộc thu hồi thì trả lỗi rõ, không âm thầm chấm bằng đáp án mới.
-- Không khóa lại bài đã hoàn thành khi thêm/chèn unit. Bài mới nhận trạng thái theo prerequisite đã xác định. Progress trả curriculumVersion để mobile phát hiện cache nội dung cũ.
-- Tiến độ AsyncStorage cũ không phải bằng chứng đáng tin cậy để thưởng hồi tố. Bản đầu không chuyển số local thành XP/streak; nếu muốn import tiến độ cần endpoint/policy riêng và đánh dấu nguồn import, không thưởng tự động.
-- Khách có thể xem/học thử local bằng catalog. Đồng bộ tài khoản và thưởng chỉ áp dụng khi đăng nhập. Bản đầu không yêu cầu thưởng offline; mất mạng giữ đáp án chờ retry, không tự mở khóa bằng kết quả chưa xác nhận.
-
-## 10. Lỗi và quy ước response
-
-Response lỗi đề xuất:
+**Lỗi:** body theo `ErrorResponse`:
 
 ```json
 {
-  "code": "VOCAB_UNIT_LOCKED",
-  "message": "Hoàn thành bài trước để tiếp tục.",
-  "details": { "requiredUnitId": "uuid" },
-  "traceId": "server-trace-id"
+  "timestamp": "2026-11-07T10:15:30",
+  "status": 409,
+  "error": "Conflict",
+  "message": "Bạn đã hết tim. Chờ hồi tim hoặc dùng điểm để hồi đầy.",
+  "path": "/api/learning-support/vocabulary-study/attempts/6f0c…/steps/c92b…/answers",
+  "details": { "nextHeartAt": "2026-11-07T15:02:11Z", "refillCost": "5" },
+  "code": "VOCAB_NO_HEARTS"
 }
 ```
 
-| HTTP | Code đề xuất | Mobile xử lý |
-|---|---|---|
-| 401 | UNAUTHENTICATED | Đăng nhập lại |
-| 403 hoặc 409 | VOCAB_UNIT_LOCKED | Hiện bài cần hoàn thành, tải lại progress |
-| 404 | VOCAB_UNIT_NOT_FOUND / ATTEMPT_NOT_FOUND | Không tồn tại, không thuộc người dùng hoặc không công khai |
-| 409 | ATTEMPT_EXPIRED / CONTENT_VERSION_RETIRED | Thông báo và tải phiên hợp lệ; không mất lịch sử đã hoàn thành |
-| 409 | IDEMPOTENCY_CONFLICT | Cùng requestId khác dữ liệu; không tự retry với ID mới |
-| 409 | STEP_OUT_OF_ORDER / ATTEMPT_NOT_COMPLETABLE | Lấy lại attempt và tiếp tục đúng bước |
-| 422 | INVALID_ANSWER | Chỉ rõ field không hợp lệ; đáp án sai bình thường trả 200 + INCORRECT |
-| 429 | RATE_LIMITED | Trả Retry-After |
-| 5xx | SERVER_ERROR | Cho retry cùng requestId |
+- `code` là mã máy đọc được, luôn có với lỗi nghiệp vụ. Mobile dựa vào `code`, không dựa vào `message`.
+- `details` là map chuỗi sang chuỗi. Mọi giá trị đều là string.
+- Lỗi kiểm tra đầu vào (thiếu trường, sai kiểu) trả `400` mà **không có** `code`. Mobile dựa vào HTTP status trong trường hợp này.
+- Lỗi xác thực từ gateway (401/403) không đi qua `ErrorResponse` của service.
 
-Giữ envelope và error format nhất quán với gateway hiện có. Các field `details/traceId` có thể map theo chuẩn BE, nhưng phải có machine-readable code. Media lỗi không biến thành lỗi mất kết nối API toàn màn hình.
+## 3. Danh sách endpoint cho mobile
 
-## 11. Checklist nghiệm thu để đội BE bàn giao
+| # | Method, đường dẫn | Xác thực | Thành công | Dùng khi |
+|---|---|---|---|---|
+| 1 | `GET /api/content/vocabulary/topics/{topicId}/units` | Không | 200 `TopicUnits` | Mở một chủ đề |
+| 2 | `GET /api/content/vocabulary/units/{unitId}` | Không | 200 `UnitContent` | Xem nội dung unit trước khi học |
+| 3 | `GET /api/learning-support/vocabulary-study/progress?topicIds=a,b,c` | Có | 200 `TopicProgress[]` | Màn Hôm nay (tối đa 100 chủ đề mỗi lần) |
+| 4 | `POST /api/learning-support/vocabulary-study/units/{unitId}/attempts` | Có | 201 mới, 200 đã có | Bắt đầu, tiếp tục hoặc học lại một unit |
+| 5 | `GET /api/learning-support/vocabulary-study/attempts/{attemptId}` | Có | 200 `Attempt` | Tải lại phiên (ví dụ sau khi đổi máy) |
+| 6 | `POST /api/learning-support/vocabulary-study/attempts/{attemptId}/steps/{stepId}/answers` | Có | 200 `StepResult` | Nộp đáp án một bước |
+| 7 | `POST /api/learning-support/vocabulary-study/attempts/{attemptId}/complete` | Có | 200 `Completion` | Hoàn thành attempt |
+| 8 | `GET /api/learning-support/vocabulary-study/me/summary` | Có | 200 `Summary` | Header XP, streak, tim |
+| 9 | `PUT /api/learning-support/vocabulary-study/me/settings` | Có | 200 `Settings` | Đổi múi giờ |
+| 10 | `POST /api/learning-support/vocabulary-study/me/hearts/refill` | Có | 200 `PurchaseResult` | Hồi đầy tim bằng Points |
+| 11 | `POST /api/learning-support/vocabulary-study/me/streak/freeze` | Có | 200 `PurchaseResult` | Mua freeze bằng Points |
+| 12 | `POST /api/learning-support/flashcards/{id}/reviews` (đã có) | Có | 200 (không đổi) | Ôn flashcard. Streak mobile cập nhật ở server; mobile đọc lại `me/summary` |
+| 13 | `PUT /api/community/comments/{commentId}/reactions/{type}` | Có | 204 | Thả hoặc đổi cảm xúc trên bình luận |
+| 14 | `DELETE /api/community/comments/{commentId}/reactions/{type}` | Có | 204 | Bỏ cảm xúc trên bình luận |
 
-- [ ] Có dữ liệu mẫu ít nhất 2 chủ đề, mỗi chủ đề nhiều unit với từ đúng nội dung tên bài.
-- [ ] Mọi unit trả nội dung không rỗng; wordCount/uniqueWordCount chính xác, sortOrder ổn định.
-- [ ] Phân biệt đúng các nghĩa của từ đa nghĩa bằng vocabularySenseId.
-- [ ] Hỗ trợ WORD, CHOICE, MATCH, FILL; không tạo quiz chỉ có một lựa chọn hoặc ghép một cặp.
-- [ ] Mở bài đầu mỗi chủ đề, chặn bài khóa trên server; complete hợp lệ mở đúng bài tiếp.
-- [ ] Đang học ở máy A, đăng nhập máy B thấy cùng tiến độ và tiếp tục đúng bước.
-- [ ] Sai đáp án có feedback, làm lại được; accuracy lần đầu không bị tăng giả khi retry.
-- [ ] Mất mạng sau khi server đã nhận: gửi lại answer/complete không ghi trùng, không thưởng trùng.
-- [ ] Hai máy bấm hoàn thành đồng thời vẫn chỉ có một lần thưởng unit.
-- [ ] Replay không thưởng XP lần đầu lần nữa; streak tuân theo policy đã chốt.
-- [ ] Daily cap, nửa đêm, đổi timezone, event đến muộn đều có kiểm thử nghiệp vụ.
-- [ ] Reward pending có thể tải lại đến trạng thái applied, có đối soát khi xử lý thất bại.
-- [ ] Thêm từ/sửa nội dung không làm mất nghĩa ID bài hoặc kết quả cũ.
-- [ ] Ảnh/audio HTTPS dùng được từ thiết bị; dữ liệu null có fallback.
-- [ ] Không cần tạo flashcard để được học/hoàn thành unit; lưu từ là thao tác độc lập.
-- [ ] Cung cấp OpenAPI, enum, ví dụ request/response và lỗi, dữ liệu seed, giới hạn payload/phân trang, cơ chế auth/gateway.
+Không có API GET riêng cho múi giờ. Múi giờ hiện tại nằm trong `Summary.streak.timezone`.
 
-Thứ tự thực hiện: **P0** curriculum/unit + attempt/chấm đáp án + progress/mở khóa; **P1** nối XP/streak với hệ thống hiện tại và chống trùng; **P2** nhập tiến độ cũ, offline sync, thống kê nâng cao nếu có yêu cầu. API notebook đã tồn tại được mobile tích hợp song song.
+Mobile không gọi các API biên soạn `/api/content/admin/vocabulary/...`. Chỉ vai trò `CONTENT_AUTHOR` được dùng, và `ADMIN` cũng không có quyền.
 
-## 12. Căn cứ mã BE đã đọc
+Cảm xúc bình luận (community-service, không liên quan XP/streak/tim) là hai API riêng, xem mục 3 dòng 13–14 và mục 5.12.
 
-- `backend/services/library-service/.../api/controller/VocabularyCatalogController.java`
-- `backend/services/library-service/.../api/controller/VocabularyController.java`
-- `backend/services/library-service/.../api/controller/VocabularyLookupController.java`
-- `backend/services/library-service/.../api/controller/VocabularyNotebookController.java`
-- `backend/services/library-service/.../api/controller/VocabularyProgressController.java`
-- `backend/services/library-service/.../application/usecase/ReviewFlashcardUseCase.java`
-- `backend/services/learning-service/.../application/service/GamificationRecorder.java`
-- `backend/services/learning-service/.../application/service/StreakRecorder.java`
-- `backend/services/learning-service/.../api/controller/GamificationController.java`
-- `backend/services/learning-service/.../api/controller/StreakController.java`
+## 4. Luồng sử dụng
 
-Đây là đối chiếu source code trong workspace, không phải xác nhận các API mới đã tồn tại trên môi trường đang chạy.
+### 4.1. Màn Hôm nay
+
+1. Gọi `GET me/summary` để hiện XP, cấp độ, streak, tim.
+2. Lấy danh sách chủ đề từ API có sẵn `GET /api/content/vocabulary/topics`.
+3. Gọi `GET progress?topicIds=...` cho các chủ đề hiện trên màn (tối đa 100). Mỗi chủ đề có `currentUnitId` và trạng thái từng unit.
+4. Mỗi unit có trạng thái `LOCKED`, `AVAILABLE`, `IN_PROGRESS` hoặc `COMPLETED`. Hiện trạng thái đó cho người học.
+
+Nếu gọi progress không thành công, hiện lỗi và cho thử lại. Không dùng dữ liệu cũ trên máy thay cho server.
+
+### 4.2. Mở một unit
+
+1. Gọi `GET units/{unitId}` nếu cần xem nội dung trước (không cần đăng nhập).
+2. Với unit `AVAILABLE` hoặc `IN_PROGRESS`: gọi `POST attempts` với `{"requestId": "<uuid mới>", "mode": "RESUME_OR_START"}`.
+   - Trả `201`: phiên mới.
+   - Trả `200`: server trả lại phiên đang làm. Không cần lưu `attemptId` trên máy: gọi lại `RESUME_OR_START` là lấy được phiên hiện tại.
+3. Với unit `COMPLETED`: gọi `POST attempts` với `mode: "REPLAY"` để học lại. Mỗi lần replay là một attempt mới.
+4. Với unit `LOCKED`: không gọi `attempts`. Hiện "Hoàn thành bài trước để tiếp tục" và dùng `requiredUnitId` trong lỗi nếu có.
+
+### 4.3. Làm từng bước
+
+Các bước phải làm **đúng thứ tự** trong `steps`. Gửi bước không phải bước hiện tại sẽ nhận `409 STEP_OUT_OF_ORDER`.
+
+- **WORD** (xem từ): gửi `{"requestId": "...", "answer": {"type": "WORD", "acknowledged": true}}`. Kết quả `outcome` là `ACKNOWLEDGED`, không chấm đúng sai. Bước này không mất tim.
+- **CHOICE**: gửi `{"type": "CHOICE", "optionId": "..."}`.
+- **MATCH**: gửi `{"type": "MATCH", "pairs": [{"leftOptionId": "...", "rightOptionId": "..."}]}`. Phải có **đúng một** cặp cho mỗi `leftOptionId` trong bước. Thiếu, thừa hoặc trùng là `422 INVALID_ANSWER`.
+- **FILL**: gửi `{"type": "FILL_TEXT", "text": "..."}`.
+
+Xử lý kết quả `StepResult`:
+
+- `outcome` là `CORRECT`: chuyển sang `nextStepId`.
+- `outcome` là `INCORRECT`: giữ nguyên bước (`nextStepId` bằng `stepId` đang làm). Hiện `correctAnswer` và `explanationVi` cho người học. Khi người học trả lời lại, dùng `requestId` mới.
+- `heartLost` là `true`: vừa mất 1 tim ở lần sai đầu của bước này. Cập nhật tim theo `hearts`.
+- `canComplete` là `true`: mọi bước chấm điểm đã đúng. Bật nút hoàn thành.
+
+Trường `hearts` có giá trị với bước chấm điểm của attempt `FIRST_COMPLETION`. Với WORD hoặc attempt `REPLAY`, `hearts` là `null` và `heartLost` là `false`.
+
+Nếu nộp mà gặp `409 VOCAB_NO_HEARTS`, hiện `nextHeartAt` và `refillCost`, đề nghị hồi tim (mục 6). Sau khi hồi, người học trả lời lại bước đó với `requestId` mới.
+
+Nếu gặp `409 ATTEMPT_EXPIRED` (phiên quá 14 ngày không hoạt động), gọi lại `POST attempts` với `RESUME_OR_START` để lấy phiên mới.
+
+Nếu mạng lỗi khi gửi đáp án, gửi lại cùng `requestId` và cùng body. Không tự tạo `requestId` mới, vì như vậy có thể ghi hai lần.
+
+### 4.4. Hoàn thành
+
+1. Khi tất cả các bước đã có `completedStepIds` đầy đủ, hoặc `canComplete` là `true`, gọi `POST complete` với `requestId` mới.
+2. Hiện `reward`: XP nhận được, cấp độ có tăng không, streak có tăng không.
+3. Hiện `unlockedUnitIds` và `nextUnitId` nếu có.
+4. Gọi lại `GET me/summary` để cập nhật header.
+
+Gọi `complete` lần hai (cùng attempt) trả lại kết quả đã lưu, không cộng thêm XP. Sau khi attempt đã hoàn thành, mọi `requestId` đều nhận lại kết quả cũ.
+
+### 4.5. Ôn flashcard (để giữ streak)
+
+Gọi `POST /api/learning-support/flashcards/{id}/reviews` như hiện tại. Phản hồi không đổi. Lưu ý: endpoint này dùng chung cho mọi client, nên một lượt ôn từ web cũng giữ streak mobile (xem mục 7). Sau đó gọi `GET me/summary` để cập nhật streak trên header. Ôn flashcard không cộng XP và không ảnh hưởng tim.
+
+### 4.6. Thả cảm xúc bình luận
+
+1. Mỗi bình luận hiện số đếm từ `reactionCounts` và trạng thái từ `myReaction`.
+2. Người học chọn một loại: gọi `PUT` với loại đó. Nếu đang có loại khác, server thay thế; không cần gọi `DELETE` trước.
+3. Chạm lại đúng loại đang có: gọi `DELETE` với loại đó để bỏ.
+4. `PUT` và `DELETE` trả `204` không có body. Mobile tự cập nhật giao diện, rồi tải lại danh sách bình luận để lấy số đếm chính xác.
+
+## 5. Các response
+
+### 5.1. `GET /api/content/vocabulary/topics/{topicId}/units` (công khai)
+
+```json
+{
+  "topicId": "7a10…",
+  "curriculumVersion": 3,
+  "totalUnits": 4,
+  "uniqueWordCount": 24,
+  "items": [
+    {
+      "unitId": "3d9f…",
+      "topicId": "7a10…",
+      "revision": 1,
+      "title": "Môn học",
+      "description": "Tên các môn học ở trường",
+      "sortOrder": 1,
+      "kind": "LEARN",
+      "wordCount": 8,
+      "estimatedMinutes": 6,
+      "exerciseTypes": ["CHOICE", "MATCH", "FILL"]
+    }
+  ]
+}
+```
+
+- Chỉ có unit đã phát hành và chưa lưu trữ, sắp theo `sortOrder`.
+- `wordCount` là số nghĩa (sense) đang hoạt động trong bản đã phát hành.
+- `uniqueWordCount` đếm số từ khác nhau trong cả chủ đề, không đếm trùng giữa các unit.
+- `estimatedMinutes` = `max(1, ceil(wordCount × 0.75))`.
+- `kind` là `LEARN` hoặc `REVIEW`.
+- `exerciseTypes` là các dạng bước chấm điểm của unit.
+- `curriculumVersion` tăng mỗi khi chủ đề đổi nội dung (phát hành, lưu trữ, sắp xếp). Mobile có thể dùng để biết cache cũ.
+- Chủ đề không tồn tại hoặc không hoạt động: `404 VOCAB_TOPIC_NOT_FOUND`.
+
+### 5.2. `GET /api/content/vocabulary/units/{unitId}` (công khai)
+
+```json
+{
+  "unit": {
+    "unitId": "3d9f…", "topicId": "7a10…", "revision": 1, "title": "Môn học",
+    "description": "Tên các môn học ở trường", "sortOrder": 1, "kind": "LEARN",
+    "wordCount": 8, "estimatedMinutes": 6, "exerciseTypes": ["CHOICE", "MATCH", "FILL"]
+  },
+  "introductionVi": "Bài này giúp bạn gọi tên các môn học.",
+  "words": [
+    {
+      "vocabularyItemId": "9c1e…",
+      "vocabularySenseId": "a1b2…",
+      "sortOrder": 1,
+      "lemma": "homework",
+      "partOfSpeech": "NOUN",
+      "vietnameseMeaning": "bài tập về nhà",
+      "englishDefinition": "work given to students to do at home",
+      "ipaUk": "/ˈhəʊmwɜːk/",
+      "ipaUs": "/ˈhoʊmwɝːk/",
+      "audioUkUrl": "https://…/vocabulary/pronunciation/uk/homework.mp3",
+      "audioUsUrl": null,
+      "imageUrl": null,
+      "exampleSentence": "I finish my homework before dinner.",
+      "exampleTranslationVi": "Tôi làm xong bài tập trước bữa tối."
+    }
+  ]
+}
+```
+
+- Mọi trường media (`audioUkUrl`, `audioUsUrl`, `imageUrl`) có thể là `null`. Mobile cần dự phòng: không hiện audio, dùng TTS hoặc để trống ảnh. Thiếu media không được chặn việc học.
+- Unit nháp, đã lưu trữ hoặc không tồn tại: `404 VOCAB_UNIT_NOT_FOUND`.
+
+### 5.3. `GET /api/learning-support/vocabulary-study/progress?topicIds=a,b` (cần đăng nhập)
+
+```json
+[
+  {
+    "topicId": "7a10…",
+    "curriculumVersion": 3,
+    "totalUnits": 4,
+    "completedUnits": 1,
+    "currentUnitId": "5e2a…",
+    "units": [
+      {
+        "unitId": "3d9f…", "status": "COMPLETED", "prerequisiteUnitId": null,
+        "currentAttemptId": null, "completedStepCount": 0, "totalStepCount": 0,
+        "firstCompletedAt": "2026-11-07T09:10:00Z", "lastCompletedAt": "2026-11-07T09:10:00Z",
+        "bestAccuracyPercent": 88
+      },
+      {
+        "unitId": "5e2a…", "status": "AVAILABLE", "prerequisiteUnitId": "3d9f…",
+        "currentAttemptId": null, "completedStepCount": 0, "totalStepCount": 0,
+        "firstCompletedAt": null, "lastCompletedAt": null, "bestAccuracyPercent": null
+      }
+    ],
+    "updatedAt": "2026-11-07T09:12:00Z"
+  }
+]
+```
+
+- `units[].status`: `LOCKED`, `AVAILABLE`, `IN_PROGRESS`, `COMPLETED`.
+- `currentUnitId`: unit đang làm, hoặc unit `AVAILABLE` đầu tiên chưa xong. Là `null` khi tất cả đã xong.
+- `completedStepCount` và `totalStepCount` lấy từ attempt đang làm (0 nếu không có).
+- `bestAccuracyPercent` là độ chính xác tốt nhất trong các lần hoàn thành, hoặc `null` nếu chưa hoàn thành.
+- Chủ đề không có unit nào trả về với `totalUnits = 0`.
+
+### 5.4. `POST /api/learning-support/vocabulary-study/units/{unitId}/attempts`
+
+Body: `{"requestId": "<uuid>", "mode": "RESUME_OR_START"}` hoặc `"mode": "REPLAY"`.
+
+Trả `201` khi tạo phiên mới, `200` khi trả lại phiên đã có.
+
+```json
+{
+  "attemptId": "6f0c…",
+  "topicId": "7a10…",
+  "unitId": "5e2a…",
+  "revision": 1,
+  "status": "IN_PROGRESS",
+  "mode": "FIRST_COMPLETION",
+  "startedAt": "2026-11-07T10:00:00Z",
+  "expiresAt": "2026-11-21T10:00:00Z",
+  "currentStepId": "b81a…",
+  "completedStepIds": [],
+  "steps": [
+    {
+      "stepId": "b81a…", "order": 1, "type": "WORD",
+      "instructionVi": "Học từ mới", "imageUrl": null, "audioUrl": "https://…/homework.mp3",
+      "word": {
+        "vocabularyItemId": "9c1e…", "vocabularySenseId": "a1b2…", "sortOrder": 1,
+        "lemma": "homework", "partOfSpeech": "NOUN", "vietnameseMeaning": "bài tập về nhà",
+        "englishDefinition": "…", "ipaUk": "…", "ipaUs": "…", "audioUkUrl": "…", "audioUsUrl": null,
+        "imageUrl": null, "exampleSentence": "…", "exampleTranslationVi": "…"
+      }
+    },
+    {
+      "stepId": "c92b…", "order": 6, "type": "CHOICE",
+      "instructionVi": "Chọn nghĩa đúng của từ", "imageUrl": null, "audioUrl": null,
+      "prompt": "homework",
+      "options": [
+        { "optionId": "o1…", "text": "kỳ thi", "imageUrl": null },
+        { "optionId": "o2…", "text": "bài tập về nhà", "imageUrl": null },
+        { "optionId": "o3…", "text": "học bổng", "imageUrl": null }
+      ]
+    },
+    {
+      "stepId": "d03c…", "order": 10, "type": "MATCH",
+      "instructionVi": "Ghép từ với nghĩa", "imageUrl": null, "audioUrl": null,
+      "left": [ { "optionId": "l1…", "text": "homework" } ],
+      "right": [ { "optionId": "r1…", "text": "bài tập về nhà" } ]
+    },
+    {
+      "stepId": "e14d…", "order": 11, "type": "FILL",
+      "instructionVi": "Điền từ vào chỗ trống", "imageUrl": null, "audioUrl": null,
+      "prompt": "bài tập về nhà",
+      "sentenceBefore": "I finish my ", "sentenceAfter": " before dinner.",
+      "inputMode": "TEXT", "options": null
+    }
+  ],
+  "completion": null
+}
+```
+
+- `steps` có đúng thứ tự, không đổi trong suốt phiên. Thứ tự có thể đảo giữa các attempt.
+- Mỗi bước có các trường chung `stepId`, `order`, `type`, `instructionVi`, `imageUrl`, `audioUrl`. Các trường riêng theo loại, như bảng dưới.
+- Không có đáp án đúng trong `steps`. Đáp án chỉ trả về sau khi nộp.
+- `mode`: `FIRST_COMPLETION` (lần học đầu, có tim và XP) hoặc `REPLAY` (không tim, chỉ tính streak).
+- `status`: `IN_PROGRESS`, `COMPLETED` hoặc `EXPIRED`.
+- `expiresAt` là 14 ngày sau lần hoạt động cuối.
+- `completion` là `null` cho đến khi hoàn thành.
+
+| `type` | Trường riêng |
+|---|---|
+| `WORD` | `word` (đối tượng từ, giống `Word` ở mục 5.2) |
+| `CHOICE` | `prompt`, `options[{optionId, text, imageUrl}]` |
+| `MATCH` | `left[{optionId, text}]`, `right[{optionId, text}]` |
+| `FILL` | `prompt`, `sentenceBefore`, `sentenceAfter`, `inputMode` (hiện luôn là `TEXT`), `options` (hiện luôn là `null`) |
+
+Bước `MATCH` luôn có ít nhất 2 cặp. Các cột `left` và `right` dùng `optionId` độc lập, không lộ cặp đúng.
+
+### 5.5. `GET /api/learning-support/vocabulary-study/attempts/{attemptId}`
+
+Trả cùng cấu trúc `Attempt` như mục 5.4. Chỉ người sở hữu phiên mới xem được. Phiên của người khác trả `404 ATTEMPT_NOT_FOUND`.
+
+### 5.6. `POST .../attempts/{attemptId}/steps/{stepId}/answers`
+
+Body: `{"requestId": "<uuid>", "answer": { ... }}`. Các dạng `answer`:
+
+```json
+{ "type": "WORD", "acknowledged": true }
+{ "type": "CHOICE", "optionId": "o2…" }
+{ "type": "MATCH", "pairs": [ { "leftOptionId": "l1…", "rightOptionId": "r1…" } ] }
+{ "type": "FILL_TEXT", "text": "bài tập về nhà" }
+```
+
+`type` phải khớp loại bước, nếu không là `422 INVALID_ANSWER` (kèm `details.field`).
+
+```json
+{
+  "attemptId": "6f0c…",
+  "stepId": "c92b…",
+  "submissionId": "5d77…",
+  "outcome": "INCORRECT",
+  "correctAnswer": { "type": "CHOICE", "optionId": "o2…" },
+  "explanationVi": "'homework' nghĩa là 'bài tập về nhà'.",
+  "stepCompleted": false,
+  "completedStepCount": 2,
+  "totalStepCount": 11,
+  "nextStepId": "c92b…",
+  "canComplete": false,
+  "heartLost": true,
+  "hearts": { "hearts": 4, "maxHearts": 5, "nextHeartAt": "2026-11-07T15:00:00Z", "refillCost": 5 }
+}
+```
+
+| Trường | Ý nghĩa |
+|---|---|
+| `outcome` | `ACKNOWLEDGED` (WORD), `CORRECT` hoặc `INCORRECT` |
+| `correctAnswer` | `null` với WORD. Với CHOICE: `{type, optionId}`. Với MATCH: `{type, pairs}`. Với FILL: `{type: "FILL_TEXT", text}` (một dạng chấp nhận được) |
+| `explanationVi` | Giải thích hiện cho người học. `null` với WORD |
+| `stepCompleted` | Bước này đã hoàn thành (đúng, hoặc là WORD) |
+| `nextStepId` | Bước tiếp theo nếu đúng. Bằng `stepId` hiện tại nếu sai |
+| `canComplete` | Tất cả bước chấm điểm đã đúng |
+| `heartLost` | Vừa mất 1 tim ở lần sai đầu của bước chấm điểm trong `FIRST_COMPLETION` |
+| `hearts` | Trạng thái tim sau lần nộp. `null` với WORD và với `REPLAY` |
+
+Gửi lại cùng `requestId` và cùng body: trả lại kết quả cũ, không mất tim thêm.
+
+### 5.7. `POST .../attempts/{attemptId}/complete`
+
+Body: `{"requestId": "<uuid>"}`.
+
+```json
+{
+  "attemptId": "6f0c…",
+  "unitId": "5e2a…",
+  "topicId": "7a10…",
+  "completedAt": "2026-11-07T10:12:00Z",
+  "studiedWordCount": 8,
+  "gradedStepCount": 11,
+  "firstTryCorrectCount": 10,
+  "accuracyPercent": 91,
+  "durationSeconds": 720,
+  "firstCompletion": true,
+  "topicProgress": { "…": "giống mục 5.3" },
+  "unlockedUnitIds": ["8b4f…"],
+  "nextUnitId": "8b4f…",
+  "reward": {
+    "xpEarned": 30,
+    "xpBreakdown": { "firstCompletion": 20, "perfectBonus": 10 },
+    "leveledUp": false,
+    "streakIncreased": true,
+    "summary": {
+      "xp": { "totalXp": 130, "level": 1, "nextLevelAt": 500, "xpToNextLevel": 370 },
+      "streak": {
+        "currentDays": 4, "longestDays": 6, "lastQualifiedDate": "2026-11-07", "qualifiedToday": true,
+        "freezeAvailable": false, "freezeCost": 10, "freezeBlockedReason": null,
+        "lostStreakDays": 0, "timezone": "Asia/Ho_Chi_Minh"
+      },
+      "hearts": { "hearts": 5, "maxHearts": 5, "nextHeartAt": null, "refillCost": 5 }
+    }
+  }
+}
+```
+
+- `accuracyPercent` = `firstTryCorrectCount / gradedStepCount`, làm tròn. Chỉ tính lần trả lời đầu của mỗi bước chấm điểm.
+- `durationSeconds` là khoảng thời gian từ lúc bắt đầu đến lúc hoàn thành, không phải thời gian học thực.
+- `firstCompletion` là `true` chỉ ở lần hoàn thành đầu của unit. Replay trả `false`.
+- `unlockedUnitIds` có một phần tử khi lần hoàn thành này mở khóa unit kế tiếp, nếu không thì rỗng.
+- `reward.xpEarned` = `xpBreakdown.firstCompletion + xpBreakdown.perfectBonus`. Replay trả `0`.
+- `perfectBonus` chỉ có khi lần hoàn thành đầu không sai bước chấm điểm nào.
+- `reward.summary` là trạng thái sau khi hoàn thành. Mobile hiển thị luôn, không cần gọi lại `summary` ngay (nhưng vẫn nên gọi khi quay về màn Hôm nay).
+
+### 5.8. `GET /api/learning-support/vocabulary-study/me/summary`
+
+```json
+{
+  "xp": { "totalXp": 130, "level": 1, "nextLevelAt": 500, "xpToNextLevel": 370 },
+  "streak": {
+    "currentDays": 4, "longestDays": 6, "lastQualifiedDate": "2026-11-07", "qualifiedToday": true,
+    "freezeAvailable": false, "freezeCost": 10, "freezeBlockedReason": null,
+    "lostStreakDays": 0, "timezone": "Asia/Ho_Chi_Minh"
+  },
+  "hearts": { "hearts": 4, "maxHearts": 5, "nextHeartAt": "2026-11-07T15:00:00Z", "refillCost": 5 }
+}
+```
+
+- `xp.level` = `floor(totalXp / 500) + 1`. Mỗi cấp 500 XP.
+- `streak.qualifiedToday`: hôm nay đã có hoạt động (hoàn thành unit hoặc ôn flashcard).
+- `streak.freezeCost`: giá mua freeze lúc này bằng Points. `null` khi đang bị chặn.
+- `streak.freezeBlockedReason`: `null`, `ALREADY_OWNED` (đã có một freeze), `NO_STREAK` (chưa có chuỗi), hoặc `LIMIT` (đã đạt giới hạn freeze liên tiếp).
+- `streak.lostStreakDays`: số ngày của chuỗi vừa mất (0 nếu không mất).
+- `hearts.nextHeartAt`: lúc có tim tiếp theo. `null` khi đã đầy.
+- `hearts.maxHearts`: 5 với người dùng thường, 7 với Premium. Giá trị này do server quyết định, mobile không tự suy ra.
+
+Người học mới nhận số mặc định: 0 XP, cấp 1, streak 0, tim đầy.
+
+### 5.9. `PUT /api/learning-support/vocabulary-study/me/settings`
+
+Body: `{"timezone": "Asia/Ho_Chi_Minh"}`. Trả `{"timezone": "Asia/Ho_Chi_Minh"}`.
+
+Múi giờ không hợp lệ: `400 INVALID_TIMEZONE`, `details.field` là `timezone`.
+
+### 5.10. `POST .../me/hearts/refill`
+
+Body: `{"requestId": "<uuid>"}`.
+
+```json
+{
+  "hearts": { "hearts": 5, "maxHearts": 5, "nextHeartAt": null, "refillCost": 5 },
+  "pointsSpent": 5,
+  "pointsBalanceAfter": 37
+}
+```
+
+Tim đã đầy: `409 HEARTS_FULL`. Không đủ Points: `402 INSUFFICIENT_POINTS`, không mất gì.
+
+### 5.11. `POST .../me/streak/freeze`
+
+Body: `{"requestId": "<uuid>"}`.
+
+```json
+{
+  "streak": {
+    "currentDays": 4, "longestDays": 6, "lastQualifiedDate": "2026-11-06", "qualifiedToday": false,
+    "freezeAvailable": true, "freezeCost": null, "freezeBlockedReason": "ALREADY_OWNED",
+    "lostStreakDays": 0, "timezone": "Asia/Ho_Chi_Minh"
+  },
+  "pointsSpent": 10,
+  "pointsBalanceAfter": 27
+}
+```
+
+Giá freeze là `10 × số ngày freeze liên tiếp, tính cả ngày mua`, tối đa 5 ngày liên tiếp. Giống web.
+
+Các lỗi: `409 FREEZE_ALREADY_OWNED`, `409 NO_STREAK_TO_PROTECT`, `409 FREEZE_LIMIT`, `402 INSUFFICIENT_POINTS`.
+
+### 5.12. Cảm xúc bình luận
+
+Bốn loại cảm xúc: `LIKE`, `LOVE`, `HELPFUL`, `ACCURATE`. Mỗi người có tối đa một cảm xúc trên một bình luận. Bình luận gốc và trả lời dùng chung cách làm này.
+
+**Thả hoặc đổi:** `PUT /api/community/comments/{commentId}/reactions/{type}`. Chọn loại khác thì thay loại cũ. Chọn lại đúng loại đang có thì không đổi gì. Trả `204`.
+
+**Bỏ:** `DELETE /api/community/comments/{commentId}/reactions/{type}`. Người học không có cảm xúc đó thì vẫn trả `204`, không lỗi.
+
+Cả hai cần đăng nhập. Không ảnh hưởng XP, streak hay tim.
+
+Mỗi bình luận trả về trong các API sau đều có hai trường mới: `GET /api/community/posts/{postId}/comments` (kể cả khi `threaded=true`), `GET /api/community/comments/{commentId}/replies`, `POST /api/community/posts/{postId}/comments`, `PUT /api/community/comments/{id}`.
+
+```json
+{
+  "id": "b7e2…", "postId": "2c9a…", "authorId": "…", "parentCommentId": null,
+  "body": "Cảm ơn bạn, phần này rất hữu ích.", "status": "ACTIVE",
+  "createdAt": "2026-11-07T08:30:00Z", "updatedAt": "2026-11-07T08:30:00Z",
+  "author": { "…": "hồ sơ công khai của người viết" },
+  "replyCount": 2,
+  "reactionCounts": { "LIKE": 3, "LOVE": 1, "HELPFUL": 0, "ACCURATE": 0 },
+  "myReaction": "LIKE"
+}
+```
+
+- `reactionCounts` luôn có đủ bốn khóa. Loại không ai thả là `0`.
+- `myReaction` là loại người đang xem đã thả, hoặc `null` nếu chưa thả.
+- `PUT` và `DELETE` không trả lại số đếm. Xem mục 4.6.
+
+**Lỗi** (không có `code`, dùng HTTP status):
+- `404`: bình luận không tồn tại, đã bị ẩn hoặc xóa, hoặc bài viết chứa nó không xem được.
+- `400`: `type` không phải một trong bốn loại trên.
+- `401`: chưa đăng nhập.
+
+## 6. Mã lỗi
+
+| HTTP | `code` | Khi nào | Mobile làm gì |
+|---|---|---|---|
+| 400 | `VOCAB_UNIT_INVALID` | Chế độ học không hợp lệ (không phải `RESUME_OR_START` hoặc `REPLAY`) | Lỗi lập trình, báo lỗi |
+| 400 | `INVALID_TIMEZONE` | Múi giờ không phải IANA | Báo người học chọn lại |
+| 402 | `INSUFFICIENT_POINTS` | Không đủ Points để hồi tim hoặc mua freeze | Báo thiếu điểm, không tự thử lại |
+| 404 | `VOCAB_TOPIC_NOT_FOUND` | Chủ đề không tồn tại hoặc không hoạt động | Quay lại danh sách |
+| 404 | `VOCAB_UNIT_NOT_FOUND` | Unit không tồn tại, nháp hoặc đã lưu trữ | Quay lại danh sách |
+| 404 | `ATTEMPT_NOT_FOUND` | Phiên không tồn tại hoặc không thuộc người dùng | Gọi lại `RESUME_OR_START` của unit |
+| 404 | `STEP_NOT_FOUND` | Bước không thuộc phiên | Tải lại phiên |
+| 409 | `VOCAB_UNIT_LOCKED` | Unit còn khóa. `details.requiredUnitId` là unit cần hoàn thành trước | Hiện thông báo, tải lại progress |
+| 409 | `VOCAB_UNIT_COMPLETED` | Gọi `RESUME_OR_START` cho unit đã hoàn thành | Gọi lại với `REPLAY` |
+| 409 | `VOCAB_UNIT_NOT_COMPLETED` | Gọi `REPLAY` cho unit chưa hoàn thành | Gọi lại với `RESUME_OR_START` |
+| 409 | `VOCAB_UNIT_UNAVAILABLE` | Unit có ít hơn 4 từ hợp lệ hoặc không có bước chấm điểm | Báo chưa học được, tải lại danh sách |
+| 409 | `STEP_OUT_OF_ORDER` | Nộp bước không phải bước hiện tại | Tải lại phiên, tiếp tục đúng bước |
+| 409 | `ATTEMPT_EXPIRED` | Phiên quá 14 ngày không hoạt động | Gọi lại `RESUME_OR_START` để có phiên mới |
+| 409 | `ATTEMPT_ALREADY_COMPLETED` | Nộp đáp án cho phiên đã xong | Tải lại phiên, hiện kết quả |
+| 409 | `ATTEMPT_NOT_COMPLETABLE` | Hoàn thành khi còn bước chưa xong | Tải lại phiên |
+| 409 | `IDEMPOTENCY_CONFLICT` | Cùng `requestId` nhưng body khác | Không thử lại với cùng `requestId`. Tạo `requestId` mới nếu là thao tác mới |
+| 409 | `VOCAB_NO_HEARTS` | Hết tim, không nộp được bước chấm điểm | Hiện `nextHeartAt` và `refillCost`, đề nghị hồi tim |
+| 409 | `HEARTS_FULL` | Hồi tim khi tim đã đầy | Ẩn nút hồi tim, tải lại summary |
+| 409 | `FREEZE_ALREADY_OWNED` | Đã có một freeze | Tải lại summary |
+| 409 | `NO_STREAK_TO_PROTECT` | Chưa có chuỗi để bảo vệ | Tải lại summary |
+| 409 | `FREEZE_LIMIT` | Đã đạt giới hạn freeze liên tiếp | Tải lại summary |
+| 422 | `INVALID_ANSWER` | Dạng đáp án không khớp bước, hoặc MATCH sai số cặp. `details.field` chỉ rõ trường | Sửa đáp án, không gửi lại nguyên văn |
+| 503 | `ACCESS_UNAVAILABLE` | Dịch vụ điểm đang bận | Thử lại với **cùng** `requestId`. Không đổi `requestId` |
+| — | (không có code) 400 | Thiếu trường hoặc sai kiểu dữ liệu | Lỗi lập trình, báo lỗi |
+| 401 / 403 | (từ gateway) | Hết phiên hoặc không đủ quyền | Đăng nhập lại |
+
+Lỗi của community-service (bình luận và cảm xúc) không có `code`. Mobile dựa vào HTTP status: 404 là không tìm thấy hoặc không xem được, 400 là dữ liệu sai, 401 là chưa đăng nhập.
+
+## 7. Quy tắc mobile cần biết
+
+**XP.** Lần hoàn thành đầu của một unit: 20 XP. Nếu không sai bước chấm điểm nào, thêm 10 XP. Replay: 0 XP. Mỗi cấp 500 XP. Lên cấp thì tim đầy. Không có trần XP theo ngày.
+
+**Tim.**
+- Người thường tối đa 5 tim, Premium tối đa 7. Hồi 1 tim mỗi 5 giờ, đồng hồ dừng khi đầy.
+- Sai lần đầu của một bước chấm điểm trong `FIRST_COMPLETION` mất 1 tim. Các lần sai sau của cùng bước không mất thêm.
+- WORD không mất tim. `REPLAY` không có tim.
+- Khi 0 tim: không bắt đầu được `FIRST_COMPLETION` mới và không nộp được bước chấm điểm. Vẫn xem được nội dung, tải lại phiên, và học lại (`REPLAY`).
+- Hồi đầy bằng 5 Points.
+
+**Streak.**
+- Một ngày được tính khi hoàn thành một unit (kể cả replay) hoặc ôn một flashcard.
+- Nhiều hoạt động trong một ngày chỉ tăng streak một lần.
+- Chuỗi bị ngắt nếu bỏ một ngày mà không có freeze.
+- Freeze bảo vệ một ngày trống. Mua bằng Points, giá tăng theo số ngày liên tiếp đã dùng freeze.
+
+**Premium.** Server đọc gói Premium và tự cập nhật `maxHearts`. Nâng lên Premium không tự hồi tim, nên người học đang đủ 5 tim sẽ có 5/7. Hạ gói thì tim bị cắt về tối đa 5. Mobile chỉ hiển thị giá trị server trả về.
+
+**Múi giờ.** Ngày của streak và của mọi sự kiện tính theo múi giờ đã lưu. Đổi múi giờ chỉ ảnh hưởng các sự kiện sau thời điểm đổi.
+
+**Khách chưa đăng nhập.** Xem danh sách chủ đề và nội dung unit (mục 5.1, 5.2) không cần đăng nhập. Mọi API còn lại cần đăng nhập. Mobile quyết định cách hiển thị cho khách (hiện tại giữ cách học thử trên máy).
+
+**Đồng thời.** Không gửi hai lần hồi tim hoặc hai lần mua freeze cùng lúc. Khóa nút đến khi có phản hồi.
+
+**Những thứ dùng chung với web.** Ví điểm (hồi tim và freeze trừ điểm dùng chung với web), gói Premium (quyết định tim tối đa), và endpoint ôn flashcard (lượt ôn từ web cũng giữ streak mobile, không cộng XP). XP, cấp độ, tim và streak mobile không đọc hay ghi dữ liệu của web.
+
+**Cảm xúc bình luận.** Không ảnh hưởng XP, streak hay tim. Không có thông báo cho tác giả bình luận khi được thả cảm xúc.
+
+## 8. Giới hạn đã biết
+
+- Chưa có dạng FILL chọn từ (`inputMode: "WORD_BANK"`). Mọi bước FILL hiện là `TEXT`.
+- Media (`audioUkUrl`, `audioUsUrl`, `imageUrl`) có thể là `null`. Trong môi trường kiểm thử, storage chưa được cấu hình nên tất cả media đều `null`. Phát được audio trên thiết bị thật chưa được kiểm chứng.
+- Hai lần mua với hai `requestId` khác nhau cùng lúc có thể đều bị trừ điểm trước khi một trong hai được áp dụng. Mobile tránh gửi đồng thời, và gửi lại đúng `requestId` khi gặp lỗi mạng.
+- Chưa có job đối soát. Giao dịch Points bị treo do Access lỗi cần kiểm tra thủ công.
+- Nội dung unit mẫu (V42) cần content author rà soát trước khi đưa vào sản xuất.
+- Thời gian phản hồi đo được trong môi trường phát triển, không phải cam kết sản xuất.
+
+## 9. Ngoài phạm vi của tài liệu này
+
+- Các API biên soạn unit cho content author (`/api/content/admin/vocabulary/...`). Mobile không gọi.
+- Thông báo cho tác giả bình luận khi có người thả cảm xúc, danh sách người đã thả, emoji tự chọn.
+- Nhập tiến độ cũ trên máy thành XP hoặc streak. Không làm.
+- Màn `learn`, `practice` cũ của mobile vẫn dùng dữ liệu web và không đổi trong đợt này.
