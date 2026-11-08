@@ -9,10 +9,10 @@ export const toGameKind = (value: string | null | undefined): GameKind =>
 
 export const GAME_META: Record<
   GameKind,
-  { name: string; tagline: string; Icon: LucideIcon }
+  { name: string; Icon: LucideIcon }
 > = {
-  WORDLY: { name: 'Wordly', tagline: 'Giải mã từ vựng qua từng lượt đoán', Icon: Grid3x3 },
-  ROCKET: { name: 'Rocket', tagline: 'Chọn đúng nghĩa để vượt chướng ngại', Icon: Rocket },
+  WORDLY: { name: 'Wordly', Icon: Grid3x3 },
+  ROCKET: { name: 'Rocket', Icon: Rocket },
 };
 
 /** Per-game accent pair; reads the live palette so dark mode follows. */

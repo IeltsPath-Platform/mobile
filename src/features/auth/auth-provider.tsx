@@ -45,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!AUTH_ENABLED) return;
     onSessionExpired(() => {
+      void queryClient.cancelQueries();
       queryClient.clear();
       setStatus('unauthenticated');
     });
@@ -66,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!AUTH_ENABLED) return;
       const tokens = await authApi.login({ email: email.trim(), password });
       await tokenStorage.save({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken });
+      void queryClient.cancelQueries();
       queryClient.clear();
       setStatus('authenticated');
     },
@@ -81,7 +83,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password,
         phoneNumber: phoneNumber.trim() || undefined,
       });
-      await signIn({ email, password });
+      try {
+        await signIn({ email, password });
+      } catch {
+        // The account exists now; a retried registration would only hit "email already used".
+        throw new Error('Tạo tài khoản thành công nhưng chưa đăng nhập được. Hãy đăng nhập bằng email vừa đăng ký.');
+      }
     },
     [signIn],
   );
@@ -89,13 +96,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     if (!AUTH_ENABLED) return;
     const tokens = await tokenStorage.load().catch(() => null);
-    // Remove the device binding while the current access token is still available.
-    await unregisterCurrentInstallation().catch(() => undefined);
-    if (tokens) {
-      // Best effort: the local session is cleared even if the server is unreachable.
-      await authApi.logout(tokens.refreshToken).catch(() => undefined);
-    }
+    // Best effort and capped: the device binding needs the access token, so this runs before the
+    // local session is cleared, but an unreachable server must not hold the user on this screen.
+    const serverCleanup = Promise.allSettled([
+      unregisterCurrentInstallation(),
+      tokens ? authApi.logout(tokens.refreshToken) : Promise.resolve(),
+    ]);
+    await Promise.race([serverCleanup, new Promise((resolve) => setTimeout(resolve, 3_000))]);
     await tokenStorage.clear();
+    void queryClient.cancelQueries();
     queryClient.clear();
     setStatus('unauthenticated');
   }, [queryClient]);

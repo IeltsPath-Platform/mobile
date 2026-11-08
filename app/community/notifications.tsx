@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { AtSign, BellOff, CheckCheck, CornerDownRight, Heart, MessageCircle, Settings, UserPlus, type LucideIcon } from 'lucide-react-native';
 import { memo, useCallback, useMemo } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, SectionList, View } from 'react-native';
@@ -12,13 +12,14 @@ import { Text } from '@/src/components/ui/text';
 import { communityApi, notificationHasNext, type Notification } from '@/src/features/community/api';
 import { CommunityAvatar } from '@/src/features/community/components/community-image';
 import { timeAgo } from '@/src/features/community/format';
+import { useUnread } from '@/src/features/community/use-unread';
 import { haptics } from '@/src/lib/haptics';
 import { colors } from '@/src/theme';
 
 const notificationsKey = ['community', 'notifications'] as const;
 const unreadKey = ['community', 'unread'] as const;
 
-export const eventLabels: Record<string, string> = {
+const eventLabels: Record<string, string> = {
   'community.post-commented.v1': 'đã bình luận về bài viết của bạn',
   'community.comment-replied.v1': 'đã trả lời bình luận của bạn',
   'community.comment-mentioned.v1': 'đã nhắc đến bạn trong bình luận',
@@ -26,7 +27,7 @@ export const eventLabels: Record<string, string> = {
   'community.user-followed.v1': 'đã bắt đầu theo dõi bạn',
 };
 
-export function eventLabel(type: string) {
+function eventLabel(type: string) {
   return eventLabels[type] ?? 'đã tương tác với bạn trong cộng đồng';
 }
 
@@ -108,8 +109,15 @@ export default function NotificationsScreen({ inTab = false }: { inTab?: boolean
     initialPageParam: 0 as number,
     getNextPageParam: (last, pages) => (notificationHasNext(last, 20) ? pages.length : undefined),
   });
-  const unread = useQuery({ queryKey: unreadKey, queryFn: communityApi.unread });
+  const unread = useUnread();
   const unreadCount = unread.data?.count ?? 0;
+
+  // The list can go stale while the unread badge keeps polling; resync whenever the screen regains focus.
+  useFocusEffect(useCallback(() => {
+    if (!queryClient.getQueryState(notificationsKey)?.dataUpdatedAt) return;
+    void queryClient.invalidateQueries({ queryKey: notificationsKey }, { cancelRefetch: false });
+    void queryClient.invalidateQueries({ queryKey: unreadKey }, { cancelRefetch: false });
+  }, [queryClient]));
   const sections = useMemo(() => groupByDay(list.data?.pages.flat() ?? []), [list.data]);
 
   const refresh = useCallback(async () => {
@@ -117,6 +125,8 @@ export default function NotificationsScreen({ inTab = false }: { inTab?: boolean
   }, [list.refetch, unread.refetch]);
 
   const markAll = useCallback(async () => {
+    await queryClient.cancelQueries({ queryKey: notificationsKey });
+    await queryClient.cancelQueries({ queryKey: unreadKey });
     const previousList = queryClient.getQueryData<InfiniteData<Notification[]>>(notificationsKey);
     const previousUnread = queryClient.getQueryData<{ count: number }>(unreadKey);
     const readAt = new Date().toISOString();
@@ -135,28 +145,28 @@ export default function NotificationsScreen({ inTab = false }: { inTab?: boolean
     }
   }, [queryClient]);
 
-  const openNotification = useCallback(async (item: Notification) => {
-    try {
-      if (!item.readAt) {
-        // Reflect the read state immediately; the list keeps its scroll position.
+  const openNotification = useCallback((item: Notification) => {
+    if (!item.readAt) {
+      // Reflect the read state immediately and mark read in the background; navigation never waits on it.
+      void (async () => {
+        await queryClient.cancelQueries({ queryKey: notificationsKey });
+        await queryClient.cancelQueries({ queryKey: unreadKey });
         const readAt = new Date().toISOString();
         queryClient.setQueryData<InfiniteData<Notification[]>>(notificationsKey, (data) => data && ({
           ...data, pages: data.pages.map((page) => page.map((row) => (row.id === item.id ? { ...row, readAt } : row))),
         }));
         queryClient.setQueryData<{ count: number }>(unreadKey, (data) => data && ({ count: Math.max(0, data.count - 1) }));
-        try { await communityApi.markRead(item.id); }
-        catch (error) {
+        try {
+          await communityApi.markRead(item.id);
+        } catch {
           void queryClient.invalidateQueries({ queryKey: notificationsKey });
           void queryClient.invalidateQueries({ queryKey: unreadKey });
-          throw error;
         }
-      }
-      if (item.eventType === 'community.user-followed.v1') router.push(`/community/users/${item.actorId}` as never);
-      else if (item.postId) router.push({ pathname: '/community/[postId]', params: { postId: item.postId, commentId: item.commentId ?? '' } } as never);
-      else Alert.alert('Nội dung không còn khả dụng', 'Thông báo đã được đánh dấu là đã đọc.');
-    } catch (error) {
-      Alert.alert('Chưa thể mở thông báo', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+      })();
     }
+    if (item.eventType === 'community.user-followed.v1') router.push(`/community/users/${item.actorId}` as never);
+    else if (item.postId) router.push({ pathname: '/community/[postId]', params: { postId: item.postId, commentId: item.commentId ?? '' } } as never);
+    else Alert.alert('Nội dung không còn khả dụng', 'Thông báo đã được đánh dấu là đã đọc.');
   }, [queryClient, router]);
 
   let empty: React.ReactElement;

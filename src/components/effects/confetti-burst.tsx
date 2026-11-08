@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
@@ -72,10 +72,18 @@ export function ConfettiBurst({
   originY?: number;
 }) {
   const reduceMotion = useReducedMotion();
+  const [visible, setVisible] = useState(false);
   const count = size === 'large' ? 38 : 20;
   const spread = size === 'large' ? 170 : 110;
   const particles = useMemo(() => makeParticles(count, spread), [count, spread, trigger]);
-  if (!trigger || reduceMotion) return null;
+  // Mount the pieces only while the burst plays so idle screens carry no hidden views.
+  useEffect(() => {
+    if (!trigger) return;
+    setVisible(true);
+    const timer = setTimeout(() => setVisible(false), 1500);
+    return () => clearTimeout(timer);
+  }, [trigger]);
+  if (!trigger || !visible || reduceMotion) return null;
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill} importantForAccessibility="no-hide-descendants">
       <View style={{ position: 'absolute', left: '50%', top: `${originY * 100}%` }}>

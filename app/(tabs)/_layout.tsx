@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TabReselectProvider } from '@/src/components/navigation/tab-reselect-context';
 import { ColorfulTabBar } from '@/src/components/navigation/colorful-tab-bar';
 import { colors } from '@/src/theme';
-import { useTheme } from '@/src/theme/app-theme';
+import { themedScreenLayout, useTheme } from '@/src/theme/app-theme';
 
 export default function TabLayout() {
   useTheme();
@@ -13,6 +13,7 @@ export default function TabLayout() {
   return (
     <TabReselectProvider>
       <Tabs
+        screenLayout={themedScreenLayout}
         tabBar={(props) => <ColorfulTabBar {...props} />}
         screenOptions={{
           sceneStyle: { backgroundColor: colors.canvas, paddingTop: insets.top },
@@ -26,7 +27,6 @@ export default function TabLayout() {
         <Tabs.Screen name="practice" options={{ title: 'Luyện' }} />
         <Tabs.Screen name="notifications" options={{ title: 'Thông báo' }} />
         <Tabs.Screen name="account" options={{ title: 'Hồ sơ' }} />
-        <Tabs.Screen name="profile" options={{ href: null }} />
       </Tabs>
     </TabReselectProvider>
   );

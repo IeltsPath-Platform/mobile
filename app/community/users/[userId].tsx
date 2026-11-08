@@ -90,6 +90,8 @@ export default function PublicProfileScreen() {
 
   const p = profile.data;
   const following = Boolean(relation.data?.following);
+  const relationFailed = relation.isError && !relation.data;
+  const countText = (value: number | undefined) => value ?? (relation.isPending ? '…' : '—');
 
   const header = (
     <View className="bg-canvas">
@@ -113,13 +115,14 @@ export default function PublicProfileScreen() {
             </View>
           ) : (
             <Pressable
-              disabled={followBusy || !relation.data}
-              onPress={() => void toggleFollow()}
+              disabled={followBusy || (!relation.data && !relationFailed)}
+              onPress={() => void (relationFailed ? relation.refetch() : toggleFollow())}
               accessibilityRole="button"
+              accessibilityLabel={relationFailed ? 'Chưa tải được trạng thái theo dõi. Chạm để thử lại' : following ? 'Đang theo dõi' : 'Theo dõi'}
               accessibilityState={{ selected: following, busy: followBusy }}
               className="mb-1 min-h-11 min-w-32 items-center justify-center rounded-full border px-5 active:opacity-80"
               style={{ backgroundColor: following ? 'transparent' : colors.accent, borderColor: following ? colors.line : colors.accent }}>
-              <Text weight="bold" className="text-sm" style={{ color: following ? colors.ink : colors.onAccent }}>{following ? 'Đang theo dõi' : 'Theo dõi'}</Text>
+              <Text weight="bold" className="text-sm" style={{ color: following ? colors.ink : colors.onAccent }}>{relationFailed ? 'Thử lại' : following ? 'Đang theo dõi' : 'Theo dõi'}</Text>
             </Pressable>
           )}
         </View>
@@ -144,12 +147,17 @@ export default function PublicProfileScreen() {
 
         <View className="mt-4 flex-row gap-6">
           <Pressable onPress={() => setTab('followers')} accessibilityRole="button" className="min-h-11 justify-center">
-            <Text className="text-sm text-muted"><Text weight="black" className="text-base text-ink">{relation.data?.followerCount ?? 0}</Text> người theo dõi</Text>
+            <Text className="text-sm text-muted"><Text weight="black" className="text-base text-ink">{countText(relation.data?.followerCount)}</Text> người theo dõi</Text>
           </Pressable>
           <Pressable onPress={() => setTab('following')} accessibilityRole="button" className="min-h-11 justify-center">
-            <Text className="text-sm text-muted"><Text weight="black" className="text-base text-ink">{relation.data?.followingCount ?? 0}</Text> đang theo dõi</Text>
+            <Text className="text-sm text-muted"><Text weight="black" className="text-base text-ink">{countText(relation.data?.followingCount)}</Text> đang theo dõi</Text>
           </Pressable>
         </View>
+        {relationFailed ? (
+          <Pressable onPress={() => void relation.refetch()} accessibilityRole="button" accessibilityLabel="Chưa tải được số người theo dõi. Chạm để thử lại" className="min-h-11 justify-center">
+            <Text className="text-xs text-danger">Chưa tải được số người theo dõi. Chạm để thử lại.</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       <View className="mt-1 flex-row border-b border-line px-2">

@@ -113,9 +113,10 @@ export function useStudyAttempt(unitId: string, initialMode: StartMode) {
       if (!mounted.current) return;
       completeOperation.current = null;
       setAttempt({ ...attempt, status: 'COMPLETED', completion });
+      // The server-provided summary is authoritative; refetch only when absent.
       if (completion.reward?.summary) client.setQueryData(studyKeys.summary, completion.reward.summary);
+      else void client.invalidateQueries({ queryKey: studyKeys.summary });
       void client.invalidateQueries({ queryKey: studyKeys.progress });
-      void client.invalidateQueries({ queryKey: studyKeys.summary });
       void client.invalidateQueries({ queryKey: ['flashcards'] });
     } catch (cause) {
       if (!isUncertainStudyWrite(cause as ApiError)) completeOperation.current = null;

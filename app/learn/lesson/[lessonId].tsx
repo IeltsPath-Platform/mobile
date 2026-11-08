@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, View } from 'react-native';
 
 import { BackHeader } from '@/src/components/navigation/back-header';
@@ -9,6 +9,7 @@ import { Card } from '@/src/components/ui/card';
 import { FormAlert } from '@/src/components/ui/form-alert';
 import { Text } from '@/src/components/ui/text';
 import { createRequestId } from '@/src/lib/request-id';
+import { isUncertainStudyWrite } from '@/src/features/vocab/study-state';
 import { isLearningApiError, learningApi } from '@/src/features/learning';
 import type { LessonBlockDto } from '@/src/features/learning/types';
 import { ChoiceButtons } from '@/src/features/session/components/choice-buttons';
@@ -27,13 +28,16 @@ export default function LessonScreen() {
     enabled: Boolean(lessonId),
   });
 
+  // Reused until success or a definite rejection so uncertain retries stay idempotent.
+  const submitRequestId = useRef<string | null>(null);
+
   const submit = useMutation({
     mutationFn: async () => {
       const lesson = lessonQuery.data;
       const block = lesson?.blocks.find((b) => b.blockType === 'EXERCISE');
       if (!lesson || !block?.questions) throw new Error('No exercise');
       return learningApi.submitExercise(lesson.lessonId, block.blockId, {
-        requestId: createRequestId(),
+        requestId: (submitRequestId.current ??= createRequestId()),
         answers: block.questions.map((q) => ({
           questionVersionId: q.questionVersionId,
           answer: answers[q.questionVersionId] ?? '',
@@ -41,8 +45,12 @@ export default function LessonScreen() {
       });
     },
     onSuccess: async () => {
+      submitRequestId.current = null;
       await queryClient.invalidateQueries({ queryKey: ['learning'] });
       await lessonQuery.refetch();
+    },
+    onError: (error) => {
+      if (!isUncertainStudyWrite(error)) submitRequestId.current = null;
     },
   });
 

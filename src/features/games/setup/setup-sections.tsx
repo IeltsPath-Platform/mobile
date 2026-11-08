@@ -113,7 +113,12 @@ export function JoinRoomCard({ setup }: { setup: GameSetup }) {
           placeholder="AB7K2Q"
           placeholderTextColor={colors.muted}
           returnKeyType="go"
-          onSubmitEditing={() => setup.join.mutate()}
+          onSubmitEditing={() => {
+            if (setup.enabled && setup.code.length === 6 && !setup.active.data && !setup.join.isPending) {
+              setup.clearError();
+              setup.join.mutate();
+            }
+          }}
           className="h-12 flex-1 rounded-xl border border-line bg-canvas px-4 text-center text-lg tracking-widest text-ink"
           accessibilityLabel="Mã phòng"
         />

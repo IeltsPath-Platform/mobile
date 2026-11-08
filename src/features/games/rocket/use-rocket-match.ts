@@ -36,7 +36,10 @@ export function useRocketMatch(matchId: string) {
   // Consecutive-correct counter is cosmetic; scoring stays on the server.
   const streak = useRef(0);
 
+  const finished = useRef(false);
   const showResult = useCallback(() => {
+    if (finished.current) return;
+    finished.current = true;
     void qc.invalidateQueries({ queryKey: ['games', 'active'] });
     router.replace(resultRoute(matchId, 'ROCKET'));
   }, [matchId, qc, router]);
@@ -59,7 +62,7 @@ export function useRocketMatch(matchId: string) {
       const round = data?.round;
       if (round && !round.deadlineAt) {
         // The server opens the round at opensAt; poll right around that moment.
-        const untilOpen = Date.parse(round.opensAt) - (Date.now() + (Date.parse(data.serverTime) - Date.now()));
+        const untilOpen = Date.parse(round.opensAt) - Date.parse(data.serverTime);
         return Math.max(1_000, Math.min(5_000, untilOpen + 250));
       }
       return connectedRef.current ? 10_000 : 5_000;
@@ -82,7 +85,10 @@ export function useRocketMatch(matchId: string) {
         const incoming = event.ranking;
         qc.setQueryData<GameRanking>(['games', 'ranking', matchId], (existing) => mergeRanking(existing ?? null, incoming));
       }
-      if (event.type === 'MATCH_FINISHED') showResult();
+      if (event.type === 'MATCH_FINISHED') {
+        showResult();
+        return;
+      }
       if (event.type === 'ROOM_CLOSED' || event.type === 'PLAYER_KICKED') setError(event.message ?? 'Phòng chơi đã kết thúc.');
       if (['ROCKET_ROUND_STARTED', 'ROCKET_ROUND_RESULT', 'MATCH_STATE', 'MATCH_STARTED'].includes(event.type)) {
         void qc.invalidateQueries({ queryKey: ['games', 'rocket-current', matchId] });
@@ -130,16 +136,26 @@ export function useRocketMatch(matchId: string) {
   // Feedback fires once per resolved round.
   const reportedRounds = useRef(new Set<string>());
   const result = current.data?.lastRoundResult;
+  const seeded = useRef(false);
+  const lastRoundNumber = useRef(0);
   useEffect(() => {
+    if (round) lastRoundNumber.current = round.number;
+  }, [round?.number]);
+  useEffect(() => {
+    if (!current.isSuccess) return;
+    // A result already present on the first load (mount/resume) is old news; do not celebrate it.
+    const firstLoad = !seeded.current;
+    seeded.current = true;
     if (!result || reportedRounds.current.has(result.roundId)) return;
     reportedRounds.current.add(result.roundId);
+    if (firstLoad) return;
     const next = (kind: Reward['kind'], title: string, subtitle?: string) =>
       setReward((previous) => ({ id: (previous?.id ?? 0) + 1, kind, title, subtitle }));
     if (result.correct) {
       streak.current += 1;
       const total = current.data?.settings.questionCount ?? 0;
-      const answered = reportedRounds.current.size;
-      const halfway = total >= 6 && answered === Math.ceil(total / 2);
+      const resolvedNumber = round && round.roundId !== result.roundId ? round.number - 1 : lastRoundNumber.current;
+      const halfway = total >= 6 && resolvedNumber === Math.ceil(total / 2);
       const points = `+${result.points} điểm`;
       if (halfway) next('milestone', 'Nửa chặng rồi!', points);
       else if (streak.current >= 2) next('streak', `Chuỗi ${streak.current} liên tiếp!`, points);
@@ -154,7 +170,7 @@ export function useRocketMatch(matchId: string) {
       haptics.error();
       void sound.play('wrong');
     }
-  }, [result?.roundId]);
+  }, [result?.roundId, current.isSuccess]);
 
   const pendingForRound = pendingAnswer.current?.roundId === round?.roundId ? pendingAnswer.current : null;
 

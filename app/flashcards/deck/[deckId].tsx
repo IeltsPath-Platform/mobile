@@ -76,8 +76,17 @@ export default function DeckDetailScreen() {
         onPress: async () => {
           try {
             await vocabApi.deleteDeck(deckId);
-            await client.invalidateQueries({ queryKey: ['flashcards'] });
+            // Leave first and drop this deck's queries so nothing refetches a deleted deck.
             router.back();
+            client.removeQueries({ queryKey: ['flashcards', 'deck', deckId] });
+            client.removeQueries({
+              queryKey: ['flashcards', 'deck-item-pages', deckId],
+            });
+            client.removeQueries({
+              queryKey: ['flashcards', 'deck-items', deckId],
+            });
+            client.removeQueries({ queryKey: ['flashcards', 'due', deckId] });
+            void client.invalidateQueries({ queryKey: ['flashcards'] });
           } catch (e) {
             haptics.error();
             Alert.alert(

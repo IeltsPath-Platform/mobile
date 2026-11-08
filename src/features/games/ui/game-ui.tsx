@@ -134,10 +134,11 @@ export function ProgressBar({ ratio, color = colors.accent, height = 6 }: { rati
   useEffect(() => {
     value.value = withTiming(Math.min(1, Math.max(0, ratio)), { duration: 900, easing: Easing.linear });
   }, [ratio, value]);
-  const style = useAnimatedStyle(() => ({ width: `${value.value * 100}%` }));
+  // scaleX from the left edge animates on the UI thread without a layout pass per frame.
+  const style = useAnimatedStyle(() => ({ transform: [{ scaleX: value.value }] }));
   return (
     <View className="overflow-hidden rounded-full" style={{ height, backgroundColor: colors.line }}>
-      <Animated.View className="h-full rounded-full" style={[{ backgroundColor: color }, style]} />
+      <Animated.View className="h-full w-full rounded-full" style={[{ backgroundColor: color, transformOrigin: 'left' }, style]} />
     </View>
   );
 }

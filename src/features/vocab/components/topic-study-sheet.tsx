@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Volume2, ArrowRight, BookOpen, BookOpenCheck, Check, Share2, X } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
@@ -13,8 +13,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/src/components/ui/button';
 import { AnswerFeedback } from '@/src/features/session/components/answer-feedback';
 import { Text } from '@/src/components/ui/text';
-import { useAuth } from '@/src/features/auth/auth-provider';
-import { listActiveDecks, listAllDeckItems, normalizeDeckList, vocabApi, type VocabularyCatalogWord, type VocabularyTopic } from '@/src/features/vocab/api';
+import { vocabApi, type VocabularyCatalogWord, type VocabularyTopic } from '@/src/features/vocab/api';
+import { resolveMatchTap, type MatchSide, type MatchTap } from '@/src/features/vocab/match-selection';
 import { colors } from '@/src/theme';
 
 const PAGE_SIZE = 30;
@@ -38,9 +38,6 @@ function normalizeAnswer(value: string) {
 }
 
 export function TopicStudySheet({ topic, setId, setTitle, topicPage, topicPageSize, visible, initialMode = 'words', onClose, onComplete }: { topic: VocabularyTopic | null; setId?: string; setTitle?: string; topicPage?: number; topicPageSize?: number; visible: boolean; initialMode?: VocabularyStudyMode; onClose: () => void; onComplete?: () => Promise<void> | void }) {
-  const client = useQueryClient();
-  const { authEnabled, status } = useAuth();
-  const signedIn = authEnabled && status === 'authenticated';
   const [quizChoice, setQuizChoice] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>('words');
   const [lessonStarted, setLessonStarted] = useState(false);
@@ -49,12 +46,10 @@ export function TopicStudySheet({ topic, setId, setTitle, topicPage, topicPageSi
   const [lessonComplete, setLessonComplete] = useState(false);
   const [savingCompletion, setSavingCompletion] = useState(false);
   const [completionError, setCompletionError] = useState('');
-  const [savedWordIds, setSavedWordIds] = useState<Set<string>>(() => new Set());
-  const [createdDeckId, setCreatedDeckId] = useState<string | null>(null);
   const [quizIndex, setQuizIndex] = useState(0);
   const [quizScore, setQuizScore] = useState(0);
   const [quizFeedback, setQuizFeedback] = useState<boolean | null>(null);
-  const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
+  const [selectedMatch, setSelectedMatch] = useState<MatchTap | null>(null);
   const [matchedIds, setMatchedIds] = useState<Set<string>>(() => new Set());
   const [matchFeedback, setMatchFeedback] = useState('');
   const [fillAnswer, setFillAnswer] = useState('');
@@ -70,30 +65,11 @@ export function TopicStudySheet({ topic, setId, setTitle, topicPage, topicPageSi
     initialPageParam: 0,
     getNextPageParam: (lastPage, pages) => topicPage === undefined && pages.reduce((count, page) => count + page.items.length, 0) < lastPage.total ? lastPage.page + 1 : undefined,
   });
-  const decksQuery = useQuery({
-    queryKey: ['flashcards', 'decks'],
-    queryFn: listActiveDecks,
-    select: normalizeDeckList,
-    enabled: visible && signedIn,
-    staleTime: 30_000,
-  });
   const words = useMemo(() => wordsQuery.data?.pages.flatMap((page) => page.items) ?? [], [wordsQuery.data]);
   const practiceWords = useMemo(() => words.flatMap((word) => {
     const sense = primarySense(word);
     return sense?.vietnameseMeaning ? [{ word, sense, meaning: sense.vietnameseMeaning }] : [];
   }), [words]);
-  const topicDeckName = topic ? `Từ vựng · ${topic.nameVi || topic.name}`.slice(0, 150) : '';
-  const availableDeck = createdDeckId
-    ? decksQuery.data?.find((deck) => deck.id === createdDeckId)
-    : decksQuery.data?.find((deck) => deck.name === topicDeckName);
-  const deckId = createdDeckId ?? availableDeck?.id ?? null;
-  const deckItemsQuery = useQuery({
-    queryKey: ['flashcards', 'deck-items', deckId],
-    queryFn: () => listAllDeckItems(deckId!),
-    enabled: visible && signedIn && Boolean(deckId),
-    staleTime: 30_000,
-  });
-  const deckDueCount = availableDeck?.dueCount ?? 0;
   const studying = visible && lessonStarted && !lessonComplete;
   useStudyMusic(studying);
   useEffect(() => {
@@ -128,38 +104,10 @@ export function TopicStudySheet({ topic, setId, setTitle, topicPage, topicPageSi
 
   useEffect(() => {
     if (!visible) return;
-    setMode(initialMode); setLessonStarted(false); setStudyIndex(0); setPreviousMode('words'); setLessonComplete(false); setSavingCompletion(false); setCompletionError(''); setSavedWordIds(new Set()); setCreatedDeckId(null);
-    setQuizIndex(0); setQuizScore(0); setQuizFeedback(null); setSelectedMatchId(null); setMatchedIds(new Set()); setMatchFeedback('');
+    setMode(initialMode); setLessonStarted(false); setStudyIndex(0); setPreviousMode('words'); setLessonComplete(false); setSavingCompletion(false); setCompletionError('');
+    setQuizIndex(0); setQuizScore(0); setQuizFeedback(null); setSelectedMatch(null); setMatchedIds(new Set()); setMatchFeedback('');
     setFillAnswer(''); setFillFeedback(null); setFillIndex(0);
   }, [initialMode, topic?.id, visible]);
-
-  const addToFlashcards = useMutation({
-    mutationFn: async ({ word, sense, meaning }: { word: VocabularyCatalogWord; sense: VocabularyCatalogWord['senses'][number]; meaning: string }) => {
-      if (!signedIn) throw new Error('Đăng nhập để lưu từ vào Flashcards.');
-      const deck = availableDeck ?? await vocabApi.createDeck({ name: topicDeckName, description: `Từ vựng chủ đề ${topic?.nameVi || topic?.name}.` });
-      setCreatedDeckId(deck.id);
-      const card = await vocabApi.createCard({
-        sourceType: 'VOCABULARY_SENSE',
-        vocabularySenseId: sense.id,
-        front: word.lemma,
-        back: meaning,
-        exampleSentence: sense.exampleSentence,
-      });
-      try {
-        await vocabApi.addDeckItem(deck.id, card.id);
-      } catch {
-        await client.invalidateQueries({ queryKey: ['flashcards'] });
-        throw new Error('Thẻ đã được tạo trong thư viện nhưng chưa thêm được vào bộ chủ đề. Mở bộ thẻ để thử thêm lại.');
-      }
-      await client.invalidateQueries({ queryKey: ['flashcards', 'deck-items', deck.id] });
-      return deck.id;
-    },
-    onSuccess: async (id, variables) => {
-      setCreatedDeckId(id);
-      setSavedWordIds((current) => new Set(current).add(variables.word.id));
-      await client.invalidateQueries({ queryKey: ['flashcards'] });
-    },
-  });
 
   const answerQuiz = (answer: string) => {
     if (quizFeedback !== null || !quizSense?.vietnameseMeaning) return;
@@ -169,12 +117,13 @@ export function TopicStudySheet({ topic, setId, setTitle, topicPage, topicPageSi
     setQuizFeedback(correct);
   };
   const nextQuizQuestion = () => { setQuizIndex((index) => index + 1); setQuizFeedback(null); setQuizChoice(null); };
-  const chooseMatch = (wordId: string) => {
-    if (!selectedMatchId) { haptics.select(); setSelectedMatchId(wordId); setMatchFeedback('Chọn nghĩa tiếng Việt tương ứng.'); return; }
-    if (selectedMatchId === wordId) {
-      setMatchedIds((current) => new Set(current).add(wordId)); setMatchFeedback('Nối đúng rồi!'); haptics.success(); void sound.play('match');
+  const chooseMatch = (id: string, side: MatchSide) => {
+    const result = resolveMatchTap(selectedMatch, { id, side });
+    if (result.type === 'select') { haptics.select(); setSelectedMatch(result.selection); setMatchFeedback(side === 'word' ? 'Chọn nghĩa tiếng Việt tương ứng.' : 'Chọn từ tương ứng.'); return; }
+    if (result.type === 'match') {
+      setMatchedIds((current) => new Set(current).add(id)); setMatchFeedback('Nối đúng rồi!'); haptics.success(); void sound.play('match');
     } else { setMatchFeedback('Chưa khớp, thử lại nhé.'); haptics.warning(); void sound.play('wrong'); }
-    setSelectedMatchId(null);
+    setSelectedMatch(null);
   };
   const submitFill = () => {
     if (fillFeedback !== null || !fillItem) return;
@@ -290,11 +239,11 @@ export function TopicStudySheet({ topic, setId, setTitle, topicPage, topicPageSi
 
           {mode === 'quiz' ? quizLength === 0 ? <Text className="py-8 text-center text-base text-muted">Chưa có nghĩa tiếng Việt để bắt đầu quiz.</Text> : quizIndex >= quizLength ? <View className="items-center rounded-[30px] border border-line bg-surface p-6"><Check size={34} color={colors.success}/><Text weight="black" className="mt-3 text-2xl">Hoàn thành phần trắc nghiệm</Text><Text className="mt-2 text-center text-muted">Bạn trả lời đúng {quizScore}/{quizLength} câu.</Text></View> : <View className="gap-3"><Image source={require('@/assets/images/owl/nav-owl-stand.webp')} contentFit="contain" style={{ height: 110, width: '100%' }}/><Text weight="bold" className="text-center text-base text-accent-deep">Chọn nghĩa tiếng Việt</Text><Text weight="black" className="mb-2 text-center text-[29px]">{quizWord?.lemma}</Text>{quizOptions.map((option) => { const isRight = option === quizSense?.vietnameseMeaning; return <Pressable key={option} accessibilityRole="button" accessibilityLabel={option} disabled={quizFeedback !== null} onPress={() => answerQuiz(option)} className="min-h-[62px] items-center justify-center rounded-2xl border border-line bg-surface px-4" accessibilityState={{ selected: quizChoice === option, disabled: quizFeedback !== null }} style={quizFeedback !== null && isRight ? { backgroundColor: colors.successSoft, borderColor: colors.success } : quizFeedback !== null && quizChoice === option ? { backgroundColor: colors.dangerSoft, borderColor: colors.danger } : undefined}><Text weight="bold" className="text-center text-lg">{option}</Text></Pressable>; })}{quizFeedback !== null ? <View className="gap-2"><AnswerFeedback key={`quiz-${quizIndex}`} correct={quizFeedback} title={quizFeedback ? 'Chính xác!' : 'Cùng thử lại nhé.'} detail={!quizFeedback ? `Đáp án: ${quizSense?.vietnameseMeaning}` : null} /></View> : null}</View> : null}
 
-          {mode === 'match' ? matchWords.length < 2 ? <Text className="py-8 text-center text-base text-muted">Bài này chưa đủ từ để chơi nối.</Text> : <View className="gap-4"><Image source={require('@/assets/images/owl/nav-owl-stand.webp')} contentFit="contain" style={{ height: 100, width: '100%' }}/><Text weight="bold" className="text-center text-lg text-accent-deep">Ghép các mục sau</Text><View className="flex-row gap-3"><View className="flex-1 gap-3">{matchWords.map(({ word }) => <Pressable key={word.id} accessibilityRole="button" disabled={matchedIds.has(word.id)} onPress={() => chooseMatch(word.id)} className="min-h-[58px] items-center justify-center rounded-2xl border border-line bg-surface px-2" style={matchedIds.has(word.id) ? { backgroundColor: colors.successSoft, borderColor: colors.success } : selectedMatchId === word.id ? { backgroundColor: colors.accentSoft, borderColor: colors.accent } : undefined}><Text weight="bold" className="text-center text-sm">{word.lemma}</Text></Pressable>)}</View><View className="flex-1 gap-3">{matchMeanings.map(({ word, meaning }) => <Pressable key={word.id} accessibilityRole="button" disabled={matchedIds.has(word.id)} onPress={() => chooseMatch(word.id)} className="min-h-[58px] items-center justify-center rounded-2xl border border-line bg-surface px-2" style={matchedIds.has(word.id) ? { backgroundColor: colors.successSoft, borderColor: colors.success } : undefined}><Text className="text-center text-sm">{meaning}</Text></Pressable>)}</View></View>{matchFeedback ? <Text className="text-center text-sm" style={{ color: matchFeedback.includes('đúng') ? colors.success : colors.muted }}>{matchFeedback}</Text> : null}</View> : null}
+          {mode === 'match' ? matchWords.length < 2 ? <Text className="py-8 text-center text-base text-muted">Bài này chưa đủ từ để chơi nối.</Text> : <View className="gap-4"><Image source={require('@/assets/images/owl/nav-owl-stand.webp')} contentFit="contain" style={{ height: 100, width: '100%' }}/><Text weight="bold" className="text-center text-lg text-accent-deep">Ghép các mục sau</Text><View className="flex-row gap-3"><View className="flex-1 gap-3">{matchWords.map(({ word }) => <Pressable key={word.id} accessibilityRole="button" disabled={matchedIds.has(word.id)} onPress={() => chooseMatch(word.id, 'word')} className="min-h-[58px] items-center justify-center rounded-2xl border border-line bg-surface px-2" style={matchedIds.has(word.id) ? { backgroundColor: colors.successSoft, borderColor: colors.success } : selectedMatch?.side === 'word' && selectedMatch.id === word.id ? { backgroundColor: colors.accentSoft, borderColor: colors.accent } : undefined}><Text weight="bold" className="text-center text-sm">{word.lemma}</Text></Pressable>)}</View><View className="flex-1 gap-3">{matchMeanings.map(({ word, meaning }) => <Pressable key={word.id} accessibilityRole="button" disabled={matchedIds.has(word.id)} onPress={() => chooseMatch(word.id, 'meaning')} className="min-h-[58px] items-center justify-center rounded-2xl border border-line bg-surface px-2" style={matchedIds.has(word.id) ? { backgroundColor: colors.successSoft, borderColor: colors.success } : selectedMatch?.side === 'meaning' && selectedMatch.id === word.id ? { backgroundColor: colors.accentSoft, borderColor: colors.accent } : undefined}><Text className="text-center text-sm">{meaning}</Text></Pressable>)}</View></View>{matchFeedback ? <Text className="text-center text-sm" style={{ color: matchFeedback.includes('đúng') ? colors.success : colors.muted }}>{matchFeedback}</Text> : null}</View> : null}
 
           {mode === 'fill' ? practiceWords.length === 0 ? <Text className="py-8 text-center text-base text-muted">Chưa có từ để luyện điền.</Text> : fillIndex >= practiceWords.length ? <View className="items-center rounded-[30px] border border-line bg-surface p-6"><Check size={34} color={colors.success}/><Text weight="black" className="mt-3 text-2xl">Đã luyện xong tất cả từ</Text><Text className="mt-2 text-center text-muted">Hoàn thành bài để mở bài kế tiếp.</Text></View> : <View className="gap-4"><Image source={require('@/assets/images/owl/nav-owl-stand.webp')} contentFit="contain" style={{ height: 100, width: '100%' }}/><Text weight="bold" className="text-center text-lg text-accent-deep">Điền từ còn thiếu</Text><Text className="text-center text-[21px] leading-8">Nghĩa tiếng Việt: {fillItem?.meaning}</Text>{fillItem?.sense.exampleSentence ? <Text className="text-center text-sm italic leading-6 text-muted">{fillItem.sense.exampleSentence}</Text> : null}<TextInput value={fillAnswer} onChangeText={setFillAnswer} editable={fillFeedback === null} autoCapitalize="none" autoCorrect={false} placeholder="Nhập từ tiếng Anh" placeholderTextColor={colors.muted} className="min-h-[60px] rounded-2xl border border-line bg-surface px-4 text-center text-xl text-ink" onSubmitEditing={submitFill} returnKeyType="done" />{fillFeedback !== null ? <AnswerFeedback key={`fill-${fillIndex}`} correct={fillFeedback} title={fillFeedback ? 'Chính xác!' : 'Cùng thử lại nhé.'} detail={!fillFeedback ? `Đáp án: ${fillItem?.word.lemma}` : null} /> : null}</View> : null}
 
-          {mode === 'flashcards' ? <View className="gap-3">{!signedIn ? <View className="rounded-2xl bg-surface p-4"><Text weight="bold">Đăng nhập để lưu và ôn flashcard</Text><Button className="mt-3" label="Đăng nhập" onPress={() => { onClose(); router.push('/(auth)/login' as never); }} /></View> : null}{signedIn && decksQuery.isError ? <Text className="text-sm text-danger">{decksQuery.error.message}</Text> : null}{signedIn && decksQuery.isPending ? <ActivityIndicator color={colors.accent} /> : null}{deckId ? <View className="rounded-2xl bg-success-soft p-4"><Text weight="bold" style={{ color: colors.success }}>Bộ thẻ chủ đề đã sẵn sàng</Text><Text className="mt-1 text-sm text-muted">{availableDeck?.cardCount ?? savedWordIds.size} thẻ · {deckDueCount} thẻ đến hạn</Text><Button className="mt-3" label="Ôn bộ flashcard này" disabled={deckDueCount === 0} onPress={() => { onClose(); router.push({ pathname: '/flashcards/[deckId]', params: { deckId } }); }} /></View> : null}{practiceWords.map(({ word, sense, meaning }) => { const saved = savedWordIds.has(word.id) || Boolean(deckItemsQuery.data?.some((item) => item.front.trim().toLocaleLowerCase() === word.lemma.trim().toLocaleLowerCase())); return <View key={word.id} className="flex-row items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3"><View className="flex-1"><Text weight="bold">{word.lemma}</Text><Text className="mt-1 text-sm text-muted">{meaning}</Text></View><Pressable accessibilityRole="button" accessibilityLabel={saved ? `${word.lemma} đã thêm vào thẻ` : `Thêm ${word.lemma} vào thẻ`} disabled={saved || addToFlashcards.isPending} onPress={() => addToFlashcards.mutate({ word, sense, meaning })} className="min-h-11 justify-center rounded-xl px-3 py-2" style={{ backgroundColor: saved ? colors.successSoft : colors.accent }}><Text weight="bold" className="text-xs" style={{ color: saved ? colors.success : colors.canvas }}>{saved ? 'Đã thêm' : addToFlashcards.isPending ? 'Đang thêm…' : 'Thêm thẻ'}</Text></Pressable></View>; })}{addToFlashcards.isError ? <Text className="text-sm text-danger">{addToFlashcards.error.message}</Text> : null}</View> : null}
+          {mode === 'flashcards' ? <View className="rounded-2xl bg-surface p-4"><Text weight="bold">Đăng nhập để lưu và ôn flashcard</Text><Button className="mt-3" label="Đăng nhập" onPress={() => { onClose(); router.push('/(auth)/login' as never); }} /></View> : null}
           {completionError ? <Text accessibilityRole="alert" className="text-center text-sm text-danger">{completionError}</Text> : null}
         </ScrollView> : null}
 

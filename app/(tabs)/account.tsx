@@ -79,8 +79,8 @@ export default function AccountScreen() {
 
   const relationshipsQuery = useQuery({
     queryKey: ['community', 'relationship', user?.id],
-    queryFn: () => communityApi.relationship(user!.id),
-    enabled: signedIn,
+    queryFn: () => communityApi.relationship(user?.id ?? ''),
+    enabled: signedIn && Boolean(user?.id),
     staleTime: 60_000,
   });
 
@@ -151,6 +151,7 @@ export default function AccountScreen() {
   useTabReselect('account', refreshProfileFromTop);
 
   const refreshProfileByPull = async () => {
+    if (!signedIn) return;
     setPullRefreshing(true);
     try {
       await Promise.all([
@@ -204,7 +205,8 @@ export default function AccountScreen() {
       setBusy('cache');
       try {
         await clearAppSettingsStorage();
-        queryClient.clear();
+        // Keep the signed-in user (['auth', 'me']); drop every other cached query.
+        queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== 'auth' });
         haptics.success();
         if (Platform.OS === 'web') window.alert('Đã xóa dữ liệu tạm trên máy.');
         else Alert.alert('Đã xóa dữ liệu tạm', 'Cài đặt ứng dụng đã được đặt lại.');
@@ -252,7 +254,7 @@ export default function AccountScreen() {
       contentContainerClassName="px-4 pb-12 pt-2"
       showsVerticalScrollIndicator={false}
       refreshControl={
-        authEnabled ? (
+        signedIn ? (
           <RefreshControl
             refreshing={pullRefreshing}
             onRefresh={() => void refreshProfileByPull()}
@@ -547,7 +549,7 @@ function StatCell({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
       onPress={onPress}
-      className="flex-1 items-center active:opacity-70"
+      className="min-h-11 flex-1 items-center justify-center active:opacity-70"
     >
       {body}
     </Pressable>

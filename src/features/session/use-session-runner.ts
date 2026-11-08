@@ -2,6 +2,7 @@ import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { createRequestId } from '@/src/lib/request-id';
+import { isUncertainStudyWrite } from '@/src/features/vocab/study-state';
 import { isLearningApiError, learningApi } from '@/src/features/learning';
 import type { LearningApiError } from '@/src/features/learning/api-error';
 import type { ReviewRefDto } from '@/src/features/learning/types';
@@ -265,7 +266,8 @@ export function useSessionRunner(lessonId: string) {
         lessonCompleted: result.lessonCompleted,
       });
     } catch (error) {
-      requestIdRef.current = createRequestId();
+      // Keep the id for uncertain failures so a resubmit stays idempotent.
+      if (!isUncertainStudyWrite(error)) requestIdRef.current = createRequestId();
       dispatch({
         type: 'submit-error',
         message: isLearningApiError(error) ? friendly(error) : 'Không nộp được bài.',

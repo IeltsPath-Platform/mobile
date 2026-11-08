@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
 import { API_BASE_URL } from '@/src/lib/env';
@@ -15,6 +15,9 @@ export function useGameSocket(
   onEvent: (event: GameEvent) => void,
 ) {
   const [connected, setConnected] = useState(false);
+  // Handlers change identity between renders; a ref keeps the socket from reconnecting for that.
+  const onEventRef = useRef(onEvent);
+  onEventRef.current = onEvent;
 
   useEffect(() => {
     if (!roomId) return;
@@ -103,7 +106,7 @@ export function useGameSocket(
             clearTimeout(retry);
           }
 
-          onEvent(event);
+          onEventRef.current(event);
         };
 
         candidate.onclose = () => {
@@ -151,7 +154,7 @@ export function useGameSocket(
       clearTimeout(handshake);
       socket?.close();
     };
-  }, [matchId, onEvent, roomId]);
+  }, [matchId, roomId]);
 
   return connected;
 }

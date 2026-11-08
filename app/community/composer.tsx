@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, usePreventRemove, useRouter } from 'expo-router';
 import { Check, ChevronDown, Hash, ImagePlus, Palette, RefreshCw, SlidersHorizontal, X } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -134,15 +134,18 @@ export default function ComposerScreen() {
     else router.replace('/(tabs)/community' as never);
   };
 
+  // Every way out (X button, Android back, swipe-back) goes through this guard.
+  const hasDraft = Boolean(body.trim() || title.trim() || images.length || videoUrl.trim());
+  const disablePrevention = usePreventRemove(busy || (dirty.current && hasDraft), ({ repeat }) => {
+    if (busy) return;
+    Alert.alert('Bỏ bài viết đang soạn?', 'Nội dung bạn vừa nhập sẽ bị xoá.', [
+      { text: 'Tiếp tục soạn', style: 'cancel' },
+      { text: 'Bỏ bài viết', style: 'destructive', onPress: () => { disablePrevention(); repeat(); } },
+    ]);
+  });
+
   const close = () => {
     if (busy) return;
-    if (dirty.current && (body.trim() || title.trim() || images.length || videoUrl.trim())) {
-      Alert.alert('Bỏ bài viết đang soạn?', 'Nội dung bạn vừa nhập sẽ bị xoá.', [
-        { text: 'Tiếp tục soạn', style: 'cancel' },
-        { text: 'Bỏ bài viết', style: 'destructive', onPress: goBack },
-      ]);
-      return;
-    }
     goBack();
   };
 
@@ -293,14 +296,16 @@ export default function ComposerScreen() {
       };
       if (id) await communityApi.update(id, input);
       else await communityApi.create(input);
-      await Promise.all([
+      haptics.success();
+      // Leave first so the post cannot be submitted twice while caches refresh in the background.
+      disablePrevention();
+      goBack();
+      void Promise.all([
         queryClient.invalidateQueries({ queryKey: FEED_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: ['community', 'bookmarks'] }),
         queryClient.invalidateQueries({ queryKey: ['community', 'profile-list'] }),
         ...(id ? [queryClient.invalidateQueries({ queryKey: ['community', 'detail', id] })] : []),
       ]);
-      haptics.success();
-      goBack();
     } catch (cause) {
       haptics.error();
       setError(cause instanceof Error ? cause.message : 'Không thể đăng bài. Hãy kiểm tra kết nối rồi thử lại.');
@@ -329,9 +334,11 @@ export default function ComposerScreen() {
           <Pressable
             onPress={() => void submit()}
             disabled={!canPost}
-            className="min-h-10 min-w-[76px] items-center justify-center rounded-full px-5 active:opacity-80"
+            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+            className="min-h-11 min-w-[76px] items-center justify-center rounded-full px-5 active:opacity-80"
             style={{ backgroundColor: canPost ? colors.accent : colors.surfaceTint }}
             accessibilityRole="button"
+            accessibilityLabel={busy ? (id ? 'Đang lưu bài viết' : 'Đang đăng bài viết') : (id ? 'Lưu bài viết' : 'Đăng bài viết')}
             accessibilityState={{ disabled: !canPost, busy }}>
             {busy ? <ActivityIndicator size="small" color={colors.onAccent} /> : <Text weight="extrabold" className="text-sm" style={{ color: canPost ? colors.onAccent : colors.muted }}>{id ? 'Lưu' : 'Đăng'}</Text>}
           </Pressable>

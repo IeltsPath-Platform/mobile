@@ -86,7 +86,7 @@ export function getNotificationRoute(data: Record<string, unknown> | undefined) 
   }
   const actorId = typeof data?.actorId === 'string' ? data.actorId : undefined;
   if (data?.eventType === 'community.user-followed.v1' && actorId) {
-    return `/community/users/${actorId}` as const;
+    return { pathname: '/community/users/[userId]' as const, params: { userId: actorId } };
   }
   return '/community/notifications' as const;
 }

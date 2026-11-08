@@ -15,7 +15,7 @@ const FONT_OPTIONS: { value: FontSizeOption; label: string }[] = [
   { value: 'L', label: 'lớn' },
 ];
 
-type BooleanSettingKey = 'notifyStudy' | 'notifyStreak' | 'soundEnabled' | 'musicEnabled';
+type BooleanSettingKey = 'soundEnabled' | 'musicEnabled';
 
 function SubHeader({ icon: Icon, title, first }: { icon: typeof Bell; title: string; first?: boolean }) {
   return (
@@ -42,16 +42,6 @@ export function AppSettingsPanel() {
   return (
     <View className="bg-canvas/40 pb-1">
       <SubHeader icon={Bell} title="Thông báo & Nhắc nhở" first />
-      <SettingsToggleItem
-        title="Nhắc nhở học tập mỗi ngày"
-        value={settings.notifyStudy}
-        onChange={toggle('notifyStudy')}
-      />
-      <SettingsToggleItem
-        title="Nhắc nhở giữ chuỗi Streak"
-        value={settings.notifyStreak}
-        onChange={toggle('notifyStreak')}
-      />
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Thông báo cộng đồng"

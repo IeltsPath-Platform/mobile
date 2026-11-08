@@ -145,12 +145,11 @@ export function StudySession({
       setPendingRating(null);
       setReviewed((count) => count + 1);
       setFlipped(false);
+      const requeue = rating === 'again' && !retried.current.has(current.id);
+      if (requeue) retried.current.add(current.id);
       setQueue((items) => {
         const rest = items.slice(1);
-        if (rating === 'again' && !retried.current.has(current.id)) {
-          retried.current.add(current.id);
-          rest.splice(Math.min(2, rest.length), 0, current);
-        }
+        if (requeue) rest.splice(Math.min(2, rest.length), 0, current);
         return rest;
       });
     } catch (reason) {

@@ -6,8 +6,6 @@ export type ThemeOption = 'light' | 'dark';
 
 export type AppSettings = {
   dailyXpGoal: number;
-  notifyStudy: boolean;
-  notifyStreak: boolean;
   fontSize: FontSizeOption;
   theme: ThemeOption;
   /** Answer chimes, tap sounds and word pronunciation. */
@@ -18,8 +16,6 @@ export type AppSettings = {
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   dailyXpGoal: 50,
-  notifyStudy: true,
-  notifyStreak: true,
   fontSize: 'M',
   theme: 'light',
   soundEnabled: true,
@@ -43,10 +39,12 @@ async function readSettings(): Promise<AppSettings> {
       memoryCache = { ...DEFAULT_APP_SETTINGS };
       return memoryCache;
     }
+    // Pick known keys only so fields removed in later versions (e.g. old reminder toggles) are dropped.
     const parsed = JSON.parse(raw) as Partial<AppSettings>;
     memoryCache = {
-      ...DEFAULT_APP_SETTINGS,
-      ...parsed,
+      dailyXpGoal: typeof parsed.dailyXpGoal === 'number' ? parsed.dailyXpGoal : DEFAULT_APP_SETTINGS.dailyXpGoal,
+      soundEnabled: typeof parsed.soundEnabled === 'boolean' ? parsed.soundEnabled : DEFAULT_APP_SETTINGS.soundEnabled,
+      musicEnabled: typeof parsed.musicEnabled === 'boolean' ? parsed.musicEnabled : DEFAULT_APP_SETTINGS.musicEnabled,
       theme: parsed.theme === 'dark' ? 'dark' : 'light',
       fontSize: parsed.fontSize === 'S' || parsed.fontSize === 'L' ? parsed.fontSize : 'M',
     };

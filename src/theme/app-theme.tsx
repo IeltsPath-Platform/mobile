@@ -1,7 +1,7 @@
 import { DefaultTheme, ThemeProvider as NavigationThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { createContext, useContext, useMemo, type ReactNode } from 'react';
-import { View } from 'react-native';
+import { createContext, Fragment, useContext, useEffect, useMemo, type ReactNode } from 'react';
+import { Appearance, View } from 'react-native';
 
 import { useAppSettings } from '@/src/features/settings/use-app-settings';
 
@@ -18,11 +18,41 @@ export function useTheme() {
   return useContext(ThemeContext);
 }
 
+/**
+ * `colors` is read at render time, so a screen that does not re-render keeps the old palette in
+ * its inline styles. Keying a screen by the theme remounts only that screen (navigation state
+ * stays) so every inline colour is read again after the theme changes.
+ */
+function ThemeKeyed({ children }: { children: ReactNode }) {
+  const { isDark } = useTheme();
+  return <Fragment key={isDark ? 'dark' : 'light'}>{children}</Fragment>;
+}
+
+/** `screenLayout` for navigators whose screens are leaf pages. */
+export const themedScreenLayout = ({ children }: { children: ReactNode }) => <ThemeKeyed>{children}</ThemeKeyed>;
+
+const NESTED_NAVIGATORS = new Set(['(tabs)', '(auth)', 'games', 'learn', 'flashcards']);
+
+/** Root stack variant: nested navigators re-theme their own screens, so they must not be remounted. */
+export const rootScreenLayout = ({ route, children }: { route: { name: string }; children: ReactNode }) =>
+  NESTED_NAVIGATORS.has(route.name) ? <>{children}</> : <ThemeKeyed>{children}</ThemeKeyed>;
+
 export function AppThemeProvider({ children }: { children: ReactNode }) {
   const { settings } = useAppSettings();
   const isDark = settings.theme === 'dark';
   const palette = isDark ? darkColors : lightColors;
-  setActivePalette(palette);
+  // Children read `colors` while rendering, so the palette must be active before they render;
+  // memoising keeps this to one assignment per theme change instead of one per render.
+  useMemo(() => setActivePalette(palette), [palette]);
+
+  // Native chrome (keyboard, alerts, system sheets) follows the in-app choice, not just the OS one.
+  useEffect(() => {
+    Appearance.setColorScheme(isDark ? 'dark' : 'light');
+  }, [isDark]);
+
+  const fontScale = FONT_SCALE[settings.fontSize] ?? 1;
+  const themeValue = useMemo(() => ({ isDark, fontScale }), [isDark, fontScale]);
+  const vars = useMemo(() => themeVars(palette, fontScale), [palette, fontScale]);
 
   const navigationTheme = useMemo(
     () => ({
@@ -41,8 +71,8 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <ThemeContext.Provider value={{ isDark, fontScale: FONT_SCALE[settings.fontSize] ?? 1 }}>
-      <View style={[{ flex: 1 }, themeVars(palette, FONT_SCALE[settings.fontSize] ?? 1)]} className="flex-1 bg-canvas">
+    <ThemeContext.Provider value={themeValue}>
+      <View style={[{ flex: 1 }, vars]} className="flex-1 bg-canvas">
         <StatusBar style={isDark ? 'light' : 'dark'} />
         <NavigationThemeProvider value={navigationTheme}>{children}</NavigationThemeProvider>
       </View>

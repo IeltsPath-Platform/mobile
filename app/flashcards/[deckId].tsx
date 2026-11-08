@@ -36,6 +36,15 @@ export default function DeckStudyScreen() {
         <FlashcardSignIn />
       </View>
     );
+  if (!deckId)
+    return (
+      <View className="flex-1 bg-canvas">
+        <BackHeader title="Học thẻ" fallbackHref="/(tabs)/flashcards" />
+        <View className="px-5 pt-5">
+          <FormAlert tone="error" message="Không tìm thấy bộ thẻ." />
+        </View>
+      </View>
+    );
   if (deckQuery.isPending || dueQuery.isPending)
     return (
       <View className="flex-1 bg-canvas">

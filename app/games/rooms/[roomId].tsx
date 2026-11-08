@@ -1,4 +1,4 @@
-﻿import { useCallback, useState } from 'react';
+﻿import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -27,7 +27,17 @@ export default function GameRoomScreen() {
   const insets = useSafeAreaInsets();
   const user = useCurrentUser();
   const [error, setError] = useState('');
-  const roomKey = ['games', 'room', roomId];
+  const roomKey = useMemo(() => ['games', 'room', roomId], [roomId]);
+  // A match start is announced by both the start response and the socket; navigate once.
+  const entered = useRef(false);
+  const enterMatch = useCallback(
+    (gameType: string, matchId: string) => {
+      if (entered.current) return;
+      entered.current = true;
+      router.replace(matchRoute(gameType, matchId));
+    },
+    [router],
+  );
 
   const query = useQuery({
     queryKey: roomKey,
@@ -45,14 +55,12 @@ export default function GameRoomScreen() {
       if (event.room) qc.setQueryData(roomKey, event.room);
       const live = qc.getQueryData<GameRoom>(roomKey);
       if (event.type === 'MATCH_STARTED' && event.match && live) {
-        router.replace(matchRoute(live.gameType, event.match.matchId));
+        enterMatch(live.gameType, event.match.matchId);
       }
       const needsSnapshot = ['MATCH_STARTED', 'MEMBER_LEFT', 'ROOM_CLOSED', 'PLAYER_KICKED'].includes(event.type) && !event.room;
       if (needsSnapshot) void qc.invalidateQueries({ queryKey: roomKey });
     },
-    // roomKey is derived from roomId only.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [qc, roomId, router],
+    [qc, roomKey, enterMatch],
   );
   const connected = useGameSocket(roomId || null, null, onEvent);
 
@@ -78,7 +86,7 @@ export default function GameRoomScreen() {
     mutationFn: () => gameApi.start(roomId),
     onSuccess: (match) => {
       haptics.success();
-      if (room) router.replace(matchRoute(room.gameType, match.matchId));
+      if (room) enterMatch(room.gameType, match.matchId);
     },
     onError: async (reason) => {
       const latest = await gameApi.getRoom(roomId).catch(() => null);
@@ -133,9 +141,7 @@ export default function GameRoomScreen() {
           },
         },
       ]),
-    // roomKey is derived from roomId only.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [qc, roomId],
+    [qc, roomId, roomKey],
   );
 
   const askLeave = () =>

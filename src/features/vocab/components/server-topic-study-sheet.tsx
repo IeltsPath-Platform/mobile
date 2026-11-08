@@ -151,7 +151,18 @@ export function ServerTopicStudySheet({
             </Pressable>
 
 
-            <View className="h-3 flex-1 overflow-hidden rounded-full bg-line">
+            <View
+              accessible
+              accessibilityRole="progressbar"
+              accessibilityLabel="Tiến độ bài học"
+              accessibilityValue={{
+                min: 0,
+                max: Math.max(totalSteps, 1),
+                now: Math.min(progressValue, Math.max(totalSteps, 1)),
+                text: `${progressValue} trên ${totalSteps} bước`,
+              }}
+              className="h-3 flex-1 overflow-hidden rounded-full bg-line"
+            >
               <View
                 className="h-full rounded-full"
                 style={{
@@ -170,6 +181,15 @@ export function ServerTopicStudySheet({
               </View>
             ) : (
               <View
+                accessible
+                accessibilityLabel={
+                  summary.data
+                    ? `Số tim còn lại: ${summary.data.hearts.hearts}`
+                    : 'Số tim chưa tải'
+                }
+                accessibilityValue={
+                  summary.data ? { text: `${summary.data.hearts.hearts} tim` } : undefined
+                }
                 className="flex-row items-center gap-1.5 rounded-full px-2.5 py-1 border"
                 style={{
                   backgroundColor: colors.dangerSoft,
@@ -187,7 +207,7 @@ export function ServerTopicStudySheet({
 
           {study.attempt?.status === 'IN_PROGRESS' && step ? (
             <View className="mb-3 flex-row items-center justify-between px-1">
-              <Text weight="bold" className="text-xs text-muted">
+              <Text accessibilityRole="header" weight="bold" className="text-xs text-muted">
                 {stepIndex >= 0 ? `BƯỚC ${stepIndex + 1} / ${totalSteps}` : 'BÀI TẬP'}
               </Text>
               <Text weight="bold" className="ml-3 flex-1 text-right text-xs text-accent-deep">
@@ -270,6 +290,7 @@ export function ServerTopicStudySheet({
               <>
                 {step.type !== 'WORD' && step.imageUrl ? (
                   <Image
+                    source={{ uri: step.imageUrl }}
                     style={{ width: '100%', height: 160, marginBottom: 16, borderRadius: 16 }}
                     contentFit="contain"
                     accessibilityLabel="Minh họa câu hỏi"

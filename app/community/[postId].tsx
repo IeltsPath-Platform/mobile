@@ -24,6 +24,8 @@ import { updateCommunityPostCache } from '@/src/features/community/post-cache';
 import { haptics } from '@/src/lib/haptics';
 import { colors } from '@/src/theme';
 
+const MAX_DEEP_LINK_PAGES = 5;
+
 export default function PostDetailScreen() {
   const { postId, commentId: rawCommentId } = useLocalSearchParams<{ postId: string; commentId?: string | string[] }>();
   const targetCommentId = (Array.isArray(rawCommentId) ? rawCommentId[0] : rawCommentId) || undefined;
@@ -62,16 +64,20 @@ export default function PostDetailScreen() {
   const postMenu = usePostMenu(user.data?.id, () => router.replace('/(tabs)/community' as never));
 
   // Deep link from a notification: load pages until the comment exists, then scroll to it once.
+  // Only top-level comments are listed (replies load lazily), so cap paging for ids that never match.
+  const jumpTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(jumpTimer.current), []);
+  const loadedPages = comments.data?.pages.length ?? 0;
   useEffect(() => {
     if (!targetCommentId || jumped.current || comments.isFetchingNextPage) return;
     const index = rows.findIndex((row) => row.id === targetCommentId);
     if (index >= 0) {
       jumped.current = true;
-      setTimeout(() => listRef.current?.scrollToIndex({ index, viewOffset: 12, animated: true }), 250);
-    } else if (comments.hasNextPage) {
+      jumpTimer.current = setTimeout(() => listRef.current?.scrollToIndex({ index, viewOffset: 12, animated: true }), 250);
+    } else if (comments.hasNextPage && loadedPages < MAX_DEEP_LINK_PAGES) {
       void comments.fetchNextPage();
     }
-  }, [targetCommentId, rows, comments.hasNextPage, comments.isFetchingNextPage, comments.fetchNextPage]);
+  }, [targetCommentId, rows, loadedPages, comments.hasNextPage, comments.isFetchingNextPage, comments.fetchNextPage]);
 
   const scrollToComments = () => listRef.current?.scrollToOffset({ offset: Math.max(headerHeight.current - 8, 0), animated: true });
 
@@ -177,7 +183,7 @@ export default function PostDetailScreen() {
       </View>
     );
   }
-  if (post.isError || !post.data) {
+  if (!post.data) {
     return (
       <View className="flex-1 bg-canvas">
         <BackHeader title="Bài viết" fallbackHref="/(tabs)/community" />
@@ -198,6 +204,11 @@ export default function PostDetailScreen() {
 
   const header = (
     <View onLayout={(event) => { headerHeight.current = event.nativeEvent.layout.height; }}>
+      {post.isError ? (
+        <Pressable onPress={() => void post.refetch()} accessibilityRole="button" accessibilityLabel="Chưa cập nhật được bài viết. Chạm để thử lại" className="mx-4 mt-3 min-h-11 justify-center rounded-xl px-3" style={{ backgroundColor: colors.dangerSoft }}>
+          <Text className="text-xs text-danger">Chưa cập nhật được bài viết. Chạm để thử lại.</Text>
+        </Pressable>
+      ) : null}
       <View className="flex-row items-center px-4 pt-4">
         <Pressable onPress={() => openProfile(item.authorId)} accessibilityRole="button" accessibilityLabel={`Hồ sơ ${item.author?.displayName ?? 'thành viên'}`}>
           <CommunityAvatar uri={item.author?.avatarUrl} name={item.author?.displayName} size={46} />

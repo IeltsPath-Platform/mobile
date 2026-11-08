@@ -18,7 +18,7 @@ import { PostRow } from '@/src/features/community/components/post-row';
 import { CommunityAvatar } from '@/src/features/community/components/community-image';
 import { useUnread } from '@/src/features/community/use-unread';
 import { usePostMenu } from '@/src/features/community/components/post-menu';
-import { CATEGORY_LABELS } from '@/src/features/community/format';
+import { CATEGORY_LABELS, dedupePosts } from '@/src/features/community/format';
 import { haptics } from '@/src/lib/haptics';
 import { colors } from '@/src/theme';
 import { useTabBarOffsetHandler, useTabReselect } from '@/src/components/navigation/tab-reselect-context';
@@ -136,11 +136,18 @@ export default function CommunityScreen() {
       refreshPrimed.current = false;
       headerReveal.value = headerHeightShared.value;
       if (!signedIn) return;
-      void queryClient.refetchQueries({
-        queryKey: ['community', 'feed'],
-        type: 'active',
-        stale: true,
-      });
+      // Refresh only the first page of stale active feeds; refetchQueries would re-request every loaded page.
+      for (const cached of queryClient.getQueryCache().findAll({ queryKey: ['community', 'feed'], type: 'active', stale: true })) {
+        if (cached.state.fetchStatus === 'fetching' || !cached.state.data) continue;
+        const [, , feedScope, feedCategory, feedQuery] = cached.queryKey as readonly [string, string, Scope, PostCategory | undefined, string];
+        void communityApi.feed(undefined, feedScope, feedCategory, feedQuery)
+          .then((firstPage) => {
+            queryClient.setQueryData(cached.queryKey, (current: typeof feed.data) => current
+              ? { ...current, pages: [firstPage, ...current.pages.slice(1)] }
+              : current);
+          })
+          .catch(() => { /* background refresh; the cached feed stays visible and pull-to-refresh reports errors */ });
+      }
       if (user.data?.id) {
         void queryClient.refetchQueries({
           queryKey: ['community', 'profile', user.data.id],
@@ -152,14 +159,7 @@ export default function CommunityScreen() {
     }, [headerHeightShared, headerReveal, previousScrollOffset, queryClient, signedIn, user.data?.id]),
   );
 
-  const posts = useMemo(() => {
-    const seen = new Set<string>();
-    return (feed.data?.pages.flatMap((page) => page.content) ?? []).filter((post) => {
-      if (seen.has(post.id)) return false;
-      seen.add(post.id);
-      return true;
-    });
-  }, [feed.data]);
+  const posts = useMemo(() => dedupePosts(feed.data?.pages), [feed.data]);
 
   // Keep only a few upcoming post images warm in the disk/memory cache. FlatList
   // still mounts rows on demand, while the image request starts just before they appear.
@@ -193,6 +193,12 @@ export default function CommunityScreen() {
   const openPost = useCallback((id: string) => router.push(`/community/${id}` as never), [router]);
   const openProfile = useCallback((id: string) => router.push(`/community/users/${id}` as never), [router]);
   const openOwnProfile = () => { if (user.data?.id) { haptics.tap(); openProfile(user.data.id); } };
+  const openNotifications = () => {
+    haptics.tap();
+    void queryClient.invalidateQueries({ queryKey: ['community', 'notifications'] });
+    void queryClient.invalidateQueries({ queryKey: ['community', 'unread'] });
+    router.push('/community/notifications' as never);
+  };
   const compose = () => { haptics.tap(); router.push('/community/composer' as never); };
 
   const closeSearch = () => { setSearching(false); setSearch(''); };
@@ -280,7 +286,7 @@ export default function CommunityScreen() {
             {signedIn ? (
               <View className="flex-row">
                 <BarButton label="Tìm bài viết" onPress={() => { haptics.tap(); setSearching((open) => !open); headerReveal.value = headerHeightShared.value; }}><Search size={21} color={colors.ink} /></BarButton>
-                <BarButton label={`Thông báo${unreadCount > 0 ? `, ${unreadCount} chưa đọc` : ''}`} onPress={() => router.push('/community/notifications' as never)}>
+                <BarButton label={`Thông báo${unreadCount > 0 ? `, ${unreadCount} chưa đọc` : ''}`} onPress={openNotifications}>
                   <View>
                     <Bell size={21} color={colors.ink} />
                     {unreadCount > 0 ? (

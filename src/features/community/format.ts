@@ -23,3 +23,13 @@ export const CATEGORY_LABELS: Record<PostCategory, string> = {
 export function totalReactions(counts?: Record<string, number> | null) {
   return Object.values(counts ?? {}).reduce((sum, count) => sum + count, 0);
 }
+
+/** Flattens paged posts and drops repeats that appear when pages shift between fetches. */
+export function dedupePosts<T extends { id: string }>(pages: { content: T[] }[] | undefined): T[] {
+  const seen = new Set<string>();
+  return (pages?.flatMap((page) => page.content) ?? []).filter((post) => {
+    if (seen.has(post.id)) return false;
+    seen.add(post.id);
+    return true;
+  });
+}

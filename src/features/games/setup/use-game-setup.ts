@@ -83,7 +83,8 @@ export function useGameSetup() {
               playMode,
               initialLives: lives,
               wordLimit: playMode === 'ENDLESS' ? null : wordLimit,
-              timeEnabled,
+              // Multiplayer rooms are always timed (the lobby locks this switch).
+              timeEnabled: mode === 'MULTIPLAYER' ? true : timeEnabled,
               cefrLevel,
               topicId,
             });

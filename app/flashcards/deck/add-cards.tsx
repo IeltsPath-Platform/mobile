@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Check } from 'lucide-react-native';
-import { memo, useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
 import { BackHeader } from '@/src/components/navigation/back-header';
 import { Button } from '@/src/components/ui/button';
@@ -36,6 +36,19 @@ export default function AddCardsScreen() {
     () => cards.data?.pages.flatMap((page) => page.items).filter((card) => !existing.has(card.id)) ?? [],
     [cards.data, existing],
   );
+
+  // Filtering is client-side, so keep paging while a page leaves nothing to show.
+  const { hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage } = cards;
+  useEffect(() => {
+    if (
+      items.isSuccess &&
+      available.length === 0 &&
+      hasNextPage &&
+      !isFetchingNextPage &&
+      !isFetchNextPageError
+    )
+      void fetchNextPage();
+  }, [items.isSuccess, available.length, hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage]);
 
   const add = useMutation({
     mutationFn: async () => {
@@ -99,7 +112,7 @@ export default function AddCardsScreen() {
               <SelectableCard card={item} checked={selectedSet.has(item.id)} disabled={add.isPending} onToggle={toggle} />
             )}
             ListEmptyComponent={
-              cards.isSuccess && items.isSuccess ? (
+              cards.isSuccess && items.isSuccess && !cards.hasNextPage ? (
                 <Text className="py-6 text-center text-muted">Không có thẻ phù hợp trong trang đã tải.</Text>
               ) : undefined
             }

@@ -22,7 +22,7 @@ import { AuthProvider, useAuth } from "@/src/features/auth/auth-provider";
 import { useOnboarding } from "@/src/features/onboarding/use-onboarding";
 import { AUTH_ENABLED } from "@/src/lib/env";
 import { queryClient } from "@/src/lib/query-client";
-import { AppThemeProvider, useTheme } from "@/src/theme/app-theme";
+import { AppThemeProvider, rootScreenLayout, useTheme } from "@/src/theme/app-theme";
 import { colors } from "@/src/theme";
 import { getNotificationRoute } from "@/src/features/community/push-notifications";
 
@@ -155,6 +155,7 @@ function RootNavigator() {
     <>
       <StatusBar style={enterApp && !isDark ? "dark" : "light"} />
       <Stack
+        screenLayout={rootScreenLayout}
         screenOptions={{
           headerShown: false,
           animation: 'slide_from_right',

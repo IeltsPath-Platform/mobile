@@ -10,6 +10,7 @@ import { FormAlert } from '@/src/components/ui/form-alert';
 import { Skeleton } from '@/src/components/ui/skeleton';
 import { Text } from '@/src/components/ui/text';
 import { useCurrentUser } from '@/src/features/auth/auth-provider';
+import { dedupePosts } from '@/src/features/community/format';
 import { communityApi, type CommunityPost } from '@/src/features/community/api';
 import { usePostMenu } from '@/src/features/community/components/post-menu';
 import { PostRow } from '@/src/features/community/components/post-row';
@@ -26,14 +27,7 @@ export default function BookmarkedScreen() {
     getNextPageParam: (page) => (page.hasNext ? page.nextCursor ?? undefined : undefined),
   });
 
-  const posts = useMemo(() => {
-    const seen = new Set<string>();
-    return (query.data?.pages.flatMap((page) => page.content) ?? []).filter((post) => {
-      if (seen.has(post.id)) return false;
-      seen.add(post.id);
-      return true;
-    });
-  }, [query.data]);
+  const posts = useMemo(() => dedupePosts(query.data?.pages), [query.data]);
 
   const openPost = useCallback((id: string) => router.push(`/community/${id}` as never), [router]);
   const openProfile = useCallback((id: string) => router.push(`/community/users/${id}` as never), [router]);

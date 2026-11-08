@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Keyboard, Platform, Pressable, TextInput, View, type TextInputInstance, type ViewInstance } from 'react-native';
+import { Dimensions, Keyboard, Platform, Pressable, TextInput, View, type TextInputInstance, type ViewInstance } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Check, Lightbulb, WifiOff } from 'lucide-react-native';
@@ -34,16 +34,26 @@ export default function WordlyMatchScreen() {
   // Lift the layout by exactly the part of the keyboard that covers it (works with or without OS resizing).
   const rootRef = useRef<ViewInstance>(null);
   const lift = useSharedValue(0);
+  const keyboardShown = useRef(false);
   useEffect(() => {
+    const lower = (event?: { duration?: number }) => {
+      keyboardShown.current = false;
+      lift.value = withTiming(0, { duration: event?.duration || 200 });
+      setKeyboardUp(false);
+    };
     const raise = (event: { endCoordinates: { screenY: number }; duration?: number }) => {
+      // iOS also reports a frame change when the keyboard hides: its top edge is the screen bottom.
+      if (event.endCoordinates.screenY >= Dimensions.get('window').height) {
+        lower(event);
+        return;
+      }
+      keyboardShown.current = true;
       rootRef.current?.measureInWindow((_x, y, _w, h) => {
+        // measureInWindow is async: ignore it if the keyboard went away meanwhile.
+        if (!keyboardShown.current) return;
         lift.value = withTiming(Math.max(0, y + h - event.endCoordinates.screenY), { duration: event.duration || 220 });
       });
       setKeyboardUp(true);
-    };
-    const lower = (event?: { duration?: number }) => {
-      lift.value = withTiming(0, { duration: event?.duration || 200 });
-      setKeyboardUp(false);
     };
     const subscriptions =
       Platform.OS === 'ios'
@@ -162,7 +172,8 @@ export default function WordlyMatchScreen() {
         ref={inputRef}
         value={game.guess}
         onChangeText={game.changeGuess}
-        editable={typingOpen}
+        // Stay editable while a guess is in flight: toggling it would dismiss the keyboard on every submit.
+        editable={Boolean(word.wordStatus === 'ACTIVE' && game.myTurn)}
         maxLength={word.columns}
         autoCapitalize="characters"
         autoCorrect={false}

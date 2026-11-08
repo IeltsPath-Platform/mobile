@@ -49,7 +49,11 @@ export function useWordlyMatch(matchId: string) {
   const hintRequest = useRef<{ wordId: string; requestId: string } | null>(null);
   const hintInFlight = useRef(false);
 
+  // The result can be signalled by the guess response, the socket and polling; navigate once.
+  const finished = useRef(false);
   const showResult = useCallback(() => {
+    if (finished.current) return;
+    finished.current = true;
     void qc.invalidateQueries({ queryKey: ['games', 'active'] });
     router.replace(resultRoute(matchId, 'WORDLY'));
   }, [matchId, qc, router]);
@@ -136,6 +140,17 @@ export function useWordlyMatch(matchId: string) {
       setError('');
     }
   }, [guessPending, word?.attemptsUsed, word?.playerWordId]);
+
+  // A 202 that the server never settles must not lock the player out: after a while, release the
+  // input but keep the same requestId so pressing ĐOÁN replays the guess idempotently.
+  useEffect(() => {
+    if (!guessPending) return;
+    const timer = setTimeout(() => {
+      setGuessPending(false);
+      setError('Chưa nhận được kết quả lượt đoán. Nhấn ĐOÁN để gửi lại.');
+    }, 10_000);
+    return () => clearTimeout(timer);
+  }, [guessPending]);
 
   // The server decides timeouts; ask for the new state as soon as the clock hits zero.
   useEffect(() => {
@@ -244,8 +259,11 @@ export function useWordlyMatch(matchId: string) {
         }
         setGuess('');
       }
-      void qc.invalidateQueries({ queryKey: ['games', 'match', matchId] });
-      void qc.invalidateQueries({ queryKey: ['games', 'ranking', matchId] });
+      // Solo matches have no opponents; only multiplayer needs the standings refreshed.
+      if (multiplayer) {
+        void qc.invalidateQueries({ queryKey: ['games', 'match', matchId] });
+        void qc.invalidateQueries({ queryKey: ['games', 'ranking', matchId] });
+      }
     } catch (cause) {
       haptics.error();
       void sound.play('wrong');
@@ -265,7 +283,7 @@ export function useWordlyMatch(matchId: string) {
     } finally {
       setBusy(false);
     }
-  }, [word, canSubmit, guess, matchId, qc, current.refetch, showResult]);
+  }, [word, canSubmit, guess, matchId, multiplayer, qc, current.refetch, showResult]);
 
   const hintReason = word ? hintUnavailableReason(word) : null;
   const hintDisabled =

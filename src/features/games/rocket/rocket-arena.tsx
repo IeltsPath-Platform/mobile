@@ -34,7 +34,7 @@ const STRIDE_MS = 170;
 
 type Pose = 'stand' | 'walk' | 'jump' | 'fall';
 
-function Obstacle({ variant }: { variant: number }) {
+const Obstacle = memo(function Obstacle({ variant }: { variant: number }) {
   const tone = colors.accentWarm;
   if (variant === 0) {
     return (
@@ -65,7 +65,29 @@ function Obstacle({ variant }: { variant: number }) {
       <View className="h-9 w-9 rounded-t-3xl rounded-bl-2xl" style={{ backgroundColor: tone, opacity: 0.9, transform: [{ rotate: '6deg' }] }} />
     </View>
   );
-}
+});
+
+/** Owns the footfall frame so the 6 Hz stride swap re-renders only the sprite, not the arena. */
+const OwlSprite = memo(function OwlSprite({ walking }: { walking: boolean }) {
+  const reduceMotion = useReducedMotion();
+  const [frame, setFrame] = useState(0);
+  useEffect(() => {
+    if (!walking || reduceMotion) {
+      setFrame(0);
+      return;
+    }
+    const timer = setInterval(() => setFrame((value) => (value + 1) % OWL_FRAMES.length), STRIDE_MS);
+    return () => clearInterval(timer);
+  }, [walking, reduceMotion]);
+  return (
+    <Image
+      source={walking && !reduceMotion ? OWL_FRAMES[frame] : OWL_STAND}
+      contentFit="contain"
+      accessibilityLabel="Cú IELTSPath"
+      style={{ width: '100%', height: '100%' }}
+    />
+  );
+});
 
 /**
  * The obstacle stands still on the track. The owl walks toward it as the round clock runs
@@ -91,7 +113,6 @@ export const RocketArena = memo(function RocketArena({
   const reduceMotion = useReducedMotion();
   const [width, setWidth] = useState(320);
   const [pose, setPose] = useState<Pose>('stand');
-  const [frame, setFrame] = useState(0);
   const x = useSharedValue(-OWL_SIZE);
   const lift = useSharedValue(0);
   const tilt = useSharedValue(0);
@@ -102,7 +123,8 @@ export const RocketArena = memo(function RocketArena({
   const cloud = useSharedValue(0);
   const played = useRef(new Set<string>());
   const busyUntil = useRef(0);
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const roundTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const outcomeTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const obstacleX = width * 0.64;
   const startX = width * 0.06;
@@ -110,21 +132,22 @@ export const RocketArena = memo(function RocketArena({
   const takeoffX = stopX - OWL_SIZE * 0.5;
   const landX = obstacleX + OBSTACLE_WIDTH - OWL_SIZE * 0.2;
 
-  const later = (ms: number, run: () => void) => {
-    timers.current.push(setTimeout(run, ms));
+  // Effects read live geometry and clock offset through this ref so a re-sync never restarts the walk.
+  const live = useRef({ width, startX, stopX, takeoffX, landX, offset: serverOffsetMs });
+  live.current = { width, startX, stopX, takeoffX, landX, offset: serverOffsetMs };
+
+  const later = (list: { current: ReturnType<typeof setTimeout>[] }, ms: number, run: () => void) => {
+    list.current.push(setTimeout(run, ms));
   };
-  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+  useEffect(
+    () => () => {
+      roundTimers.current.forEach(clearTimeout);
+      outcomeTimers.current.forEach(clearTimeout);
+    },
+    [],
+  );
 
   const onLayout = (event: LayoutChangeEvent) => setWidth(event.nativeEvent.layout.width);
-
-  useEffect(() => {
-    if (pose !== 'walk' || reduceMotion) {
-      setFrame(0);
-      return;
-    }
-    const timer = setInterval(() => setFrame((value) => (value + 1) % OWL_FRAMES.length), STRIDE_MS);
-    return () => clearInterval(timer);
-  }, [pose, reduceMotion]);
 
   useEffect(() => {
     if (reduceMotion) return;
@@ -133,9 +156,10 @@ export const RocketArena = memo(function RocketArena({
 
   // New round: the obstacle pops up and the owl walks in from the left, then toward it.
   useEffect(() => {
-    timers.current.forEach(clearTimeout);
-    timers.current = [];
+    roundTimers.current.forEach(clearTimeout);
+    roundTimers.current = [];
     const begin = () => {
+      const { startX, stopX, offset } = live.current;
       cancelAnimation(x);
       lift.value = 0;
       tilt.value = 0;
@@ -149,7 +173,7 @@ export const RocketArena = memo(function RocketArena({
         return;
       }
       const total = Math.max(1, Date.parse(deadlineAt) - Date.parse(opensAt));
-      const remaining = Math.max(0, Date.parse(deadlineAt) - (Date.now() + serverOffsetMs));
+      const remaining = Math.max(0, Date.parse(deadlineAt) - (Date.now() + offset));
       const elapsed = 1 - remaining / total;
       obstacleScale.value = withSpring(1, { damping: 11, stiffness: 220 });
       setPose('walk');
@@ -165,10 +189,15 @@ export const RocketArena = memo(function RocketArena({
         );
       }
     };
+    // The round just resolved is animated by the outcome effect, which owns the stage until it ends.
+    const resolving = !roundId && outcome !== null && !played.current.has(outcome.roundId);
+    if (resolving) return;
     const wait = busyUntil.current - Date.now();
-    if (wait > 0) later(wait, begin);
+    if (wait > 0) later(roundTimers, wait, begin);
     else begin();
-  }, [roundId, deadlineAt, opensAt, serverOffsetMs, startX, stopX, x, lift, tilt, dizzy, obstacleScale, obstacleWobble]);
+    // Only a new round (or its deadline) restarts the walk; offset and size are read from `live`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roundId, deadlineAt, opensAt]);
 
   useEffect(() => {
     if (!outcome || played.current.has(outcome.roundId)) return;
@@ -182,6 +211,9 @@ export const RocketArena = memo(function RocketArena({
       return;
     }
 
+    outcomeTimers.current.forEach(clearTimeout);
+    outcomeTimers.current = [];
+    const { width, stopX, takeoffX, landX } = live.current;
     cancelAnimation(x);
     const reach = Math.max(0, takeoffX - x.value);
     const walkMs = Math.min(520, Math.max(120, reach * 2.4));
@@ -195,16 +227,16 @@ export const RocketArena = memo(function RocketArena({
         withTiming(landX, { duration: JUMP_MS, easing: Easing.linear }),
         withTiming(width + OWL_SIZE, { duration: exitMs, easing: Easing.in(Easing.quad) }),
       );
-      later(walkMs, () => setPose('jump'));
+      later(outcomeTimers, walkMs, () => setPose('jump'));
       lift.value = withDelay(walkMs, withSequence(withTiming(1, { duration: JUMP_MS / 2, easing: Easing.out(Easing.quad) }), withTiming(0, { duration: JUMP_MS / 2, easing: Easing.in(Easing.quad) })));
-      later(walkMs + JUMP_MS, () => setPose('walk'));
+      later(outcomeTimers, walkMs + JUMP_MS, () => setPose('walk'));
     } else {
       const toStop = Math.max(0, stopX - x.value);
       const closeMs = Math.min(480, Math.max(0, toStop * 2.4));
       busyUntil.current = Date.now() + closeMs + 1500;
       setPose('walk');
       x.value = withSequence(withTiming(stopX, { duration: closeMs, easing: Easing.linear }), withDelay(120, withTiming(stopX + 16, { duration: 260, easing: Easing.out(Easing.quad) })));
-      later(closeMs + 40, () => setPose('fall'));
+      later(outcomeTimers, closeMs + 40, () => setPose('fall'));
       // Trip: pitch forward over the obstacle, bounce, then lie dizzy before getting up.
       tilt.value = withDelay(closeMs, withSequence(withTiming(78, { duration: 220, easing: Easing.in(Easing.quad) }), withTiming(70, { duration: 120 }), withDelay(900, withTiming(0, { duration: 320 }))));
       lift.value = withDelay(closeMs, withSequence(withTiming(0.18, { duration: 130 }), withTiming(0, { duration: 130 })));
@@ -212,9 +244,9 @@ export const RocketArena = memo(function RocketArena({
       dizzy.value = withDelay(closeMs + 200, withSequence(withTiming(1, { duration: 120 }), withDelay(900, withTiming(0, { duration: 260 }))));
       spin.value = 0;
       spin.value = withDelay(closeMs + 200, withRepeat(withTiming(360, { duration: 700, easing: Easing.linear }), 2));
-      later(closeMs + 1300, () => setPose('stand'));
+      later(outcomeTimers, closeMs + 1300, () => setPose('stand'));
     }
-  }, [outcome, roundId, width, takeoffX, landX, stopX, x, lift, tilt, dizzy, spin, obstacleWobble]);
+  }, [outcome, roundId, x, lift, tilt, dizzy, spin, obstacleWobble]);
 
   const owlStyle = useAnimatedStyle(() => ({
     left: x.value,
@@ -230,8 +262,6 @@ export const RocketArena = memo(function RocketArena({
     transform: [{ rotate: `${spin.value}deg` }],
   }));
   const cloudStyle = useAnimatedStyle(() => ({ transform: [{ translateX: width - cloud.value * (width + 120) }] }));
-
-  const source = pose === 'walk' && !reduceMotion ? OWL_FRAMES[frame] : OWL_STAND;
 
   return (
     <View
@@ -251,7 +281,7 @@ export const RocketArena = memo(function RocketArena({
       </Animated.View>
 
       <Animated.View className="absolute" style={[{ bottom: GROUND - 3, width: OWL_SIZE, height: OWL_SIZE }, owlStyle]}>
-        <Image source={source} contentFit="contain" accessibilityLabel="Cú IELTSPath" style={{ width: '100%', height: '100%' }} />
+        <OwlSprite walking={pose === 'walk'} />
       </Animated.View>
 
       <Animated.View

@@ -172,6 +172,7 @@ export function RoomSettingsCard({
                 <View className="mt-2 flex-row items-center justify-between">
                   <Text className="text-sm">Số từ (tối thiểu 5)</Text>
                   <TextInput
+                    key={settings.wordLimit}
                     accessibilityLabel="Số từ mỗi ván"
                     keyboardType="number-pad"
                     defaultValue={String(settings.wordLimit ?? 10)}

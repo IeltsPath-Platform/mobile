@@ -16,7 +16,7 @@ import type { LetterStatus } from './types';
 
 export type TileMode = 'empty' | 'typed' | 'hint' | LetterStatus;
 
-export function tileColors(mode: TileMode) {
+function tileColors(mode: TileMode) {
   switch (mode) {
     case 'CORRECT':
       return { bg: colors.success, border: colors.success, fg: colors.onAccent };

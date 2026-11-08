@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 
 import { BackHeader } from '@/src/components/navigation/back-header';
@@ -9,6 +9,7 @@ import { Card } from '@/src/components/ui/card';
 import { FormAlert } from '@/src/components/ui/form-alert';
 import { Text } from '@/src/components/ui/text';
 import { createRequestId } from '@/src/lib/request-id';
+import { isUncertainStudyWrite } from '@/src/features/vocab/study-state';
 import { isLearningApiError, learningApi } from '@/src/features/learning';
 import type { QuestionDto } from '@/src/features/learning/types';
 import { FillInput } from '@/src/features/session/components/fill-input';
@@ -53,13 +54,17 @@ export default function ReviewScreen() {
     enabled: Boolean(reviewId),
   });
 
+  // Reused until success or a definite rejection so uncertain retries stay idempotent.
+  const submitRequestId = useRef<string | null>(null);
+  const theoryRequestId = useRef<string | null>(null);
+
   const submit = useMutation({
     mutationFn: async () => {
       const review = reviewQuery.data;
       if (!review?.set) throw new Error('No set');
       return learningApi.submitReview(review.reviewId, {
         reviewSetId: review.set.reviewSetId,
-        requestId: createRequestId(),
+        requestId: (submitRequestId.current ??= createRequestId()),
         answers: review.set.questions.map((q) => ({
           questionVersionId: q.questionVersionId,
           answer: answers[q.questionVersionId] ?? '',
@@ -67,8 +72,12 @@ export default function ReviewScreen() {
       });
     },
     onSuccess: async (result) => {
+      submitRequestId.current = null;
       await queryClient.invalidateQueries({ queryKey: ['learning'] });
       if (result.reviewStatus === 'DONE') router.back();
+    },
+    onError: (error) => {
+      if (!isUncertainStudyWrite(error)) submitRequestId.current = null;
     },
   });
 
@@ -77,7 +86,7 @@ export default function ReviewScreen() {
       const review = reviewQuery.data;
       if (!review) throw new Error('Review is not loaded');
       return learningApi.submitReviewTheoryCheck(review.reviewId, {
-        requestId: createRequestId(),
+        requestId: (theoryRequestId.current ??= createRequestId()),
         answers: (review.quickCheck ?? []).flatMap((question) => {
           const answer = theoryAnswers[question.questionVersionId]?.trim();
           return answer ? [{ questionVersionId: question.questionVersionId, answer }] : [];
@@ -85,8 +94,12 @@ export default function ReviewScreen() {
       });
     },
     onSuccess: async (result) => {
+      theoryRequestId.current = null;
       setTheoryResult({ correct: result.correct, total: result.total });
       await queryClient.invalidateQueries({ queryKey: ['learning'] });
+    },
+    onError: (error) => {
+      if (!isUncertainStudyWrite(error)) theoryRequestId.current = null;
     },
   });
 

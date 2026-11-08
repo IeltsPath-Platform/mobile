@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { Camera, Check, Clock3, ImagePlus, Trash2, UserRound } from 'lucide-react-native';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,6 +16,7 @@ import { TextField } from '@/src/components/ui/text-field';
 import { useCurrentUser } from '@/src/features/auth/auth-provider';
 import { profileApi, profileQueryKeys } from '@/src/features/profile/api';
 import { gamificationApi } from '@/src/features/progress/gamification-api';
+import { studyKeys } from '@/src/features/vocab/study-api';
 import { colors, fonts } from '@/src/theme';
 
 const MAX_SOURCE_AVATAR_BYTES = 20 * 1024 * 1024;
@@ -50,25 +51,35 @@ export default function EditProfileScreen() {
     ]);
   };
 
+  // Hydrate each source once so background refetches never wipe typed input.
+  const userHydrated = useRef(false);
+  const learnerHydrated = useRef(false);
+  const timezoneHydrated = useRef(false);
+
   useEffect(() => {
-    if (user.data) {
+    if (user.data && !userHydrated.current) {
+      userHydrated.current = true;
       setFullName(user.data.fullName);
       setPhoneNumber(user.data.phoneNumber ?? '');
     }
   }, [user.data]);
 
   useEffect(() => {
-    if (learner.data) {
+    if (learner.data && !learnerHydrated.current) {
+      learnerHydrated.current = true;
       setDisplayName(learner.data.displayName ?? user.data?.fullName ?? '');
       setBio(learner.data.bio ?? '');
       setBand(learner.data.selfReportedBand == null ? '' : String(learner.data.selfReportedBand));
-      setTimezone(learner.data.timezone || 'Asia/Ho_Chi_Minh');
+      if (!timezoneHydrated.current) setTimezone(learner.data.timezone || 'Asia/Ho_Chi_Minh');
       setVisibility(learner.data.visibility === 'PRIVATE' ? 'PRIVATE' : 'PUBLIC');
     }
   }, [learner.data, user.data?.fullName]);
 
   useEffect(() => {
-    if (gamificationSettings.data?.timezone) setTimezone(gamificationSettings.data.timezone);
+    if (gamificationSettings.data?.timezone && !timezoneHydrated.current) {
+      timezoneHydrated.current = true;
+      setTimezone(gamificationSettings.data.timezone);
+    }
   }, [gamificationSettings.data?.timezone]);
 
   const avatarMutation = useMutation({
@@ -112,8 +123,7 @@ export default function EditProfileScreen() {
         queryClient.invalidateQueries({ queryKey: profileQueryKeys.user }),
         queryClient.invalidateQueries({ queryKey: profileQueryKeys.learner }),
         queryClient.invalidateQueries({ queryKey: ['gamification', 'settings'] }),
-        queryClient.invalidateQueries({ queryKey: ['progress', 'summary'] }),
-        queryClient.invalidateQueries({ queryKey: ['streak'] }),
+        queryClient.invalidateQueries({ queryKey: studyKeys.summary }),
         refreshCommunityAvatar(),
       ]);
       router.back();

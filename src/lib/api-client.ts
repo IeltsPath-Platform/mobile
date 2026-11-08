@@ -194,5 +194,12 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     sessionExpiredListener?.();
     throw new ApiError(401, 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.');
   }
-  return parse<T>(await send(path, options, refreshed.accessToken));
+  const retry = await send(path, options, refreshed.accessToken);
+  if (retry.status === 401) {
+    // A freshly issued token was rejected too: the session cannot be recovered.
+    await tokenStorage.clear();
+    sessionExpiredListener?.();
+    throw new ApiError(401, 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.');
+  }
+  return parse<T>(retry);
 }

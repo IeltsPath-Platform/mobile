@@ -30,6 +30,9 @@ export function useDueStudy(deckId?: string) {
     queryFn: ({ signal }) => vocabApi.dueCards(deckId, 0, 50, signal),
     enabled,
     staleTime: 0,
+    // The due queue changes with every review; never replay a cached list.
+    gcTime: 0,
+    refetchOnMount: 'always',
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });

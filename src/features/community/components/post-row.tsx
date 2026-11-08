@@ -68,7 +68,7 @@ export const PostRow = memo(function PostRow({ post, authorOverride, onOpen, onO
         </Pressable>
         <View className="ml-3 flex-1">
           <View className="flex-row items-center">
-            <Pressable onPress={() => onOpenProfile(post.authorId)} className="shrink">
+            <Pressable onPress={() => onOpenProfile(post.authorId)} className="shrink" hitSlop={{ top: 8, bottom: 8 }} accessibilityRole="button" accessibilityLabel={`Hồ sơ ${author?.displayName ?? 'thành viên'}`}>
               <Text weight="bold" numberOfLines={1} className="text-[15px]">{author?.displayName ?? 'Học viên IELTSPath'}</Text>
             </Pressable>
             <Text className="ml-1.5 text-[13px] text-muted">· {timeAgo(post.createdAt)}</Text>
@@ -89,7 +89,7 @@ export const PostRow = memo(function PostRow({ post, authorOverride, onOpen, onO
       </Pressable>
 
       {images.length ? (
-        <Pressable onPress={onMediaTap} className="mx-4 mt-1 overflow-hidden rounded-2xl" accessibilityRole="imagebutton" accessibilityLabel={`${images.length} ảnh. Chạm hai lần để thả tim`}>
+        <Pressable onPress={onMediaTap} className="mx-4 mt-1 overflow-hidden rounded-2xl" accessibilityRole="imagebutton" accessibilityLabel={`${images.length} ảnh. Mở bài viết`} accessibilityActions={[{ name: 'love', label: 'Thả tim' }]} onAccessibilityAction={(event) => { if (event.nativeEvent.actionName === 'love' && myReaction !== 'LOVE') void reactToPost(qc, post, 'LOVE'); }}>
           <MediaGrid urls={images} />
           <HeartBurst burst={burst} />
         </Pressable>

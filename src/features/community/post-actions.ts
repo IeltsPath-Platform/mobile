@@ -33,7 +33,8 @@ export function reactToPost(qc: QueryClient, post: CommunityPost, type: Reaction
     try {
       await (post.myReaction === type ? communityApi.removeReaction(post.id, type) : communityApi.react(post.id, type));
     } catch (error) {
-      updateCommunityPostCache(qc, post.id, () => post);
+      // Restore only the reaction fields so concurrent bookmark/follow/comment updates survive.
+      updateCommunityPostCache(qc, post.id, (cached) => ({ ...cached, myReaction: post.myReaction, reactionCounts: post.reactionCounts }));
       fail('Không thể thả cảm xúc', error);
     }
   });
