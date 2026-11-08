@@ -48,6 +48,7 @@ async function readSettings(): Promise<AppSettings> {
       ...DEFAULT_APP_SETTINGS,
       ...parsed,
       theme: parsed.theme === 'dark' ? 'dark' : 'light',
+      fontSize: parsed.fontSize === 'S' || parsed.fontSize === 'L' ? parsed.fontSize : 'M',
     };
     return memoryCache;
   } catch {
@@ -58,8 +59,13 @@ async function readSettings(): Promise<AppSettings> {
 
 async function writeSettings(next: AppSettings): Promise<void> {
   memoryCache = next;
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   notifyListeners();
+  try {
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  } catch (error) {
+    // Keep the in-memory value so the UI stays consistent for this session.
+    console.warn('Không lưu được cài đặt ứng dụng', error);
+  }
 }
 
 /** Non-React access (audio helpers) to the latest persisted settings. */

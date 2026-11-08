@@ -8,19 +8,13 @@ import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
 import { FormAlert } from '@/src/components/ui/form-alert';
 import { Text } from '@/src/components/ui/text';
+import { createRequestId } from '@/src/lib/request-id';
 import { isLearningApiError, learningApi } from '@/src/features/learning';
 import type { LessonBlockDto } from '@/src/features/learning/types';
 import { ChoiceButtons } from '@/src/features/session/components/choice-buttons';
 import { FillInput } from '@/src/features/session/components/fill-input';
 import { colors } from '@/src/theme';
 
-function newRequestId() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
 
 export default function LessonScreen() {
   const { lessonId } = useLocalSearchParams<{ lessonId: string }>();
@@ -39,7 +33,7 @@ export default function LessonScreen() {
       const block = lesson?.blocks.find((b) => b.blockType === 'EXERCISE');
       if (!lesson || !block?.questions) throw new Error('No exercise');
       return learningApi.submitExercise(lesson.lessonId, block.blockId, {
-        requestId: newRequestId(),
+        requestId: createRequestId(),
         answers: block.questions.map((q) => ({
           questionVersionId: q.questionVersionId,
           answer: answers[q.questionVersionId] ?? '',

@@ -1,5 +1,4 @@
 import { router } from 'expo-router';
-import { ArrowLeft } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -81,8 +80,8 @@ export default function OnboardingScreen() {
             return (
               <Pressable
                 key={option}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: active }}
                 onPress={() => { if (!active) haptics.select(); choose(option); }}
                 className="min-h-16 justify-center rounded-2xl border border-b-4 px-4"
                 style={{

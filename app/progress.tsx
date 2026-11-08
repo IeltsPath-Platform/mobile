@@ -14,14 +14,14 @@ export default function ProgressScreen() {
   return (
     <SafeAreaView className="flex-1 bg-canvas">
       <ScrollView contentContainerClassName="pb-12" showsVerticalScrollIndicator={false}>
-        {/* Header */}
+
         <View className="flex-row items-center gap-2 px-5 pb-2 pt-4">
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Quay lại"
             hitSlop={8}
             onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/account' as never))}
-            className="h-10 w-10 items-center justify-center rounded-full active:bg-line"
+            className="h-11 w-11 items-center justify-center rounded-full active:bg-line"
           >
             <ChevronLeft size={22} color={colors.ink} />
           </Pressable>

@@ -13,6 +13,24 @@ beforeEach(() => {
 });
 const json = (status: number, data: unknown) => new Response(JSON.stringify(data), { status });
 describe('refresh token contract', () => {
+  it('does not report caller cancellation as a network failure', async () => {
+    vi.stubGlobal('__DEV__', true);
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const controller = new AbortController();
+    controller.abort();
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('The operation was aborted.'); }));
+    try {
+      await expect(apiRequest('/cancelled', { signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' });
+      expect(warning).not.toHaveBeenCalled();
+    } finally { warning.mockRestore(); }
+  });
+
+  it('still identifies a real timeout separately from cancellation', async () => {
+    vi.stubGlobal('fetch', vi.fn((_url: string, options: RequestInit) => new Promise((_resolve, reject) => {
+      options.signal?.addEventListener('abort', () => reject(new Error('The operation was aborted.')));
+    })));
+    await expect(apiRequest('/slow', { timeoutMs: 5 })).rejects.toMatchObject({ code: 'TIMEOUT' });
+  });
   it('allows multipart uploads longer than the regular API timeout', async () => {
     const fetchMock = vi.fn(async (_url: string, options: RequestInit) => {
       await new Promise((resolve) => setTimeout(resolve, 140));

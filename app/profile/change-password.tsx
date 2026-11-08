@@ -2,7 +2,7 @@ import { useMutation } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { CheckCircle2, LockKeyhole, ShieldCheck } from 'lucide-react-native';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BackButton } from '@/src/components/navigation/back-header';

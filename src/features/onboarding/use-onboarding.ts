@@ -49,8 +49,13 @@ async function readProfile(): Promise<OnboardingProfile> {
 export async function saveOnboarding(profile: OnboardingProfile) {
   memory = profile;
   loaded = true;
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
   notify();
+  try {
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+  } catch (error) {
+    // The in-memory profile keeps this session working; it just will not survive a restart.
+    console.warn('Không lưu được thông tin làm quen', error);
+  }
 }
 
 export function useOnboarding() {

@@ -5,7 +5,8 @@ import { BeVietnamPro_700Bold } from "@expo-google-fonts/be-vietnam-pro/700Bold"
 import { BeVietnamPro_800ExtraBold } from "@expo-google-fonts/be-vietnam-pro/800ExtraBold";
 import { BeVietnamPro_900Black } from "@expo-google-fonts/be-vietnam-pro/900Black";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Stack, type ErrorBoundaryProps } from "expo-router";
+import { Stack, type ErrorBoundaryProps, useRouter } from "expo-router";
+import * as Notifications from "expo-notifications";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
@@ -23,14 +24,25 @@ import { AUTH_ENABLED } from "@/src/lib/env";
 import { queryClient } from "@/src/lib/query-client";
 import { AppThemeProvider, useTheme } from "@/src/theme/app-theme";
 import { colors } from "@/src/theme";
+import { getNotificationRoute } from "@/src/features/community/push-notifications";
 
 const SPLASH = colors.accent;
+
+// Mobile currently has no notification WebSocket subscription, so keep the native foreground banner visible.
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 // Do not block first paint on fonts — returning null left a blank cream screen on web/SSR.
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 export const unstable_settings = {
-  initialRouteName: "welcome",
+  anchor: "welcome",
 };
 
 export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
@@ -88,10 +100,29 @@ export default function RootLayout() {
 }
 
 function RootNavigator() {
+  const router = useRouter();
   const { isDark } = useTheme();
   const { status } = useAuth();
   const { ready, onboarded } = useOnboarding();
   const isAuthenticated = status === "authenticated";
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let handledResponseKey: string | undefined;
+    const openNotification = (response: Notifications.NotificationResponse) => {
+      const responseKey = `${response.notification.request.identifier}:${response.actionIdentifier}`;
+      if (handledResponseKey === responseKey) return;
+      handledResponseKey = responseKey;
+      const data = response.notification.request.content.data as Record<string, unknown>;
+      router.push(getNotificationRoute(data) as never);
+      void Notifications.clearLastNotificationResponseAsync().catch(() => undefined);
+    };
+    const subscription = Notifications.addNotificationResponseReceivedListener(openNotification);
+    void Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) openNotification(response);
+    }).catch(() => undefined);
+    return () => subscription.remove();
+  }, [isAuthenticated, router]);
 
   if (!ready || (AUTH_ENABLED && status === "loading")) {
     return (

@@ -3,7 +3,9 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
+import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useMemo } from 'react';
 import {
   BookOpenCheck,
   MoreVertical,
@@ -14,7 +16,7 @@ import {
 import {
   ActivityIndicator,
   Alert,
-  Image,
+
   Pressable,
   FlatList,
   View,
@@ -86,6 +88,7 @@ export default function DeckDetailScreen() {
         },
       },
     ]);
+  const allItems = useMemo(() => items.data?.pages.flatMap((page) => page.items) ?? [], [items.data]);
   if (deck.isPending || items.isPending)
     return (
       <View className="flex-1 bg-canvas">
@@ -138,7 +141,7 @@ export default function DeckDetailScreen() {
         }
       />
       <FlatList
-        data={items.data.pages.flatMap((page) => page.items)}
+        data={allItems}
         keyExtractor={(item) => item.flashcardId}
         className="flex-1"
         contentContainerClassName="px-5 pb-12 pt-4"
@@ -221,6 +224,7 @@ export default function DeckDetailScreen() {
                   params: { deckId },
                 })
               }
+              accessibilityRole="button"
               className="mt-2 min-h-11 justify-center"
             >
               <Text weight="bold" className="text-accent">
@@ -231,7 +235,7 @@ export default function DeckDetailScreen() {
         }
         renderItem={({ item }) => (
           <Card
-            key={item.flashcardId}
+
             className="mb-3 border-b-0 bg-surface p-4"
           >
             <View className="flex-row items-start gap-3">
@@ -239,12 +243,14 @@ export default function DeckDetailScreen() {
                 <Image
                   source={{ uri: item.imageUrl }}
                   accessibilityLabel={`Ảnh minh họa ${item.front}`}
-                  className="h-16 w-16 rounded-xl"
-                  resizeMode="cover"
+                  style={{ width: 64, height: 64, borderRadius: 12 }}
+                  contentFit="cover"
                 />
               ) : null}
               <Pressable
-                className="flex-1"
+                accessibilityRole="button"
+                accessibilityLabel={`Sửa thẻ ${item.front}`}
+                className="min-h-11 flex-1 justify-center"
                 onPress={() =>
                   router.push({
                     pathname: '/flashcards/card/edit',
@@ -263,8 +269,9 @@ export default function DeckDetailScreen() {
                 ) : null}
               </Pressable>
               <Pressable
+                accessibilityRole="button"
                 onPress={() => remove(item.flashcardId)}
-                accessibilityLabel="Bỏ thẻ khỏi bộ"
+                accessibilityLabel={`Bỏ thẻ ${item.front} khỏi bộ`}
                 className="ml-2 h-11 w-11 items-center justify-center"
               >
                 <Trash2 size={18} color={colors.danger} />
@@ -283,6 +290,8 @@ export default function DeckDetailScreen() {
               />
             ) : null}
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Xóa bộ thẻ"
               onPress={deleteDeck}
               className="mt-4 min-h-12 flex-row items-center justify-center gap-2"
             >

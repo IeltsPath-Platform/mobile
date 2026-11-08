@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { router, useFocusEffect } from 'expo-router';
 import { ChevronRight, CircleHelp, Flame, Gamepad2, Rocket, Users } from 'lucide-react-native';
-import { useCallback, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, View, type ScrollViewInstance } from 'react-native';
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
@@ -13,47 +13,228 @@ import { haptics } from '@/src/lib/haptics';
 import { sound } from '@/src/lib/sound';
 import { colors } from '@/src/theme';
 import { useTheme } from '@/src/theme/app-theme';
+import { useTabBarScrollHandler } from '@/src/components/navigation/tab-reselect-context';
 
 type GameType = 'WORDLY' | 'ROCKET';
+type PlayerMode = 'SOLO' | 'MULTIPLAYER';
+type GameEntry = GameCatalog['games'][number];
+
 const gameInfo = (): Record<GameType, { title: string; subtitle: string; Icon: typeof Gamepad2; tint: string; foreground: string }> => ({
   WORDLY: { title: 'Wordly', subtitle: 'Đoán từ qua gợi ý, rèn phản xạ và vốn từ.', Icon: Gamepad2, tint: colors.accentSoft, foreground: colors.accent },
   ROCKET: { title: 'Rocket', subtitle: 'Chọn đáp án thật nhanh, thi đua cùng bạn bè.', Icon: Rocket, tint: colors.warmSoft, foreground: colors.accentWarm },
 });
+
 function availability(status: string) {
   if (status === 'AVAILABLE') return { label: 'ĐANG MỞ', color: colors.success, bg: colors.successSoft };
   if (status === 'COMING_SOON') return { label: 'SẮP RA MẮT', color: colors.muted, bg: colors.surfaceTint };
   if (status === 'MAINTENANCE') return { label: 'ĐANG BẢO TRÌ', color: colors.accentWarm, bg: colors.warmSoft };
   return { label: 'TẠM THỜI ĐÓNG', color: colors.muted, bg: colors.surfaceTint };
 }
-const matchRoute = (type: string, id: string) => type === 'ROCKET' ? `/games/rocket/${id}` as never : `/games/matches/${id}` as never;
+
+const matchRoute = (type: string, id: string) =>
+  (type === 'ROCKET' ? `/games/rocket/${id}` : `/games/matches/${id}`) as never;
 
 export default function PracticeScreen() {
   useTheme();
-  const gamesInfo = gameInfo();
+  const info = gameInfo();
   const scrollRef = useRef<ScrollViewInstance>(null);
+  const handleTabBarScroll = useTabBarScrollHandler();
   useFocusEffect(useCallback(() => () => scrollRef.current?.scrollTo({ y: 0, animated: false }), []));
-  const { authEnabled, status } = useAuth(); const canFetch = authEnabled && status === 'authenticated';
+  const { authEnabled, status } = useAuth();
+  const canFetch = authEnabled && status === 'authenticated';
   const catalog = useQuery({ queryKey: ['games', 'catalog'], queryFn: gameApi.catalog, enabled: canFetch, staleTime: 60_000, retry: 1 });
   const active = useQuery({ queryKey: ['games', 'active'], queryFn: gameApi.activeGame, enabled: canFetch, staleTime: 10_000, retry: 1 });
-  const games: GameCatalog['games'] = catalog.data?.games.filter((item) => item.gameType === 'WORDLY' || item.gameType === 'ROCKET') ?? [];
-  const activeRoute = active.data?.matchId ? matchRoute(active.data.gameType, active.data.matchId) : active.data ? `/games/rooms/${active.data.roomId}` as never : null;
-  const openGame = (gameType: GameType, playerMode: 'SOLO' | 'MULTIPLAYER') => {
+  const games = useMemo<GameEntry[]>(
+    () => catalog.data?.games.filter((item) => item.gameType === 'WORDLY' || item.gameType === 'ROCKET') ?? [],
+    [catalog.data],
+  );
+  const activeGame = active.data;
+  const activeRoute = activeGame
+    ? activeGame.matchId
+      ? matchRoute(activeGame.gameType, activeGame.matchId)
+      : (`/games/rooms/${activeGame.roomId}` as never)
+    : null;
+
+  const openGame = (gameType: GameType, playerMode: PlayerMode) => {
     haptics.tap();
     void sound.play('tap');
     router.push({ pathname: '/games', params: { gameType, playerMode } } as never);
   };
-  return <ScrollView ref={scrollRef} className="flex-1 bg-canvas" contentContainerClassName="px-5 pb-8 pt-4" keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} refreshControl={canFetch ? <RefreshControl refreshing={(catalog.isRefetching || active.isRefetching) && !catalog.isPending} onRefresh={() => { void catalog.refetch(); void active.refetch(); }} tintColor={colors.accent} /> : undefined}>
-    <Text accessibilityRole="header" className="mb-4 text-[24px]" weight="black">Luyện tập</Text>
-    {!canFetch ? <Card className="mb-4 border-b-0 bg-surface p-5"><Text weight="bold">Đăng nhập để chơi</Text><Text className="mt-2 text-sm leading-5 text-muted">Trạng thái game, phòng chơi và kết quả được đồng bộ với tài khoản của bạn.</Text><Button className="mt-4" label="Đăng nhập" onPress={() => router.push('/(auth)/login' as never)}/></Card> : null}
-    {canFetch && active.data && activeRoute ? <Pressable onPress={() => router.push(activeRoute)} className="mb-4"><Card className="overflow-hidden border-0 p-4" style={{ backgroundColor: colors.accentSoft }}><View className="flex-row items-center"><View className="h-11 w-11 items-center justify-center rounded-2xl bg-surface"><Gamepad2 size={21} color={colors.accent}/></View><View className="ml-3 flex-1"><Text className="text-xs uppercase tracking-wider text-accent" weight="bold">ĐANG CHƠI</Text><Text className="mt-1 text-base" weight="black">{active.data.gameType === 'ROCKET' ? 'Rocket' : 'Wordly'}{active.data.roomStatus === 'WAITING' ? ` · Phòng ${active.data.roomCode}` : ''}</Text><Text className="mt-1 text-xs text-muted">Chạm để quay lại ván của bạn</Text></View><ChevronRight size={20} color={colors.accent}/></View></Card></Pressable> : null}
-    {canFetch && catalog.isPending ? <View className="items-center py-8"><ActivityIndicator color={colors.accent}/><Text className="mt-2 text-sm text-muted">Đang tải trò chơi…</Text></View> : null}
-    {canFetch && catalog.isError ? <Card className="mb-4 border-b-0 bg-surface p-4"><Text weight="bold">Chưa tải được danh sách trò chơi</Text><Text className="mt-2 text-sm text-danger">{catalog.error.message}</Text><Button className="mt-4" variant="secondary" label="Thử lại" onPress={() => void catalog.refetch()}/></Card> : null}
-    {canFetch && catalog.isSuccess && !games.length ? <Card className="mb-4 items-center border-b-0 bg-surface p-5"><CircleHelp size={24} color={colors.muted}/><Text className="mt-2" weight="bold">Chưa có trò chơi nào</Text><Text className="mt-1 text-center text-sm text-muted">Danh sách trò chơi sẽ xuất hiện khi máy chủ cung cấp.</Text></Card> : null}
-    {canFetch && games.map((game) => {
-      const type = game.gameType as GameType; const info = gamesInfo[type]; const state = availability(game.status); const Icon = info.Icon; const available = game.status === 'AVAILABLE';
-      return <Card key={game.gameType} className="mb-3 overflow-hidden border-b-0 bg-surface p-0"><View className="p-4"><View className="flex-row items-center"><View className="h-12 w-12 items-center justify-center rounded-2xl" style={{ backgroundColor: info.tint }}><Icon size={23} color={info.foreground}/></View><View className="ml-3 flex-1"><Text className="text-lg" weight="black">{game.name || info.title}</Text><Text className="mt-1 text-xs leading-5 text-muted">{game.description || info.subtitle}</Text></View><View className="rounded-full px-2.5 py-1" style={{ backgroundColor: state.bg }}><Text className="text-[9px]" weight="bold" style={{ color: state.color }}>{state.label}</Text></View></View></View><View className="flex-row border-t border-line px-3 py-2"><Pressable disabled={!available || !canFetch || active.isPending || Boolean(active.data)} onPress={() => openGame(type, 'SOLO')} className="min-h-11 flex-1 flex-row items-center justify-center gap-2 rounded-xl"><Flame size={16} color={available ? colors.accentWarm : colors.muted}/><Text className="text-xs" weight="bold" style={{ color: available ? colors.ink : colors.muted }}>Chơi một mình</Text></Pressable><View className="my-2 w-px bg-line"/><Pressable disabled={!available || !canFetch || active.isPending || Boolean(active.data)} onPress={() => openGame(type, 'MULTIPLAYER')} className="min-h-11 flex-1 flex-row items-center justify-center gap-2 rounded-xl"><Users size={16} color={available ? colors.accent : colors.muted}/><Text className="text-xs" weight="bold" style={{ color: available ? colors.ink : colors.muted }}>Chơi cùng bạn</Text></Pressable></View></Card>;
-    })}
-    {canFetch && active.isError ? <Text className="mb-3 text-xs text-muted">Chưa kiểm tra được ván đang chơi. {active.error.message}</Text> : null}
-    {canFetch && active.data && !activeRoute ? <Button className="mb-4" variant="secondary" label="Cập nhật trạng thái ván" onPress={() => void active.refetch()}/> : null}
-  </ScrollView>;
+
+  return (
+    <ScrollView
+      ref={scrollRef}
+      onScroll={handleTabBarScroll}
+      scrollEventThrottle={16}
+      className="flex-1 bg-canvas"
+      contentContainerClassName="px-5 pb-8 pt-4"
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        canFetch ? (
+          <RefreshControl
+            refreshing={(catalog.isRefetching || active.isRefetching) && !catalog.isPending}
+            onRefresh={() => {
+              void catalog.refetch();
+              void active.refetch();
+            }}
+            tintColor={colors.accent}
+          />
+        ) : undefined
+      }
+    >
+      <Text accessibilityRole="header" className="mb-4 text-[24px]" weight="black">
+        Luyện tập
+      </Text>
+
+      {!canFetch ? (
+        <Card className="mb-4 border-b-0 bg-surface p-5">
+          <Text weight="bold">Đăng nhập để chơi</Text>
+          <Text className="mt-2 text-sm leading-5 text-muted">
+            Trạng thái game, phòng chơi và kết quả được đồng bộ với tài khoản của bạn.
+          </Text>
+          <Button className="mt-4" label="Đăng nhập" onPress={() => router.push('/(auth)/login' as never)} />
+        </Card>
+      ) : null}
+
+      {canFetch && activeGame && activeRoute ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Quay lại ván đang chơi"
+          onPress={() => router.push(activeRoute)}
+          className="mb-4"
+        >
+          <Card className="overflow-hidden border-0 p-4" style={{ backgroundColor: colors.accentSoft }}>
+            <View className="flex-row items-center">
+              <View className="h-11 w-11 items-center justify-center rounded-2xl bg-surface">
+                <Gamepad2 size={21} color={colors.accent} />
+              </View>
+              <View className="ml-3 flex-1">
+                <Text className="text-xs uppercase tracking-wider text-accent" weight="bold">
+                  ĐANG CHƠI
+                </Text>
+                <Text className="mt-1 text-base" weight="black">
+                  {activeGame.gameType === 'ROCKET' ? 'Rocket' : 'Wordly'}
+                  {activeGame.roomStatus === 'WAITING' ? ` · Phòng ${activeGame.roomCode}` : ''}
+                </Text>
+                <Text className="mt-1 text-xs text-muted">Chạm để quay lại ván của bạn</Text>
+              </View>
+              <ChevronRight size={20} color={colors.accent} />
+            </View>
+          </Card>
+        </Pressable>
+      ) : null}
+
+      {canFetch && catalog.isPending ? (
+        <View className="items-center py-8">
+          <ActivityIndicator color={colors.accent} />
+          <Text className="mt-2 text-sm text-muted">Đang tải trò chơi…</Text>
+        </View>
+      ) : null}
+
+      {canFetch && catalog.isError ? (
+        <Card className="mb-4 border-b-0 bg-surface p-4">
+          <Text weight="bold">Chưa tải được danh sách trò chơi</Text>
+          <Text className="mt-2 text-sm text-danger">{catalog.error.message}</Text>
+          <Button className="mt-4" variant="secondary" label="Thử lại" onPress={() => void catalog.refetch()} />
+        </Card>
+      ) : null}
+
+      {canFetch && catalog.isSuccess && !games.length ? (
+        <Card className="mb-4 items-center border-b-0 bg-surface p-5">
+          <CircleHelp size={24} color={colors.muted} />
+          <Text className="mt-2" weight="bold">
+            Chưa có trò chơi nào
+          </Text>
+          <Text className="mt-1 text-center text-sm text-muted">
+            Danh sách trò chơi sẽ xuất hiện khi máy chủ cung cấp.
+          </Text>
+        </Card>
+      ) : null}
+
+      {canFetch
+        ? games.map((game) => {
+            const type = game.gameType as GameType;
+            const meta = info[type];
+            const state = availability(game.status);
+            const playable = game.status === 'AVAILABLE' && !active.isPending && !activeGame;
+            const name = game.name || meta.title;
+            return (
+              <Card key={game.gameType} className="mb-3 overflow-hidden border-b-0 bg-surface p-0">
+                <View className="flex-row items-center p-4">
+                  <View className="h-12 w-12 items-center justify-center rounded-2xl" style={{ backgroundColor: meta.tint }}>
+                    <meta.Icon size={23} color={meta.foreground} />
+                  </View>
+                  <View className="ml-3 flex-1">
+                    <Text className="text-lg" weight="black">
+                      {name}
+                    </Text>
+                    <Text className="mt-1 text-xs leading-5 text-muted">{game.description || meta.subtitle}</Text>
+                  </View>
+                  <View className="rounded-full px-2.5 py-1" style={{ backgroundColor: state.bg }}>
+                    <Text className="text-[9px]" weight="bold" style={{ color: state.color }}>
+                      {state.label}
+                    </Text>
+                  </View>
+                </View>
+                <View className="flex-row border-t border-line px-3 py-2">
+                  <ModeButton
+                    label="Chơi một mình"
+                    a11yLabel={`${name}: chơi một mình`}
+                    disabled={!playable}
+                    icon={<Flame size={16} color={playable ? colors.accentWarm : colors.muted} />}
+                    onPress={() => openGame(type, 'SOLO')}
+                  />
+                  <View className="my-2 w-px bg-line" />
+                  <ModeButton
+                    label="Chơi cùng bạn"
+                    a11yLabel={`${name}: chơi cùng bạn`}
+                    disabled={!playable}
+                    icon={<Users size={16} color={playable ? colors.accent : colors.muted} />}
+                    onPress={() => openGame(type, 'MULTIPLAYER')}
+                  />
+                </View>
+              </Card>
+            );
+          })
+        : null}
+
+      {canFetch && active.isError ? (
+        <Text className="mb-3 text-xs text-muted">Chưa kiểm tra được ván đang chơi. {active.error.message}</Text>
+      ) : null}
+      {canFetch && activeGame && !activeRoute ? (
+        <Button className="mb-4" variant="secondary" label="Cập nhật trạng thái ván" onPress={() => void active.refetch()} />
+      ) : null}
+    </ScrollView>
+  );
+}
+
+function ModeButton({
+  label,
+  a11yLabel,
+  disabled,
+  icon,
+  onPress,
+}: {
+  label: string;
+  a11yLabel: string;
+  disabled: boolean;
+  icon: React.ReactElement;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={a11yLabel}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      className="min-h-11 flex-1 flex-row items-center justify-center gap-2 rounded-xl"
+    >
+      {icon}
+      <Text className="text-xs" weight="bold" style={{ color: disabled ? colors.muted : colors.ink }}>
+        {label}
+      </Text>
+    </Pressable>
+  );
 }

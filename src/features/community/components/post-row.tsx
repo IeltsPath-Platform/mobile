@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Bookmark, MessageCircle, MoreHorizontal } from 'lucide-react-native';
 import { memo, useEffect, useRef, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Pressable, View, useWindowDimensions } from 'react-native';
 
 import { Text } from '@/src/components/ui/text';
 import { haptics } from '@/src/lib/haptics';
@@ -123,7 +123,7 @@ export const PostRow = memo(function PostRow({ post, authorOverride, onOpen, onO
 
 function MediaGrid({ urls }: { urls: string[] }) {
   if (urls.length === 1) {
-    return <CommunityImage uri={urls[0]} label="Ảnh trong bài viết" className="h-64 w-full" />;
+    return <SinglePostImage uri={urls[0]} />;
   }
   const shown = urls.slice(0, 3);
   const extra = urls.length - shown.length;
@@ -139,6 +139,34 @@ function MediaGrid({ urls }: { urls: string[] }) {
           ) : null}
         </View>
       ))}
+    </View>
+  );
+}
+
+function SinglePostImage({ uri }: { uri: string }) {
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
+  const frameWidth = Math.max(1, screenWidth - 32);
+  const maxHeight = Math.max(240, screenHeight * 0.72);
+  const aspectRatio = dimensions ? dimensions.width / dimensions.height : null;
+  const imageHeight = aspectRatio ? Math.min(frameWidth / aspectRatio, maxHeight) : Math.min(256, maxHeight);
+  const imageWidth = aspectRatio ? Math.min(frameWidth, imageHeight * aspectRatio) : frameWidth;
+
+  return (
+    <View className="w-full items-center justify-center bg-surface" style={{ height: imageHeight }}>
+      <CommunityImage
+        uri={uri}
+        label="Ảnh trong bài viết"
+        resizeMode="contain"
+        style={{ width: imageWidth, height: imageHeight }}
+        onLoad={({ source }) => {
+          if (source.width > 0 && source.height > 0) {
+            setDimensions((current) => current?.width === source.width && current.height === source.height
+              ? current
+              : { width: source.width, height: source.height });
+          }
+        }}
+      />
     </View>
   );
 }

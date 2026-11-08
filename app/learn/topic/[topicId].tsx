@@ -101,6 +101,9 @@ export default function TopicDetailScreen() {
         return (
           <Pressable
             key={lesson.lessonId}
+            accessibilityRole="button"
+            accessibilityLabel={`${lesson.code}. ${lesson.title}. ${lessonLabel(lesson.status)}`}
+            accessibilityState={{ disabled: locked }}
             disabled={locked}
             onPress={() => router.push({ pathname: '/learn/session/[lessonId]', params: { lessonId: lesson.lessonId } })}
             className={locked ? 'opacity-50' : ''}>

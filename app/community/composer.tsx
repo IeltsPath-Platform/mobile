@@ -153,6 +153,7 @@ export default function ComposerScreen() {
       setError('Mỗi bài viết có thể đính kèm tối đa 4 ảnh.');
       return;
     }
+    Keyboard.dismiss();
     setPicking(true);
     setError('');
     try {
@@ -186,6 +187,7 @@ export default function ComposerScreen() {
         setBackground(undefined);
         setShowBackgrounds(false);
         haptics.tap();
+        requestAnimationFrame(() => requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true })));
       }
       setError(rejected.join('\n'));
     } catch (cause) {
@@ -317,9 +319,9 @@ export default function ComposerScreen() {
   const optionCount = [title.trim(), targetBand.trim(), videoUrl.trim()].filter(Boolean).length;
 
   return (
-    <SafeAreaView className="flex-1 bg-canvas" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-canvas" edges={[]}>
       <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'web' ? undefined : 'padding'}>
-        <View className="min-h-14 flex-row items-center border-b border-line px-2">
+        <View className="flex-row items-center border-b border-line bg-surface px-3 pb-2" style={{ paddingTop: Math.max(insets.top, 12) }}>
           <Pressable onPress={close} disabled={busy} className="h-11 w-11 items-center justify-center rounded-full active:bg-tint" accessibilityRole="button" accessibilityLabel="Đóng trình soạn bài">
             <X size={24} color={colors.ink} />
           </Pressable>
@@ -353,10 +355,11 @@ export default function ComposerScreen() {
 
           {(!id || existing.data) && !existing.isError ? (
             <>
-              <View className="flex-row items-center">
+              <View className="flex-row items-center rounded-3xl border border-line bg-surface p-3.5">
                 <CommunityAvatar uri={ownProfile.data?.avatarUrl} name={ownProfile.data?.displayName ?? currentUser.data?.fullName} size={44} />
                 <View className="ml-3 flex-1 items-start">
                   <Text weight="bold" className="text-base">{currentUser.data?.fullName ?? 'Bạn'}</Text>
+                  <Text className="mt-0.5 text-xs text-muted">Chia sẻ với cộng đồng</Text>
                   <Pressable
                     onPress={() => { Keyboard.dismiss(); setSheet('category'); }}
                     disabled={busy}
@@ -386,19 +389,26 @@ export default function ComposerScreen() {
                   />
                 </View>
               ) : (
-                <TextInput
-                  value={body}
-                  onChangeText={(value) => { markDirty(); setBody(value); if (background && value.trim().length > MAX_BACKGROUND_LENGTH) setBackground(undefined); }}
-                  editable={!busy}
-                  autoFocus={!id}
-                  placeholder="Bạn đang học gì hôm nay? Hỏi, chia sẻ hoặc tìm bạn luyện cùng…"
-                  placeholderTextColor={colors.muted}
-                  multiline
-                  textAlignVertical="top"
-                  maxLength={MAX_BODY_LENGTH}
-                  accessibilityLabel="Nội dung bài viết"
-                  className="mt-3 min-h-[180px] text-lg leading-7 text-ink"
-                />
+                <View className="mt-4 min-h-[300px] rounded-3xl border border-line bg-surface p-4">
+                  <View className="flex-row items-center justify-between">
+                    <Text weight="bold" className="text-sm">Nội dung bài viết</Text>
+                    {body.length > 3_500 ? <Text className="text-xs text-muted">{body.length}/{MAX_BODY_LENGTH}</Text> : null}
+                  </View>
+                  <TextInput
+                    value={body}
+                    onChangeText={(value) => { markDirty(); setBody(value); if (background && value.trim().length > MAX_BACKGROUND_LENGTH) setBackground(undefined); }}
+                    editable={!busy}
+                    autoFocus={!id}
+                    placeholder="Chia sẻ điều bạn đang học, đặt câu hỏi hoặc tìm bạn luyện cùng…"
+                    placeholderTextColor={colors.muted}
+                    multiline
+                    textAlignVertical="top"
+                    maxLength={MAX_BODY_LENGTH}
+                    accessibilityLabel="Nội dung bài viết"
+                    className="mt-3 min-h-[220px] text-base leading-7 text-ink"
+                    style={{ textAlignVertical: 'top' }}
+                  />
+                </View>
               )}
 
               {images.length ? (
@@ -459,7 +469,7 @@ export default function ComposerScreen() {
           </View>
         ) : null}
 
-        <View className="min-h-14 flex-row items-center border-t border-line bg-surface px-2" style={{ paddingBottom: Platform.OS === 'ios' && !keyboardVisible ? Math.max(insets.bottom - 8, 0) : 0 }}>
+        <View className="min-h-14 flex-row items-center border-t border-line bg-surface px-2" style={{ paddingBottom: Platform.OS === 'ios' && !keyboardVisible ? Math.max(insets.bottom, 12) : 4 }}>
           <ToolButton label={picking ? 'Đang mở thư viện ảnh' : `Thêm ảnh, ${images.length}/${MAX_IMAGE_COUNT}`} disabled={busy || picking || images.length >= MAX_IMAGE_COUNT} onPress={() => void pickImages()}>
             {picking ? <ActivityIndicator color={colors.success} /> : <ImagePlus size={23} color={colors.success} />}
           </ToolButton>

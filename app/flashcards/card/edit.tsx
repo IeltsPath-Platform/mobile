@@ -1,18 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import {
-  ChevronDown,
-  ImagePlus,
-  Search,
-  Sparkles,
-  X,
-} from 'lucide-react-native';
+import { ChevronDown, ImagePlus, X } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   Pressable,
   ScrollView,
   TextInput,
@@ -24,11 +18,9 @@ import { BackHeader } from '@/src/components/navigation/back-header';
 import { Button } from '@/src/components/ui/button';
 import { FormAlert } from '@/src/components/ui/form-alert';
 import { Text } from '@/src/components/ui/text';
+import { CardWordPicker, type PickedSense } from '@/src/features/flashcards/components/card-word-picker';
 import { vocabApi } from '@/src/features/vocab/api';
-import {
-  invalidateFlashcards,
-  useDebouncedSearch,
-} from '@/src/features/flashcards/queries';
+import { invalidateFlashcards } from '@/src/features/flashcards/queries';
 import { colors } from '@/src/theme';
 
 const field =
@@ -50,22 +42,9 @@ export default function EditCardScreen() {
   const [imageKey, setImageKey] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [wordQuery, setWordQuery] = useState('');
-  const [sense, setSense] = useState<{
-    id: string;
-    lemma: string;
-    meaning: string;
-    example: string | null;
-  } | null>(null);
+  const [sense, setSense] = useState<PickedSense | null>(null);
   const [error, setError] = useState('');
   const [showExtra, setShowExtra] = useState(false);
-  const debouncedWordQuery = useDebouncedSearch(wordQuery);
-  const search = useQuery({
-    queryKey: ['vocabulary', 'search', debouncedWordQuery],
-    queryFn: ({ signal }) => vocabApi.search(debouncedWordQuery, signal),
-    enabled: debouncedWordQuery.length >= 2 && !cardId,
-    staleTime: 60_000,
-  });
   const hydratedId = useRef<string | null>(null);
   useEffect(() => {
     if (card.data && hydratedId.current !== card.data.id) {
@@ -210,85 +189,16 @@ export default function EditCardScreen() {
             </View>
           ) : null}
           {!cardId ? (
-            <View className="mb-4 rounded-3xl border border-line bg-surface p-4">
-              <View className="mb-3 flex-row items-center gap-2">
-                <Sparkles size={17} color={colors.accent} />
-                <Text weight="bold">Chọn từ có sẵn</Text>
-                <Text className="text-xs text-muted">· nhanh hơn</Text>
-              </View>
-              <View className="flex-row items-center rounded-2xl border border-line bg-canvas px-3">
-                <Search size={18} color={colors.muted} />
-                <TextInput
-                  value={wordQuery}
-                  onChangeText={setWordQuery}
-                  placeholder="Tìm từ vựng tiếng Anh"
-                  placeholderTextColor={colors.muted}
-                  autoCapitalize="none"
-                  returnKeyType="search"
-                  className="min-h-12 flex-1 px-2 text-base text-ink"
-                />
-              </View>
-              {search.isFetching ? (
-                <View className="flex-row items-center gap-2 py-3">
-                  <ActivityIndicator size="small" color={colors.accent} />
-                  <Text className="text-xs text-muted">Đang tìm từ…</Text>
-                </View>
-              ) : null}
-              {search.isError ? (
-                <Text className="mt-2 text-xs text-danger">
-                  Chưa tìm được từ. Bạn vẫn có thể nhập thẻ thủ công bên dưới.
-                </Text>
-              ) : null}
-              {search.data?.slice(0, 4).map((item) => (
-                <View key={item.id}>
-                  {item.senses.slice(0, 2).map((s) => (
-                    <Pressable
-                      key={s.id}
-                      accessibilityRole="button"
-                      onPress={() => {
-                        setSense({
-                          id: s.id,
-                          lemma: item.lemma,
-                          meaning:
-                            s.vietnameseMeaning ?? s.englishDefinition ?? '',
-                          example: s.exampleSentence,
-                        });
-                        setFront(item.lemma);
-                        setBack(
-                          s.vietnameseMeaning ?? s.englishDefinition ?? '',
-                        );
-                        setExample(s.exampleSentence ?? '');
-                        setWordQuery('');
-                      }}
-                      className="mt-2 rounded-2xl bg-canvas p-3"
-                    >
-                      <Text weight="bold">
-                        {item.lemma}{' '}
-                        <Text className="text-xs text-muted">{item.ipa}</Text>
-                      </Text>
-                      <Text
-                        numberOfLines={2}
-                        className="mt-1 text-sm text-muted"
-                      >
-                        {s.vietnameseMeaning ?? s.englishDefinition}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              ))}
-              {sense ? (
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => setSense(null)}
-                  className="mt-3 flex-row items-center gap-2"
-                >
-                  <Text className="text-sm text-success" weight="bold">
-                    Đã chọn từ trong kho
-                  </Text>
-                  <X size={15} color={colors.success} />
-                </Pressable>
-              ) : null}
-            </View>
+            <CardWordPicker
+              selected={sense}
+              onClear={() => setSense(null)}
+              onPick={(picked) => {
+                setSense(picked);
+                setFront(picked.lemma);
+                setBack(picked.meaning);
+                setExample(picked.example ?? '');
+              }}
+            />
           ) : null}
           <View className="mb-4 rounded-3xl border border-line bg-surface p-4">
             <Text className="mb-3 text-base" weight="black">
@@ -331,6 +241,7 @@ export default function EditCardScreen() {
           </View>
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel="Thêm ví dụ hoặc hình ảnh"
             accessibilityState={{ expanded: showExtra }}
             onPress={() => setShowExtra((value) => !value)}
             className="min-h-[58px] flex-row items-center gap-3 rounded-2xl border border-line bg-surface px-4"
@@ -374,8 +285,8 @@ export default function EditCardScreen() {
                   <Image
                     source={{ uri: imageUrl }}
                     accessibilityLabel="Ảnh minh họa thẻ"
-                    className="h-48 w-full"
-                    resizeMode="cover"
+                    style={{ height: 192, width: '100%' }}
+                    contentFit="cover"
                   />
                   <Pressable
                     accessibilityRole="button"
@@ -391,6 +302,8 @@ export default function EditCardScreen() {
                 </View>
               ) : (
                 <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Chọn ảnh minh họa"
                   disabled={uploadingImage}
                   onPress={() => void pickImage()}
                   className="mt-2 min-h-14 flex-row items-center justify-center gap-2 rounded-2xl border border-dashed border-accent bg-accent-soft"
@@ -432,6 +345,8 @@ export default function EditCardScreen() {
           />
           {cardId ? (
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Xóa thẻ"
               onPress={remove}
               className="mt-3 min-h-12 items-center justify-center"
             >

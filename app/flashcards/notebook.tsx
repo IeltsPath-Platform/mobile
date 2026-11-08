@@ -1,12 +1,13 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useRef, useState } from 'react';
-import { FlatList, Image, Pressable, TextInput, View } from 'react-native';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { FlatList, Pressable, TextInput, View } from 'react-native';
 import { BackHeader } from '@/src/components/navigation/back-header';
 import { Button } from '@/src/components/ui/button';
 import { Text } from '@/src/components/ui/text';
 import { levels, notebookApi, type NotebookFilters, type UnderstandingLevel } from '@/src/features/flashcards/notebook-api';
 import { invalidateFlashcards, nextPage, useDebouncedSearch, useFlashcardAccess } from '@/src/features/flashcards/queries';
+import { NotebookEntryRow } from '@/src/features/flashcards/components/notebook-entry-row';
 import { FlashcardSignIn, QueryState } from '@/src/features/flashcards/components/query-state';
 import { createRequestId } from '@/src/lib/request-id';
 import { colors } from '@/src/theme';
@@ -39,17 +40,33 @@ export default function NotebookScreen() {
       await invalidateFlashcards(client);
     },
   });
-  const setUnderstanding = (id: string, value: UnderstandingLevel) => {
-    const key = `${id}:${value}`;
-    const requestId = requestIds.current.get(key) ?? createRequestId();
-    requestIds.current.set(key, requestId);
-    update.mutate({ id, value, requestId });
-  };
+  const { mutate: mutateLevel, reset: resetLevel } = update;
+  const setUnderstanding = useCallback(
+    (id: string, value: UnderstandingLevel) => {
+      const key = `${id}:${value}`;
+      const requestId = requestIds.current.get(key) ?? createRequestId();
+      requestIds.current.set(key, requestId);
+      mutateLevel({ id, value, requestId });
+    },
+    [mutateLevel],
+  );
+  const toggleEdit = useCallback(
+    (id: string) => {
+      setEditing((current) => (current === id ? null : id));
+      resetLevel();
+    },
+    [resetLevel],
+  );
+  const editCard = useCallback(
+    (cardId: string) => router.push({ pathname: '/flashcards/card/edit', params: { cardId } }),
+    [],
+  );
+  const rows = useMemo(() => entries.data?.pages.flatMap((page) => page.items) ?? [], [entries.data]);
 
   return <View className="flex-1 bg-canvas">
     <BackHeader title={title || 'Sổ từ của tôi'} fallbackHref="/(tabs)/flashcards" />
     {!enabled ? <FlashcardSignIn /> : <FlatList
-      data={entries.data?.pages.flatMap((page) => page.items) ?? []}
+      data={rows}
       keyExtractor={(entry) => entry.flashcardId}
       contentContainerClassName="px-5 pb-10"
       keyboardShouldPersistTaps="handled"
@@ -68,19 +85,16 @@ export default function NotebookScreen() {
         <QueryState pending={entries.isPending} error={entries.error} retry={() => void entries.refetch()} />
         {update.error ? <Text accessibilityRole="alert" className="text-sm text-danger">{update.error.message}</Text> : null}
       </View>}
-      renderItem={({ item }) => <View className="mb-3 rounded-2xl border border-line bg-surface p-4">
-        <View className="flex-row items-center gap-3">
-          {item.imageUrl ? <Image source={{ uri: item.imageUrl }} className="h-14 w-14 rounded-xl" accessibilityLabel={item.lemma} /> : null}
-          <View className="flex-1"><Text weight="bold" className="text-lg">{item.lemma}</Text><Text className="text-sm text-muted">{[item.ipa, item.partOfSpeech].filter(Boolean).join(' · ')}</Text></View>
-        </View>
-        <Text className="mt-2">{item.vietnameseMeaning || item.englishDefinition}</Text>
-        {item.exampleSentence ? <Text className="mt-2 text-sm italic text-muted">{item.exampleSentence}</Text> : null}
-        <View className="mt-2 flex-row items-center justify-between">
-          <Pressable accessibilityRole="button" accessibilityLabel={`Đổi mức độ ghi nhớ ${item.lemma}`} onPress={() => { setEditing(editing === item.flashcardId ? null : item.flashcardId); update.reset(); }} className="min-h-11 justify-center"><Text weight="bold" className="text-sm text-accent-deep">{levels[item.level]} ▾</Text></Pressable>
-          <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/flashcards/card/edit', params: { cardId: item.flashcardId } })} className="min-h-11 justify-center px-2"><Text className="text-sm text-muted">Sửa thẻ</Text></Pressable>
-        </View>
-        {editing === item.flashcardId ? <View className="flex-row flex-wrap gap-2">{(Object.keys(levels) as UnderstandingLevel[]).map((value) => <Button key={value} variant="secondary" label={levels[value]} disabled={update.isPending || value === item.level} onPress={() => setUnderstanding(item.flashcardId, value)} />)}</View> : null}
-      </View>}
+      renderItem={({ item }) => (
+        <NotebookEntryRow
+          entry={item}
+          editing={editing === item.flashcardId}
+          updating={update.isPending}
+          onToggleEdit={toggleEdit}
+          onSetLevel={setUnderstanding}
+          onEditCard={editCard}
+        />
+      )}
       ListEmptyComponent={entries.isSuccess ? <Text className="py-8 text-center text-muted">Chưa có từ phù hợp. Thêm từ hoặc đổi bộ lọc.</Text> : undefined}
       ListFooterComponent={entries.hasNextPage ? <Button label="Tải thêm từ" variant="secondary" loading={entries.isFetchingNextPage} onPress={() => void entries.fetchNextPage()} /> : undefined}
     />}

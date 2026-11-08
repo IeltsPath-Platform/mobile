@@ -73,8 +73,14 @@ export default function BookmarkedScreen() {
         keyExtractor={(post) => post.id}
         renderItem={({ item }) => <PostRow post={item} onOpen={openPost} onOpenProfile={openProfile} onMenu={menu.open} />}
         ListEmptyComponent={empty}
-        ListFooterComponent={query.isFetchingNextPage ? <ActivityIndicator className="py-5" color={colors.accent} /> : undefined}
-        onEndReached={() => { if (query.hasNextPage && !query.isFetchingNextPage) void query.fetchNextPage(); }}
+        ListFooterComponent={
+          query.isFetchNextPageError
+            ? <View className="items-center gap-2 px-4 py-5"><Text className="text-sm text-muted">Không tải được các bài tiếp theo.</Text><Button variant="secondary" label="Thử lại" onPress={() => void query.fetchNextPage()} /></View>
+            : query.isFetchingNextPage
+              ? <ActivityIndicator className="py-5" color={colors.accent} />
+              : undefined
+        }
+        onEndReached={() => { if (query.hasNextPage && !query.isFetching && !query.isFetchNextPageError) void query.fetchNextPage(); }}
         onEndReachedThreshold={0.5}
         removeClippedSubviews
         initialNumToRender={5}

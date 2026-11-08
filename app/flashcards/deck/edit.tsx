@@ -1,12 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { ImagePlus, X } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
-  Image,
   Pressable,
   ScrollView,
   TextInput,
@@ -171,8 +170,8 @@ export default function EditDeckScreen() {
                 <Image
                   source={{ uri: coverUrl }}
                   accessibilityLabel="Ảnh bìa bộ thẻ"
-                  className="h-40 w-full"
-                  resizeMode="cover"
+                  style={{ height: 160, width: '100%' }}
+                  contentFit="cover"
                 />
                 <Pressable
                   accessibilityRole="button"
@@ -181,13 +180,15 @@ export default function EditDeckScreen() {
                     setCoverKey(null);
                     setCoverUrl('');
                   }}
-                  className="absolute right-2 top-2 h-10 w-10 items-center justify-center rounded-full bg-black/60"
+                  className="absolute right-2 top-2 h-11 w-11 items-center justify-center rounded-full bg-black/60"
                 >
                   <X color="white" size={19} />
                 </Pressable>
               </View>
             ) : (
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Thêm ảnh bìa"
                 disabled={uploadingCover}
                 onPress={() => void pickCover()}
                 className="mt-2 min-h-[58px] flex-row items-center justify-center gap-2 rounded-2xl border border-dashed border-accent bg-accent-soft"

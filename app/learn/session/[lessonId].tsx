@@ -71,12 +71,6 @@ export default function SessionScreen() {
   }, [runner.status, runner.lessonCompleted, lessonId, queryClient]);
 
   const finish = () => {
-    if (runner.lessonCompleted && lessonId) {
-      queryClient.setQueryData(SESSION_DONE_KEY, {
-        nodeId: lessonId,
-        lessonCompleted: true,
-      });
-    }
     router.back();
   };
 
@@ -216,7 +210,6 @@ export default function SessionScreen() {
   }
 
   const kind = questionKind(question);
-  const locked = false;
   const isLast = runner.index >= runner.blockTotal - 1;
   const checkLabel = isLast ? 'Nộp bài' : 'Câu tiếp theo';
 
@@ -246,16 +239,16 @@ export default function SessionScreen() {
 
         <View className="mt-4">
           {kind === 'tfng' && question.options ? (
-            <TfngButtons options={question.options} value={runner.draft} onChange={runner.setDraft} disabled={locked} />
+            <TfngButtons options={question.options} value={runner.draft} onChange={runner.setDraft} />
           ) : null}
           {kind === 'choice' && question.options ? (
-            <ChoiceButtons options={question.options} value={runner.draft} onChange={runner.setDraft} disabled={locked} />
+            <ChoiceButtons options={question.options} value={runner.draft} onChange={runner.setDraft} />
           ) : null}
           {kind === 'fill' ? (
             <>
-              <FillInput value={runner.draft} onChange={runner.setDraft} disabled={locked} />
+              <FillInput value={runner.draft} onChange={runner.setDraft} />
               {question.wordBank ? (
-                <WordBank words={question.wordBank} value={runner.draft} onChange={runner.setDraft} disabled={locked} />
+                <WordBank words={question.wordBank} value={runner.draft} onChange={runner.setDraft} />
               ) : null}
             </>
           ) : null}

@@ -4,6 +4,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { onSessionExpired } from '@/src/lib/api-client';
 import { AUTH_ENABLED } from '@/src/lib/env';
 import { tokenStorage } from '@/src/lib/token-storage';
+import * as Notifications from 'expo-notifications';
+import { registerCurrentInstallation, unregisterCurrentInstallation } from '@/src/features/community/push-notifications';
 
 import { authApi } from './api';
 import type { LoginInput, RegisterInput } from './schemas';
@@ -49,6 +51,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => onSessionExpired(null);
   }, [queryClient]);
 
+  useEffect(() => {
+    if (!AUTH_ENABLED || status !== 'authenticated') return;
+    // Permission and native token registration are best effort; inbox notifications remain available without push.
+    void registerCurrentInstallation().catch(() => undefined);
+    const tokenSubscription = Notifications.addPushTokenListener((token) => {
+      void registerCurrentInstallation(token.data).catch(() => undefined);
+    });
+    return () => tokenSubscription.remove();
+  }, [status]);
+
   const signIn = useCallback(
     async ({ email, password }: LoginInput) => {
       if (!AUTH_ENABLED) return;
@@ -77,6 +89,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     if (!AUTH_ENABLED) return;
     const tokens = await tokenStorage.load().catch(() => null);
+    // Remove the device binding while the current access token is still available.
+    await unregisterCurrentInstallation().catch(() => undefined);
     if (tokens) {
       // Best effort: the local session is cleared even if the server is unreachable.
       await authApi.logout(tokens.refreshToken).catch(() => undefined);

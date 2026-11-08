@@ -88,6 +88,11 @@ async function send(path: string, options: RequestOptions, accessToken?: string)
       signal: controller.signal,
     });
   } catch (cause) {
+    if (options.signal?.aborted && !timedOut) {
+      const cancelled = new Error('Request cancelled');
+      cancelled.name = 'AbortError';
+      throw cancelled;
+    }
     const reason = cause instanceof Error ? cause.message : String(cause);
     if (__DEV__) {
       console.warn('[api] Network request failed', {

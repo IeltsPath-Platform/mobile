@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ActionSheet, type ActionSheetItem } from '@/src/components/ui/action-sheet';
 import { BackHeader } from '@/src/components/navigation/back-header';
 import { Button } from '@/src/components/ui/button';
+import { Skeleton } from '@/src/components/ui/skeleton';
 import { Text } from '@/src/components/ui/text';
 import { useCurrentUser } from '@/src/features/auth/auth-provider';
 import { communityApi, insertMention, type Comment, type ReactionType } from '@/src/features/community/api';
@@ -109,6 +110,7 @@ export default function PostDetailScreen() {
       setEditDraft('');
       await sync(editing.parentCommentId ?? undefined);
     } catch (error) {
+      haptics.error();
       Alert.alert('Không thể sửa bình luận', error instanceof Error ? error.message : 'Vui lòng thử lại.');
     }
   };
@@ -164,7 +166,14 @@ export default function PostDetailScreen() {
     return (
       <View className="flex-1 bg-canvas">
         <BackHeader title="Bài viết" fallbackHref="/(tabs)/community" />
-        <View className="flex-1 items-center justify-center"><ActivityIndicator color={colors.accent} /></View>
+        <View className="px-4 pt-4" accessibilityLabel="Đang tải bài viết" accessibilityRole="progressbar">
+          <View className="flex-row items-center">
+            <Skeleton width={46} height={46} radius={23} />
+            <View className="ml-3 gap-2"><Skeleton width={140} height={13} /><Skeleton width={90} height={10} /></View>
+          </View>
+          <View className="mt-5 gap-2"><Skeleton height={14} /><Skeleton height={14} width="92%" /><Skeleton height={14} width="64%" /></View>
+          <Skeleton height={220} radius={16} style={{ marginTop: 16 }} />
+        </View>
       </View>
     );
   }
@@ -205,6 +214,8 @@ export default function PostDetailScreen() {
           <Pressable
             onPress={() => { haptics.tap(); void toggleFollowAuthor(qc, item); }}
             accessibilityRole="button"
+            accessibilityLabel={item.followingAuthor ? 'Bỏ theo dõi' : 'Theo dõi'}
+            hitSlop={{ top: 4, bottom: 4 }}
             accessibilityState={{ selected: item.followingAuthor }}
             className="min-h-10 justify-center rounded-full border px-4 active:opacity-70"
             style={{ backgroundColor: item.followingAuthor ? 'transparent' : colors.accent, borderColor: item.followingAuthor ? colors.line : colors.accent }}>
@@ -253,7 +264,16 @@ export default function PostDetailScreen() {
       </View>
 
       <Text weight="extrabold" className="px-4 pb-1 pt-5 text-base">Bình luận{item.commentCount > 0 ? ` (${item.commentCount})` : ''}</Text>
-      {comments.isPending ? <ActivityIndicator className="py-8" color={colors.accent} /> : null}
+      {comments.isPending ? (
+        <View className="gap-4 px-4 py-4" accessibilityLabel="Đang tải bình luận" accessibilityRole="progressbar">
+          {[0, 1, 2].map((row) => (
+            <View key={row} className="flex-row">
+              <Skeleton width={36} height={36} radius={18} />
+              <View className="ml-2.5 flex-1 gap-2"><Skeleton width={120} height={12} /><Skeleton height={12} width="80%" /></View>
+            </View>
+          ))}
+        </View>
+      ) : null}
       {comments.isError ? (
         <View className="px-4 py-3"><Button variant="secondary" label="Tải lại bình luận" onPress={() => void comments.refetch()} /></View>
       ) : null}

@@ -17,6 +17,12 @@ export type OffsetPage<T> = { content: T[]; page: number; size: number; totalEle
 export type Comment = { id: string; authorId: string; parentCommentId: string | null; body: string; createdAt?: string; updatedAt?: string; replyCount: number; author?: PublicProfile | null; myComment?: boolean; reactionCounts: Record<ReactionType, number>; myReaction: ReactionType | null };
 export type Notification = { id: string; actorId: string; actor?: PublicProfile | null; eventType: string; postId?: string | null; commentId?: string | null; createdAt: string; readAt?: string | null };
 export type NotificationPreference = { eventType: string; enabled: boolean };
+export type NotificationDeviceRegistration = {
+  provider: 'FCM';
+  platform: 'ANDROID';
+  token: string;
+  appVersion: string;
+};
 export type PostInput = { category: PostCategory; title?: string; body: string; imageUrls: string[]; videoUrl?: string | null; targetBand?: number | null; background?: string | null };
 
 const query = (values: Record<string, string | undefined>) => {
@@ -88,6 +94,10 @@ export const communityApi = {
   markAll: () => apiRequest<void>('/api/notifications/read-all', { method: 'PUT', auth: true }),
   preferences: () => apiRequest<NotificationPreference[]>('/api/notifications/preferences', { auth: true }),
   updatePreference: (eventType: string, enabled: boolean) => apiRequest<NotificationPreference>(`/api/notifications/preferences/${encodeURIComponent(eventType)}`, { method: 'PUT', body: { enabled }, auth: true }),
+  registerNotificationDevice: (installationId: string, body: NotificationDeviceRegistration) =>
+    apiRequest<void>(`/api/notifications/devices/${installationId}`, { method: 'PUT', body, auth: true }),
+  unregisterNotificationDevice: (installationId: string) =>
+    apiRequest<void>(`/api/notifications/devices/${installationId}`, { method: 'DELETE', auth: true }),
   uploadImage: async (uri: string, name: string, type: string) => {
     const data = await imageUploadForm({ uri, name, type });
     return apiRequest<{ url: string }>('/api/community/media/images', { method: 'POST', body: data, auth: true, timeoutMs: 60_000 });

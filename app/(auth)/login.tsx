@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { TextInput, View, type TextInputInstance } from 'react-native';
+import { View, type TextInputInstance } from 'react-native';
 
 import { haptics } from '@/src/lib/haptics';
 import { Button } from '@/src/components/ui/button';

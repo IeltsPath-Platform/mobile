@@ -5,6 +5,7 @@ import { memo, useCallback, useMemo } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, SectionList, View } from 'react-native';
 
 import { BackHeader } from '@/src/components/navigation/back-header';
+import { useTabBarScrollHandler } from '@/src/components/navigation/tab-reselect-context';
 import { Button } from '@/src/components/ui/button';
 import { Skeleton } from '@/src/components/ui/skeleton';
 import { Text } from '@/src/components/ui/text';
@@ -97,9 +98,10 @@ const NotificationRow = memo(function NotificationRow({ item, onOpen }: { item: 
   );
 });
 
-export default function NotificationsScreen() {
+export default function NotificationsScreen({ inTab = false }: { inTab?: boolean }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const handleTabBarScroll = useTabBarScrollHandler();
   const list = useInfiniteQuery({
     queryKey: notificationsKey,
     queryFn: ({ pageParam }) => communityApi.notifications(Number(pageParam), 20),
@@ -189,7 +191,22 @@ export default function NotificationsScreen() {
 
   return (
     <View className="flex-1 bg-canvas">
-      <BackHeader
+      {inTab ? (
+        <View className="min-h-[58px] flex-row items-center gap-2 border-b border-line bg-surface px-4 py-2">
+          <View className="min-w-0 flex-1">
+            <Text accessibilityRole="header" weight="extrabold" className="text-xl text-ink">Thông báo</Text>
+            {unreadCount > 0 ? <Text className="mt-0.5 text-xs text-muted">{unreadCount} chưa đọc</Text> : null}
+          </View>
+          {unreadCount > 0 ? (
+            <Pressable onPress={() => void markAll()} accessibilityRole="button" accessibilityLabel="Đánh dấu tất cả là đã đọc" className="h-11 flex-row items-center gap-1.5 rounded-full px-3 active:opacity-70" style={{ backgroundColor: colors.accentSoft }}>
+              <CheckCheck size={16} color={colors.accentDeep} /><Text weight="bold" className="text-xs text-accent-deep">Đọc hết</Text>
+            </Pressable>
+          ) : null}
+          <Pressable onPress={() => router.push('/community/notification-preferences' as never)} accessibilityRole="button" accessibilityLabel="Tuỳ chọn thông báo" className="h-11 w-11 items-center justify-center rounded-full active:bg-tint">
+            <Settings size={20} color={colors.ink} />
+          </Pressable>
+        </View>
+      ) : <BackHeader
         title="Thông báo"
         subtitle={unreadCount > 0 ? `${unreadCount} chưa đọc` : undefined}
         fallbackHref="/(tabs)/community"
@@ -205,9 +222,11 @@ export default function NotificationsScreen() {
             </Pressable>
           </>
         }
-      />
+      />}
       <SectionList<Notification, Section>
         sections={sections}
+        onScroll={handleTabBarScroll}
+        scrollEventThrottle={16}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <NotificationRow item={item} onOpen={openNotification} />}
         renderSectionHeader={({ section }) => (
@@ -226,7 +245,7 @@ export default function NotificationsScreen() {
         initialNumToRender={10}
         maxToRenderPerBatch={8}
         windowSize={7}
-        contentContainerClassName="pb-10"
+        contentContainerClassName="pb-28"
         refreshControl={<RefreshControl refreshing={list.isRefetching && !list.isFetchingNextPage} onRefresh={() => void refresh()} tintColor={colors.accent} />}
       />
     </View>

@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, View } from 'react-native';
 
 import { Button } from '@/src/components/ui/button';
@@ -12,12 +12,16 @@ import { TopicCourseSection } from '@/src/features/vocab/components/topic-course
 import { studyKeys, vocabularyStudyApi } from '@/src/features/vocab/study-api';
 import { colors } from '@/src/theme';
 import { useTheme } from '@/src/theme/app-theme';
+import { useTabBarScrollHandler, useTabReselect } from '@/src/components/navigation/tab-reselect-context';
 
 export default function HomeScreen() {
   useTheme();
   const { status, authEnabled } = useAuth();
   const signedIn = authEnabled && status === 'authenticated';
   const queryClient = useQueryClient();
+  const listRef = useRef<FlatList<VocabularyTopic>>(null);
+  const refreshPrimed = useRef(false);
+  const handleTabBarScroll = useTabBarScrollHandler();
 
   const vocabularyTopicsQuery = useQuery({
     queryKey: ['vocab', 'topics'],
@@ -45,22 +49,38 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (signedIn) {
-        void queryClient.invalidateQueries({ queryKey: studyKeys.summary });
-        void queryClient.invalidateQueries({ queryKey: studyKeys.progress });
-      }
+      refreshPrimed.current = false;
+      // Refetch only stale data when returning to this tab. Cached topic cards
+      // remain visible during the request, so the page never flashes empty.
+      void queryClient.refetchQueries({ queryKey: ['vocab', 'topics'], type: 'active', stale: true });
+      if (signedIn) void queryClient.refetchQueries({ queryKey: studyKeys.summary, type: 'active', stale: true });
+      if (signedIn) void queryClient.refetchQueries({ queryKey: studyKeys.progress, type: 'active', stale: true });
     }, [queryClient, signedIn]),
   );
 
+  const refetchTopics = vocabularyTopicsQuery.refetch;
+  const refetchProgress = progressQuery.refetch;
   const refreshing = vocabularyTopicsQuery.isRefetching || progressQuery.isRefetching;
-  const refetch = () => {
-    void vocabularyTopicsQuery.refetch();
+  const refreshAll = useCallback(() => {
+    void refetchTopics();
     void queryClient.invalidateQueries({ queryKey: studyKeys.unitLists });
     if (signedIn) {
       void queryClient.invalidateQueries({ queryKey: studyKeys.summary });
       void queryClient.invalidateQueries({ queryKey: studyKeys.progress });
     }
-  };
+  }, [queryClient, refetchTopics, signedIn]);
+
+  const refreshFromTop = useCallback(() => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+    if (!refreshPrimed.current) {
+      refreshPrimed.current = true;
+      return;
+    }
+    refreshPrimed.current = false;
+    refreshAll();
+  }, [refreshAll]);
+
+  useTabReselect('index', refreshFromTop);
 
   const hasError = vocabularyTopicsQuery.isError;
   const isPending = vocabularyTopicsQuery.isPending;
@@ -68,6 +88,9 @@ export default function HomeScreen() {
   return (
     <View className="flex-1 bg-canvas">
       <FlatList<VocabularyTopic>
+        ref={listRef}
+        onScroll={handleTabBarScroll}
+        scrollEventThrottle={16}
         data={topics}
         keyExtractor={(topic) => topic.id}
         renderItem={({ item }) => (
@@ -79,9 +102,7 @@ export default function HomeScreen() {
                     data: progressByTopic.get(item.id) ?? null,
                     isPending: progressQuery.isPending,
                     error: progressQuery.error,
-                    refetch: () => {
-                      void progressQuery.refetch();
-                    },
+                    refetch: () => void refetchProgress(),
                   }
                 : undefined
             }
@@ -89,10 +110,10 @@ export default function HomeScreen() {
         )}
         ListHeaderComponent={
           <View className="pb-1 pt-1">
-            {/* 1. Header Bar tích hợp: Brand + Chỉ số Streak / XP / Tim */}
+
             <TodayHeader signedIn={signedIn} />
 
-            {/* 2. Tiêu đề danh sách khóa học */}
+
             {topics.length > 0 ? (
               <View className="mb-3 mt-1 flex-row items-center justify-between">
                 <Text accessibilityRole="header" weight="black" className="text-lg text-ink">
@@ -116,7 +137,7 @@ export default function HomeScreen() {
               <>
                 <Text weight="bold">Chưa tải được chủ đề từ vựng</Text>
                 <Text className="mt-2 text-sm leading-5 text-muted">Kiểm tra kết nối máy chủ rồi thử lại.</Text>
-                <Button className="mt-4" variant="secondary" label="Thử lại" onPress={refetch} />
+                <Button className="mt-4" variant="secondary" label="Thử lại" onPress={refreshAll} />
               </>
             ) : (
               <>
@@ -128,7 +149,7 @@ export default function HomeScreen() {
         }
         contentContainerClassName="px-4 pb-12 pt-1"
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refetch} tintColor={colors.accent} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshAll} tintColor={colors.accent} />}
         initialNumToRender={2}
         maxToRenderPerBatch={2}
         windowSize={5}

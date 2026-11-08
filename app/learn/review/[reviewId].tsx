@@ -8,6 +8,7 @@ import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
 import { FormAlert } from '@/src/components/ui/form-alert';
 import { Text } from '@/src/components/ui/text';
+import { createRequestId } from '@/src/lib/request-id';
 import { isLearningApiError, learningApi } from '@/src/features/learning';
 import type { QuestionDto } from '@/src/features/learning/types';
 import { FillInput } from '@/src/features/session/components/fill-input';
@@ -38,13 +39,6 @@ function ReviewQuestion({ question, value, onChange }: { question: QuestionDto; 
   );
 }
 
-function newRequestId() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
 
 export default function ReviewScreen() {
   const { reviewId } = useLocalSearchParams<{ reviewId: string }>();
@@ -65,7 +59,7 @@ export default function ReviewScreen() {
       if (!review?.set) throw new Error('No set');
       return learningApi.submitReview(review.reviewId, {
         reviewSetId: review.set.reviewSetId,
-        requestId: newRequestId(),
+        requestId: createRequestId(),
         answers: review.set.questions.map((q) => ({
           questionVersionId: q.questionVersionId,
           answer: answers[q.questionVersionId] ?? '',
@@ -83,7 +77,7 @@ export default function ReviewScreen() {
       const review = reviewQuery.data;
       if (!review) throw new Error('Review is not loaded');
       return learningApi.submitReviewTheoryCheck(review.reviewId, {
-        requestId: newRequestId(),
+        requestId: createRequestId(),
         answers: (review.quickCheck ?? []).flatMap((question) => {
           const answer = theoryAnswers[question.questionVersionId]?.trim();
           return answer ? [{ questionVersionId: question.questionVersionId, answer }] : [];

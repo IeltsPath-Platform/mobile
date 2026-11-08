@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { Camera, Check, Clock3, ImagePlus, Trash2, UserRound } from 'lucide-react-native';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -212,7 +213,7 @@ export default function EditProfileScreen() {
               <View className="flex-row items-center gap-4">
                 <Pressable onPress={() => void pickAvatar()} accessibilityRole="button" accessibilityLabel="Thay ảnh đại diện" className="relative">
                   <View className="h-24 w-24 items-center justify-center overflow-hidden rounded-full border-[3px] border-white/80 bg-accent">
-                    {avatar ? <Image source={{ uri: avatar }} className="h-full w-full" resizeMode="cover" /> : <Text weight="black" className="text-3xl text-white">{initial}</Text>}
+                    {avatar ? <Image source={{ uri: avatar }} accessibilityIgnoresInvertColors contentFit="cover" style={{ width: '100%', height: '100%' }} /> : <Text weight="black" className="text-3xl text-white">{initial}</Text>}
                   </View>
                   <View className="absolute bottom-0 right-0 h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-accent">
                     {avatarMutation.isPending || avatarUploading ? <ActivityIndicator size="small" color="#fff" /> : <Camera size={17} color="#fff" />}
@@ -227,7 +228,7 @@ export default function EditProfileScreen() {
                   </Pressable>
                 </View>
               </View>
-              {avatar ? <Pressable onPress={confirmDeleteAvatar} disabled={avatarUploading || avatarMutation.isPending} accessibilityRole="button" className="mt-4 min-h-11 flex-row items-center justify-center gap-2 rounded-xl border border-white/20">
+              {avatar ? <Pressable onPress={confirmDeleteAvatar} disabled={avatarUploading || avatarMutation.isPending} accessibilityRole="button" accessibilityLabel="Xóa ảnh đại diện hiện tại" className="mt-4 min-h-11 flex-row items-center justify-center gap-2 rounded-xl border border-white/20">
                 {avatarMutation.isPending ? <ActivityIndicator size="small" color="#fff" /> : <Trash2 size={16} color="#fff" />}
                 <Text weight="semibold" className="text-sm text-white">Xóa ảnh hiện tại</Text>
               </Pressable> : null}
@@ -260,7 +261,7 @@ export default function EditProfileScreen() {
                 <View className="flex-row gap-2">
                   {(['PUBLIC', 'PRIVATE'] as const).map((value) => {
                     const selected = visibility === value;
-                    return <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected }} onPress={() => setVisibility(value)} className="min-h-12 flex-1 items-center justify-center rounded-2xl border px-2" style={{ borderColor: selected ? colors.accent : colors.line, backgroundColor: selected ? colors.accentSoft : colors.surface }}>
+                    return <Pressable key={value} accessibilityRole="radio" accessibilityLabel={value === 'PUBLIC' ? 'Công khai' : 'Riêng tư'} accessibilityState={{ checked: selected }} onPress={() => setVisibility(value)} className="min-h-12 flex-1 items-center justify-center rounded-2xl border px-2" style={{ borderColor: selected ? colors.accent : colors.line, backgroundColor: selected ? colors.accentSoft : colors.surface }}>
                       <Text weight="bold" className="text-sm" style={{ color: selected ? colors.accentDeep : colors.ink }}>{value === 'PUBLIC' ? 'Công khai' : 'Riêng tư'}</Text>
                     </Pressable>;
                   })}

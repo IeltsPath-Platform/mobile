@@ -1,6 +1,6 @@
+import { Image } from 'expo-image';
 import { useEffect } from 'react';
 import {
-  Image,
   Pressable,
   ScrollView,
   View,
@@ -126,8 +126,8 @@ export function FlipCard({
             {imageUrl ? (
               <Image
                 source={{ uri: imageUrl }}
-                resizeMode="contain"
-                className="mt-3 h-20 w-full"
+                contentFit="contain"
+                style={{ marginTop: 12, height: 80, width: '100%' }}
                 accessibilityLabel="Ảnh minh họa của thẻ"
               />
             ) : null}

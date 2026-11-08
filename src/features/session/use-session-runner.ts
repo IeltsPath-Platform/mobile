@@ -1,19 +1,13 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
+import { createRequestId } from '@/src/lib/request-id';
 import { isLearningApiError, learningApi } from '@/src/features/learning';
 import type { LearningApiError } from '@/src/features/learning/api-error';
 import type { ReviewRefDto } from '@/src/features/learning/types';
 import { sessionFromLesson } from './from-lesson';
 import type { Graded, RunnerState, SessionBlock, SessionSource } from './types';
 
-function newRequestId() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
 
 function currentBlock(source: SessionSource | null, blockIndex: number): SessionBlock | null {
   return source?.blocks[blockIndex] ?? null;
@@ -173,7 +167,7 @@ export function useSessionRunner(lessonId: string) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const stateRef = useRef(state);
   stateRef.current = state;
-  const requestIdRef = useRef(newRequestId());
+  const requestIdRef = useRef(createRequestId());
   const busyRef = useRef(false);
 
   useEffect(() => {
@@ -182,7 +176,7 @@ export function useSessionRunner(lessonId: string) {
 
   useEffect(() => {
     let cancelled = false;
-    requestIdRef.current = newRequestId();
+    requestIdRef.current = createRequestId();
     busyRef.current = false;
     dispatch({ type: 'reset' });
 
@@ -271,7 +265,7 @@ export function useSessionRunner(lessonId: string) {
         lessonCompleted: result.lessonCompleted,
       });
     } catch (error) {
-      requestIdRef.current = newRequestId();
+      requestIdRef.current = createRequestId();
       dispatch({
         type: 'submit-error',
         message: isLearningApiError(error) ? friendly(error) : 'Không nộp được bài.',
@@ -285,7 +279,7 @@ export function useSessionRunner(lessonId: string) {
     const current = stateRef.current;
     const more = Boolean(current.source && current.blockIndex < current.source.blocks.length - 1);
     if (current.blockPassed && more) {
-      requestIdRef.current = newRequestId();
+      requestIdRef.current = createRequestId();
     }
     dispatch({ type: 'continue' });
   }, []);
@@ -295,7 +289,7 @@ export function useSessionRunner(lessonId: string) {
   }, []);
 
   const retry = useCallback(() => {
-    requestIdRef.current = newRequestId();
+    requestIdRef.current = createRequestId();
     busyRef.current = false;
     dispatch({ type: 'retry' });
   }, []);

@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
-import { Image, Pressable, View } from 'react-native';
+import { Image } from 'expo-image';
+import { Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/src/components/ui/text';
@@ -26,7 +27,7 @@ export default function WelcomeScreen() {
         <Image
           source={require('@/assets/images/owl/hero-wave.png')}
           style={{ width: 300, height: 300, backgroundColor: 'transparent' }}
-          resizeMode="contain"
+          contentFit="contain"
           accessibilityIgnoresInvertColors
         />
         <Text weight="black" className="mt-3 text-5xl leading-[56px]" style={{ color: '#ffffff', letterSpacing: -1 }}>
