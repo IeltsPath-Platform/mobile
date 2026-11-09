@@ -43,6 +43,8 @@ export default function RegisterScreen() {
   return (
     <AuthScreen
       title="Tạo tài khoản"
+      description="Học từ vựng IELTS mỗi ngày và giữ nhịp cùng cộng đồng."
+      actions={<Button label="Tạo tài khoản" loadingLabel="Đang tạo phiên…" loading={isSubmitting} onPress={() => void onSubmit()} />}
       footer={<AuthLink prompt="Đã có tài khoản?" label="Đăng nhập" href="/login" />}>
       {formError ? <FormAlert message={formError} /> : null}
 
@@ -152,8 +154,8 @@ export default function RegisterScreen() {
         )}
       />
 
-      <Button label="Tạo tài khoản" loadingLabel="Đang tạo phiên…" loading={isSubmitting} onPress={() => void onSubmit()} />
       <GoogleSignInButton />
+
     </AuthScreen>
   );
 }

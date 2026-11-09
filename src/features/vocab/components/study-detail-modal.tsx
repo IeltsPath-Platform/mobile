@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Coins, Flame, Heart, RotateCcw, Shield, X } from 'lucide-react-native';
+import { Coins, Flame, Heart, Shield, X } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,7 +13,7 @@ import { purchaseStudyBenefit, type StudyPurchase } from '../study-purchase';
 
 type PurchaseKind = 'refill' | 'freeze';
 
-/** Detail sheet for XP, streak, hearts refill and study timezone. */
+/** Detail sheet for XP, streak and hearts refill. */
 export function StudyDetailModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { vars } = useTheme();
   const client = useQueryClient();
@@ -40,7 +40,6 @@ export function StudyDetailModal({ visible, onClose }: { visible: boolean; onClo
   const [notice, setNotice] = useState('');
   const inFlight = useRef(false);
   const data = summary.data;
-  const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const purchase = async () => {
     if (!confirmation || inFlight.current) return;
@@ -63,22 +62,6 @@ export function StudyDetailModal({ visible, onClose }: { visible: boolean; onClo
     }
   };
 
-  const updateTimezone = async () => {
-    if (!localTimezone || inFlight.current) return;
-    inFlight.current = true;
-    setBusy(true);
-    setError('');
-    try {
-      await vocabularyStudyApi.settings(localTimezone);
-      await summary.refetch();
-      setNotice('Đã cập nhật múi giờ học.');
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Chưa cập nhật được múi giờ.');
-    } finally {
-      inFlight.current = false;
-      setBusy(false);
-    }
-  };
 
   return (
     <Modal
@@ -234,25 +217,6 @@ export function StudyDetailModal({ visible, onClose }: { visible: boolean; onClo
                     Đã đạt giới hạn bảo vệ liên tiếp. Hãy học hôm nay để tiếp tục chuỗi.
                   </Text>
                 ) : null}
-              </View>
-
-              {/* Timezone sync card */}
-              <View className="gap-2 rounded-3xl border border-line bg-surface p-4">
-                <Text weight="bold" className="text-sm">
-                  Múi giờ học: {data.streak.timezone}
-                </Text>
-                {localTimezone && localTimezone !== data.streak.timezone ? (
-                  <Button
-                    variant="secondary"
-                    loading={busy && !confirmation}
-                    disabled={busy || Boolean(confirmation)}
-                    icon={<RotateCcw size={15} color={colors.ink} />}
-                    label={`Đồng bộ múi giờ thiết bị: ${localTimezone}`}
-                    onPress={() => void updateTimezone()}
-                  />
-                ) : (
-                  <Text className="text-xs text-muted">Đang khớp với múi giờ của thiết bị.</Text>
-                )}
               </View>
             </>
           ) : null}

@@ -1,9 +1,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Play } from 'lucide-react-native';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
-import { Button } from '@/src/components/ui/button';
 import { ProgressBar } from '@/src/components/ui/progress-bar';
 import { Text } from '@/src/components/ui/text';
 import { useTheme } from '@/src/theme/app-theme';
@@ -60,39 +59,38 @@ export function ContinueCard({ topics, progress }: { topics: VocabularyTopic[]; 
   return (
     <>
       {showCard && target && topicProgress && unitId ? (
-    <View
-      className="mb-4 rounded-3xl border border-accent-edge bg-accent-soft p-4"
-      style={{ shadowColor: colors.shadow, shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
-      <Text weight="black" className="text-[11px] uppercase tracking-wider text-accent-deep">
-        {started ? 'Tiếp tục học' : 'Bài tiếp theo'}
-      </Text>
-      <Text accessibilityRole="header" weight="black" className="mt-1 text-xl leading-7 text-ink" numberOfLines={2}>
-        {unit?.title ?? target.nameVi ?? target.name}
-      </Text>
-      <Text className="mt-0.5 text-sm text-muted" numberOfLines={1}>
-        {target.nameVi ?? target.name}
-        {unit ? ` · ${unit.wordCount} từ · khoảng ${unit.estimatedMinutes} phút` : ''}
-      </Text>
-      <View className="mt-3">
-        <ProgressBar
-          value={topicProgress.completedUnits}
-          max={topicProgress.totalUnits}
-          tone="success"
-          height={8}
-          accessibilityLabel="Tiến độ chủ đề"
-          valueText={`${topicProgress.completedUnits} trên ${topicProgress.totalUnits} bài`}
-        />
-        <Text className="mt-1 text-xs text-muted">
-          {topicProgress.completedUnits}/{topicProgress.totalUnits} bài đã hoàn thành
-        </Text>
-      </View>
-      <Button
-        className="mt-3"
-        label={started ? 'Tiếp tục bài học' : 'Bắt đầu bài học'}
-        icon={<Play size={18} color={colors.canvas} fill={colors.canvas} />}
-        onPress={() => setOpenUnitId(unitId)}
-      />
-    </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${started ? 'Tiếp tục bài học' : 'Bắt đầu bài học'}: ${unit?.title ?? target.nameVi ?? target.name}`}
+          onPress={() => setOpenUnitId(unitId)}
+          className="mb-4 flex-row items-center gap-3 rounded-2xl px-4 py-3 active:opacity-80"
+          style={{ borderWidth: 2, borderBottomWidth: 4, borderColor: colors.accent, borderBottomColor: colors.accentShade, backgroundColor: colors.accentSoft }}>
+          <View className="flex-1">
+            <Text weight="black" className="text-[11px] uppercase tracking-wider text-accent-deep">
+              {started ? 'Tiếp tục học' : 'Bài tiếp theo'}
+            </Text>
+            <Text accessibilityRole="header" weight="black" className="mt-0.5 text-base leading-6 text-ink" numberOfLines={1}>
+              {unit?.title ?? target.nameVi ?? target.name}
+            </Text>
+            <Text className="text-xs text-muted" numberOfLines={1}>
+              {target.nameVi ?? target.name}
+              {unit ? ` · ${unit.wordCount} từ · ${unit.estimatedMinutes} phút` : ''}
+            </Text>
+            <View className="mt-2">
+              <ProgressBar
+                value={topicProgress.completedUnits}
+                max={topicProgress.totalUnits}
+                tone="success"
+                height={6}
+                accessibilityLabel="Tiến độ chủ đề"
+                valueText={`${topicProgress.completedUnits} trên ${topicProgress.totalUnits} bài`}
+              />
+            </View>
+          </View>
+          <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: colors.accent, borderBottomWidth: 4, borderBottomColor: colors.accentShade, alignItems: 'center', justifyContent: 'center' }}>
+            <Play size={22} color={colors.canvas} fill={colors.canvas} />
+          </View>
+        </Pressable>
       ) : null}
       {sheet}
     </>

@@ -7,7 +7,7 @@ import type { VocabularyAchievement } from '@/src/features/vocab/api';
 import { colors } from '@/src/theme';
 import { useTheme } from '@/src/theme/app-theme';
 
-import { ACHIEVEMENT_COPY } from '../profile-achievements';
+import { ACHIEVEMENT_COPY, achievementColors } from '../profile-achievements';
 
 /** Arched medals: coloured when earned, dimmed with a lock and progress otherwise. */
 export function ProfileRewardsCard({
@@ -39,9 +39,7 @@ export function ProfileRewardsCard({
         <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 16 }}>
           {shown.map((item) => {
             const copy = ACHIEVEMENT_COPY[item.code];
-            const tone = copy?.tone ?? 'accent';
-            const fg = tone === 'warm' ? colors.xpDeep : tone === 'success' ? colors.success : colors.accentDeep;
-            const bg = tone === 'warm' ? colors.warmSoft : tone === 'success' ? colors.successSoft : colors.accentSoft;
+            const { foreground: fg, background: bg } = achievementColors(copy?.tone ?? 'accent');
             const title = copy?.title ?? item.code;
             return (
               <View

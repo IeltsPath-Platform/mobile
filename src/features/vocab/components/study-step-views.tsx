@@ -25,15 +25,7 @@ export function correctAnswerText(step: StudyStep, answer: StudyAnswer | null): 
   if (answer.type === 'FILL_TEXT') return answer.text;
   if (answer.type === 'CHOICE' && step.type === 'CHOICE')
     return step.options.find((option) => option.optionId === answer.optionId)?.text ?? null;
-  if (answer.type === 'MATCH' && step.type === 'MATCH')
-    return answer.pairs
-      .map((pair) => {
-        const left = step.left.find((option) => option.optionId === pair.leftOptionId)?.text;
-        const right = step.right.find((option) => option.optionId === pair.rightOptionId)?.text;
-        return left && right ? `${left} → ${right}` : '';
-      })
-      .filter(Boolean)
-      .join('\n');
+  // Matching is shown pair by pair on the tiles themselves, never as one block of text.
   return null;
 }
 
@@ -119,9 +111,21 @@ export function WordStepCard({ step, listen }: { step: WordStep; listen?: ReactN
   );
 }
 
+/** Result of a graded matching step: `correctPairs` is null when the server did not send the key. */
+export type MatchGrade = { outcome: 'CORRECT' | 'INCORRECT' | 'ACKNOWLEDGED'; correctPairs: MatchPair[] | null };
+
+/** Number of the learner's pairs that were wrong, or 0 when everything was right. */
+export function wrongPairCount(pairs: MatchPair[], grade: MatchGrade) {
+  if (grade.outcome !== 'INCORRECT') return 0;
+  if (!grade.correctPairs) return pairs.length;
+  const key = grade.correctPairs;
+  return pairs.filter((pair) => !key.some((ok) => ok.leftOptionId === pair.leftOptionId && ok.rightOptionId === pair.rightOptionId)).length;
+}
+
 export function MatchStepView({
   step,
   pairs,
+  grade,
   selectedLeft,
   disabled,
   onSelectLeft,
@@ -129,27 +133,38 @@ export function MatchStepView({
 }: {
   step: MatchStep;
   pairs: MatchPair[];
+  grade?: MatchGrade | null;
   selectedLeft: string | null;
   disabled: boolean;
   onSelectLeft: (optionId: string) => void;
   onSelectRight: (optionId: string) => void;
 }) {
+  const pairState = (pair: MatchPair | undefined) => {
+    if (!pair) return 'default' as const;
+    if (!grade) return 'selected' as const;
+    if (grade.outcome !== 'INCORRECT') return 'correct' as const;
+    if (!grade.correctPairs) return 'wrong' as const;
+    const ok = grade.correctPairs.some((c) => c.leftOptionId === pair.leftOptionId && c.rightOptionId === pair.rightOptionId);
+    return ok ? ('correct' as const) : ('wrong' as const);
+  };
   return (
     <>
       <Text className="mb-4 text-sm text-muted">
-        {selectedLeft ? 'Giờ chọn nghĩa tương ứng ở cột phải.' : 'Chọn một từ ở cột trái, rồi chọn nghĩa ở cột phải.'}
+        {grade ? (grade.outcome === 'INCORRECT' ? 'Cặp màu đỏ chưa đúng.' : 'Ghép đúng hết rồi!') : selectedLeft ? 'Giờ chọn nghĩa tương ứng ở cột phải.' : 'Chọn một từ ở cột trái, rồi chọn nghĩa ở cột phải.'}
       </Text>
       <View className="flex-row gap-3">
         <View className="flex-1">
           {step.left.map((option) => {
             const index = pairs.findIndex((pair) => pair.leftOptionId === option.optionId);
+            const graded = pairState(pairs[index]);
             return (
               <AnswerOption
                 key={option.optionId}
                 text={option.text}
                 imageUrl={option.imageUrl}
                 align="center"
-                state={selectedLeft === option.optionId || index >= 0 ? 'selected' : 'default'}
+                compact
+                state={graded !== 'default' ? graded : selectedLeft === option.optionId ? 'selected' : 'default'}
                 badge={index + 1}
                 disabled={disabled}
                 onPress={() => onSelectLeft(option.optionId)}
@@ -160,13 +175,15 @@ export function MatchStepView({
         <View className="flex-1">
           {step.right.map((option) => {
             const index = pairs.findIndex((pair) => pair.rightOptionId === option.optionId);
+            const graded = pairState(pairs[index]);
             return (
               <AnswerOption
                 key={option.optionId}
                 text={option.text}
                 imageUrl={option.imageUrl}
                 align="center"
-                state={index >= 0 ? 'selected' : 'default'}
+                compact
+                state={graded}
                 badge={index + 1}
                 disabled={disabled || !selectedLeft}
                 onPress={() => onSelectRight(option.optionId)}
@@ -205,8 +222,8 @@ export function FillStepView({
       {step.sentenceBefore || step.sentenceAfter ? (
         <Text className="mb-5 text-xl leading-9 text-ink">
           {step.sentenceBefore}
-          <Text weight="black" className="text-accent">
-            {' ______ '}
+          <Text weight="black" style={{ color: colors.accent, textDecorationLine: 'underline' }}>
+            {value.trim() ? ` ${value.trim()} ` : ' … '}
           </Text>
           {step.sentenceAfter}
         </Text>

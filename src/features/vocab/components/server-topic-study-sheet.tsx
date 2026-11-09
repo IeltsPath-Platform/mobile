@@ -31,6 +31,7 @@ import {
   ListenButton,
   MascotPrompt,
   MatchStepView,
+  wrongPairCount,
   StepsDoneView,
   StreakCelebration,
   WordStepCard,
@@ -327,6 +328,14 @@ export function ServerTopicStudySheet({
                   <MatchStepView
                     step={step}
                     pairs={pairs}
+                    grade={
+                      feedback
+                        ? {
+                            outcome: feedback.outcome,
+                            correctPairs: feedback.correctAnswer?.type === 'MATCH' ? feedback.correctAnswer.pairs : null,
+                          }
+                        : null
+                    }
                     selectedLeft={selectedLeft}
                     disabled={blocked}
                     onSelectLeft={(optionId) => {
@@ -371,7 +380,14 @@ export function ServerTopicStudySheet({
               key={feedback.submissionId}
               correct={feedback.outcome !== 'INCORRECT'}
               correctText={correctAnswerText(step, feedback.correctAnswer)}
-              explanation={feedback.explanationVi}
+              explanation={
+                step.type === 'MATCH' && feedback.outcome === 'INCORRECT'
+                  ? `Có ${wrongPairCount(pairs, {
+                      outcome: feedback.outcome,
+                      correctPairs: feedback.correctAnswer?.type === 'MATCH' ? feedback.correctAnswer.pairs : null,
+                    })} cặp chưa đúng. Hãy ghép lại các cặp màu đỏ.`
+                  : feedback.explanationVi
+              }
               heartLost={feedback.heartLost}
               buttonLabel={feedback.outcome === 'INCORRECT' ? 'Thử lại câu này' : 'Tiếp tục'}
               busy={study.busy}

@@ -89,7 +89,7 @@ export function StudyFeedbackFooter({ correct, correctText, explanation, heartLo
             </Text>
           </View>
         ) : null}
-        {explanation ? <Text className="mb-2 text-sm leading-5 text-ink">{explanation}</Text> : null}
+        {!correct && explanation ? <Text className="mb-2 text-sm leading-5 text-ink">{explanation}</Text> : null}
         {!correct && !explanation && !correctText ? (
           <Text className="mb-2 text-sm leading-5 text-ink">Đọc lại câu hỏi và thử thêm lần nữa nhé.</Text>
         ) : null}

@@ -12,8 +12,9 @@ import { gameApi } from '../api';
 import { PRACTICE_HOME, resultRoute } from '../game-meta';
 import { useCountdown } from '../use-countdown';
 import { useGameSocket } from '../use-game-socket';
-import type { GameEvent, GameRanking, RocketCurrent } from '../types';
+import type { GameEvent, GameRanking, RocketCurrent, RocketRound, RocketRoundResult } from '../types';
 import { mergeRanking } from '../types';
+import { recordReview } from '../review-log';
 
 type PendingAnswer = { roundId: string; optionId: string; requestId: string };
 
@@ -135,6 +136,26 @@ export function useRocketMatch(matchId: string) {
 
   // Feedback fires once per resolved round.
   const reportedRounds = useRef(new Set<string>());
+  const roundsSeen = useRef(new Map<string, RocketRound>());
+  useEffect(() => {
+    if (round) roundsSeen.current.set(round.roundId, round);
+  }, [round]);
+  // Keep a display-only record of every resolved question for the result screen.
+  const logRound = useCallback(
+    (resolved: RocketRoundResult) => {
+      const seen = roundsSeen.current.get(resolved.roundId);
+      if (!seen) return;
+      const wordOf = (optionId: string | null) => seen.options.find((option) => option.optionId === optionId)?.word ?? null;
+      recordReview(matchId, {
+        id: resolved.roundId,
+        meaning: seen.meaning,
+        correct: resolved.correct,
+        answer: wordOf(resolved.correctOptionId),
+        yours: resolved.correct ? null : (wordOf(resolved.chosenOptionId) ?? 'Hết giờ, chưa chọn'),
+      });
+    },
+    [matchId],
+  );
   const result = current.data?.lastRoundResult;
   const seeded = useRef(false);
   const lastRoundNumber = useRef(0);
@@ -148,6 +169,7 @@ export function useRocketMatch(matchId: string) {
     seeded.current = true;
     if (!result || reportedRounds.current.has(result.roundId)) return;
     reportedRounds.current.add(result.roundId);
+    logRound(result);
     if (firstLoad) return;
     const next = (kind: Reward['kind'], title: string, subtitle?: string) =>
       setReward((previous) => ({ id: (previous?.id ?? 0) + 1, kind, title, subtitle }));
@@ -191,6 +213,7 @@ export function useRocketMatch(matchId: string) {
       try {
         const ack = await gameApi.rocketAnswer(matchId, round.roundId, pending.requestId, optionId);
         pendingAnswer.current = null;
+        if (ack.roundResult) logRound(ack.roundResult);
         if (ack.roundResult?.matchFinished) {
           showResult();
           return;
@@ -211,7 +234,7 @@ export function useRocketMatch(matchId: string) {
         setBusy(false);
       }
     },
-    [round, awaitingOpen, busy, matchId, qc, current.refetch, showResult],
+    [round, awaitingOpen, busy, matchId, qc, current.refetch, showResult, logRound],
   );
 
   const leave = useCallback(async () => {

@@ -1,4 +1,4 @@
-import { Bell, ChevronRight, Volume2 } from 'lucide-react-native';
+import { Bell, ChevronRight, Music, Volume2 } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -9,26 +9,19 @@ import { colors } from '@/src/theme';
 import { SettingsToggleItem } from './settings-rows';
 import { type AppSettings, type FontSizeOption, useAppSettings } from '../use-app-settings';
 
-const FONT_OPTIONS: { value: FontSizeOption; label: string }[] = [
-  { value: 'S', label: 'nhỏ' },
-  { value: 'M', label: 'vừa' },
-  { value: 'L', label: 'lớn' },
+const FONT_OPTIONS: { value: FontSizeOption; label: string; preview: number }[] = [
+  { value: 'S', label: 'Nhỏ', preview: 15 },
+  { value: 'M', label: 'Vừa', preview: 19 },
+  { value: 'L', label: 'Lớn', preview: 24 },
 ];
 
 type BooleanSettingKey = 'soundEnabled' | 'musicEnabled';
 
-function SubHeader({ icon: Icon, title, first }: { icon: typeof Bell; title: string; first?: boolean }) {
-  return (
-    <View className={`flex-row items-center gap-1.5 px-4 pb-1.5 ${first ? 'pt-3' : 'pt-3.5'}`}>
-      <Icon size={13} color={colors.accentDeep} />
-      <Text weight="black" className="text-[11px] uppercase tracking-wider text-accent-deep">
-        {title}
-      </Text>
-    </View>
-  );
+function Divider() {
+  return <View style={{ height: 2, backgroundColor: colors.line, marginHorizontal: 16 }} />;
 }
 
-/** Notification, sound, theme and font-size controls shown inside the accordion. */
+/** Notification, sound and font-size controls shown inside the settings accordion. */
 export function AppSettingsPanel() {
   const router = useRouter();
   const { settings, update } = useAppSettings();
@@ -40,58 +33,70 @@ export function AppSettingsPanel() {
   };
 
   return (
-    <View className="bg-canvas/40 pb-1">
-      <SubHeader icon={Bell} title="Thông báo & Nhắc nhở" first />
+    <View>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Thông báo cộng đồng"
         onPress={() => router.push('/community/notification-preferences' as never)}
-        className="min-h-12 flex-row items-center justify-between border-b border-line/60 px-4 py-2.5 active:bg-canvas"
-      >
-        <Text weight="bold" className="text-sm text-ink">
-          Thông báo cộng đồng
-        </Text>
-        <ChevronRight size={14} color={colors.accentDeep} />
+        className="min-h-16 flex-row items-center gap-3 px-4 py-3 active:opacity-70">
+        <Bell size={22} color={colors.accentDeep} />
+        <View className="flex-1">
+          <Text weight="bold" className="text-base text-ink">
+            Thông báo cộng đồng
+          </Text>
+          <Text className="mt-0.5 text-sm text-muted">Chọn loại thông báo bạn muốn nhận</Text>
+        </View>
+        <ChevronRight size={20} color={colors.muted} />
       </Pressable>
+      <Divider />
 
-      <SubHeader icon={Volume2} title="Âm thanh & Hiển thị" />
       <SettingsToggleItem
-        title="Âm thanh & phát âm bài học"
+        icon={Volume2}
+        title="Âm thanh bài học"
+        description="Hiệu ứng đúng, sai và phát âm từ"
         value={settings.soundEnabled}
         onChange={toggle('soundEnabled')}
       />
+      <Divider />
       <SettingsToggleItem
-        title="Nhạc nền khi học bài"
+        icon={Music}
+        title="Nhạc nền"
+        description="Phát nhạc nhẹ khi học bài"
         value={settings.musicEnabled}
         onChange={toggle('musicEnabled')}
       />
+      <Divider />
 
-      <View className="flex-row items-center justify-between px-4 py-2.5">
-        <Text weight="bold" className="text-xs text-ink">
-          Cỡ chữ hiển thị
+      <View className="px-4 pb-4 pt-3">
+        <Text weight="bold" className="text-base text-ink">
+          Cỡ chữ
         </Text>
-        <View className="flex-row gap-1.5">
-          {FONT_OPTIONS.map(({ value, label }) => {
+        <View className="mt-3 flex-row gap-2">
+          {FONT_OPTIONS.map(({ value, label, preview }) => {
             const selected = settings.fontSize === value;
             return (
               <Pressable
                 key={value}
                 accessibilityRole="radio"
-                accessibilityLabel={`Cỡ chữ ${label}`}
+                accessibilityLabel={`Cỡ chữ ${label.toLowerCase()}`}
                 accessibilityState={{ checked: selected }}
-                onPress={() => void update({ fontSize: value })}
-                className="h-12 w-12 items-center justify-center rounded-lg border active:opacity-75"
-                style={{
-                  backgroundColor: selected ? colors.accentSoft : colors.surface,
-                  borderColor: selected ? colors.accent : colors.line,
+                onPress={() => {
+                  haptics.select();
+                  void update({ fontSize: value });
                 }}
-              >
-                <Text
-                  weight="black"
-                  className="text-[11px]"
-                  style={{ color: selected ? colors.accentDeep : colors.muted }}
-                >
-                  {value}
+                className="min-h-16 flex-1 items-center justify-center rounded-2xl active:opacity-80"
+                style={{
+                  borderWidth: 2,
+                  borderBottomWidth: 4,
+                  borderColor: selected ? colors.accent : colors.line,
+                  borderBottomColor: selected ? colors.accentShade : colors.edge,
+                  backgroundColor: selected ? colors.accentSoft : colors.surface,
+                }}>
+                <Text weight="black" style={{ fontSize: preview, color: selected ? colors.accentDeep : colors.ink }}>
+                  Aa
+                </Text>
+                <Text weight="bold" className="text-xs" style={{ color: selected ? colors.accentDeep : colors.muted }}>
+                  {label}
                 </Text>
               </Pressable>
             );

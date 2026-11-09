@@ -1,7 +1,7 @@
 import { keepPreviousData, useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Image as CachedImage } from 'expo-image';
-import { Bell, PenLine, Search, Users, X } from 'lucide-react-native';
+import { PenLine, Search, Users, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, TextInput, View, type FlatList as NativeFlatList, type LayoutChangeEvent, type ListViewToken } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,7 +16,6 @@ import { communityApi, type CommunityPost, type PostCategory } from '@/src/featu
 import { communityCategoryColor } from '@/src/features/community/community-colors';
 import { PostRow } from '@/src/features/community/components/post-row';
 import { CommunityAvatar } from '@/src/features/community/components/community-image';
-import { useUnread } from '@/src/features/community/use-unread';
 import { usePostMenu } from '@/src/features/community/components/post-menu';
 import { CATEGORY_LABELS, dedupePosts } from '@/src/features/community/format';
 import { haptics } from '@/src/lib/haptics';
@@ -42,8 +41,6 @@ export default function CommunityScreen() {
   const { authEnabled, status } = useAuth();
   const user = useCurrentUser();
   const signedIn = authEnabled && status === 'authenticated';
-  const unread = useUnread();
-  const unreadCount = unread.data?.count ?? 0;
   const ownProfile = useQuery({ queryKey: ['community', 'profile', user.data?.id], queryFn: () => communityApi.profile(user.data!.id), enabled: signedIn && Boolean(user.data?.id), staleTime: 5 * 60_000 });
 
   const [scope, setScope] = useState<Scope>('ALL');
@@ -193,12 +190,6 @@ export default function CommunityScreen() {
   const openPost = useCallback((id: string) => router.push(`/community/${id}` as never), [router]);
   const openProfile = useCallback((id: string) => router.push(`/community/users/${id}` as never), [router]);
   const openOwnProfile = () => { if (user.data?.id) { haptics.tap(); openProfile(user.data.id); } };
-  const openNotifications = () => {
-    haptics.tap();
-    void queryClient.invalidateQueries({ queryKey: ['community', 'notifications'] });
-    void queryClient.invalidateQueries({ queryKey: ['community', 'unread'] });
-    router.push('/community/notifications' as never);
-  };
   const compose = () => { haptics.tap(); router.push('/community/composer' as never); };
 
   const closeSearch = () => { setSearching(false); setSearch(''); };
@@ -279,46 +270,41 @@ export default function CommunityScreen() {
         pointerEvents="box-none"
         style={[{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20, elevation: 10, backgroundColor: colors.canvas }, headerAnimatedStyle]}>
         <View onLayout={onHeaderLayout} style={{ paddingTop: insets.top, backgroundColor: colors.canvas }}>
-          <View className="flex-row items-center px-4 pb-1 pt-1">
-            <Text accessibilityRole="header" weight="black" className="flex-1 text-[28px]">Cộng đồng</Text>
-            {(manualRefreshing || (feed.isRefetching && !feed.isFetchingNextPage)) ? <ActivityIndicator size="small" color={colors.accent} className="mr-2" /> : null}
-            {signedIn ? (
-              <View className="flex-row">
-                <BarButton label="Tìm bài viết" onPress={() => { haptics.tap(); setSearching((open) => !open); headerReveal.value = headerHeightShared.value; }}><Search size={21} color={colors.ink} /></BarButton>
-                <BarButton label={`Thông báo${unreadCount > 0 ? `, ${unreadCount} chưa đọc` : ''}`} onPress={openNotifications}>
-                  <View>
-                    <Bell size={21} color={colors.ink} />
-                    {unreadCount > 0 ? (
-                      <View className="absolute -right-2 -top-2 h-4 min-w-4 items-center justify-center rounded-full border border-canvas bg-danger px-1">
-                        <Text weight="bold" className="text-[10px] leading-[12px]" style={{ color: colors.onAccent }}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                </BarButton>
-                <Pressable onPress={openOwnProfile} disabled={!user.data?.id} accessibilityRole="button" accessibilityLabel="Hồ sơ cộng đồng của tôi" className="h-11 w-11 items-center justify-center rounded-full active:bg-tint">
-                  <CommunityAvatar uri={ownProfile.data?.avatarUrl} name={ownProfile.data?.displayName ?? user.data?.fullName} size={34} />
+          <View className="flex-row items-center gap-2 px-4 pb-1 pt-1">
+            {searching ? (
+              <View className="min-h-12 flex-1 flex-row items-center rounded-2xl px-4" style={{ borderWidth: 2, borderColor: colors.accent, backgroundColor: colors.surface }}>
+                <Search size={18} color={colors.muted} />
+                <TextInput
+                  value={search}
+                  onChangeText={setSearch}
+                  autoFocus
+                  placeholder="Tìm bài viết hoặc chủ đề"
+                  placeholderTextColor={colors.muted}
+                  returnKeyType="search"
+                  className="min-h-11 flex-1 px-2 text-base text-ink"
+                  accessibilityLabel="Tìm bài viết hoặc chủ đề"
+                />
+                <Pressable onPress={closeSearch} hitSlop={10} accessibilityRole="button" accessibilityLabel="Đóng tìm kiếm" className="h-8 w-8 items-center justify-center">
+                  <X size={20} color={colors.muted} />
                 </Pressable>
               </View>
-            ) : null}
+            ) : (
+              <>
+                <Text accessibilityRole="header" weight="black" className="flex-1 text-[28px]">Cộng đồng</Text>
+                {(manualRefreshing || (feed.isRefetching && !feed.isFetchingNextPage)) ? <ActivityIndicator size="small" color={colors.accent} /> : null}
+                {signedIn ? (
+                  <>
+                    <Pressable onPress={() => { haptics.tap(); setSearching(true); headerReveal.value = headerHeightShared.value; }} accessibilityRole="button" accessibilityLabel="Tìm bài viết" className="h-12 w-12 items-center justify-center rounded-full active:opacity-70">
+                      <Search size={22} color={colors.ink} />
+                    </Pressable>
+                    <Pressable onPress={openOwnProfile} disabled={!user.data?.id} accessibilityRole="button" accessibilityLabel="Hồ sơ cộng đồng của tôi" className="h-12 w-12 items-center justify-center rounded-full active:opacity-80">
+                      <CommunityAvatar uri={ownProfile.data?.avatarUrl} name={ownProfile.data?.displayName ?? user.data?.fullName} size={40} />
+                    </Pressable>
+                  </>
+                ) : null}
+              </>
+            )}
           </View>
-          {searching ? (
-            <View className="mx-4 mb-2 mt-1 min-h-11 flex-row items-center rounded-full bg-tint px-4">
-              <Search size={17} color={colors.muted} />
-              <TextInput
-                value={search}
-                onChangeText={setSearch}
-                autoFocus
-                placeholder="Tìm bài viết hoặc chủ đề"
-                placeholderTextColor={colors.muted}
-                returnKeyType="search"
-                className="min-h-11 flex-1 px-2 text-base text-ink"
-                accessibilityLabel="Tìm bài viết hoặc chủ đề"
-              />
-              <Pressable onPress={closeSearch} hitSlop={10} accessibilityRole="button" accessibilityLabel="Đóng tìm kiếm" className="h-8 w-8 items-center justify-center">
-                <X size={18} color={colors.muted} />
-              </Pressable>
-            </View>
-          ) : null}
           {signedIn ? listHeader : null}
         </View>
       </Animated.View>
@@ -369,14 +355,6 @@ export default function CommunityScreen() {
 
       {menu.element}
     </View>
-  );
-}
-
-function BarButton({ label, onPress, children }: { label: string; onPress: () => void; children: React.ReactNode }) {
-  return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} hitSlop={2} className="h-11 w-11 items-center justify-center rounded-full active:bg-tint">
-      {children}
-    </Pressable>
   );
 }
 

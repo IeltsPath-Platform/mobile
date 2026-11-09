@@ -14,6 +14,7 @@ type TextFieldProps = TextInputProps & {
   secureToggle?: boolean;
 };
 
+/** Labelled input in the same 2px-frame style as the cards; the frame turns blue on focus and red on error. */
 export const TextField = forwardRef<TextInputInstance, TextFieldProps>(function TextField(
   { label, error, hint, secureToggle = false, secureTextEntry, onFocus, onBlur, ...props },
   ref,
@@ -22,19 +23,24 @@ export const TextField = forwardRef<TextInputInstance, TextFieldProps>(function 
   const [focused, setFocused] = useState(false);
   const [hidden, setHidden] = useState(true);
   const isSecure = secureToggle ? hidden : secureTextEntry;
-
-  const borderClass = error ? 'border-danger' : focused ? 'border-accent' : 'border-line';
+  const frame = error ? colors.danger : focused ? colors.accent : colors.line;
 
   return (
     <View className="gap-1.5">
-      <Text weight="semibold" className="text-sm">
+      <Text weight="bold" className="text-sm text-ink">
         {label}
       </Text>
-      <View className={`min-h-12 flex-row items-center rounded-xl border bg-surface px-3.5 ${borderClass}`}>
+      <View
+        className="min-h-14 flex-row items-center rounded-2xl px-4"
+        style={{
+          borderWidth: 2,
+          borderColor: frame,
+          backgroundColor: focused ? colors.surface : colors.surfaceTint,
+        }}>
         <TextInput
           ref={ref}
           className="flex-1 py-3 text-base text-ink"
-          style={{ fontFamily: fonts.regular, fontSize: Math.round(16 * fontScale) }}
+          style={{ fontFamily: fonts.medium ?? fonts.regular, fontSize: Math.round(17 * fontScale) }}
           placeholderTextColor={colors.muted}
           selectionColor={colors.accentDeep}
           secureTextEntry={isSecure}
@@ -54,15 +60,15 @@ export const TextField = forwardRef<TextInputInstance, TextFieldProps>(function 
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={hidden ? 'Hiện mật khẩu' : 'Ẩn mật khẩu'}
-            hitSlop={10}
+            hitSlop={12}
             onPress={() => setHidden((value) => !value)}
             className="pl-2">
-            {hidden ? <Eye size={20} color={colors.muted} /> : <EyeOff size={20} color={colors.muted} />}
+            {hidden ? <Eye size={22} color={colors.muted} /> : <EyeOff size={22} color={colors.muted} />}
           </Pressable>
         ) : null}
       </View>
       {error ? (
-        <Text className="text-sm text-danger" accessibilityLiveRegion="polite">
+        <Text weight="semibold" className="text-sm text-danger" accessibilityLiveRegion="polite">
           {error}
         </Text>
       ) : hint ? (

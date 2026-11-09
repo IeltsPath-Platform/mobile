@@ -126,8 +126,7 @@ export function CommunityReactionControl({ selected, disabled = false, onSelect,
           {reactions.map(({ type, label, Icon, color }) => {
             const isHovered = hovered === type;
             return (
-              <View key={type} ref={(node) => { if (node) reactionRefs.current.set(type, node); }} onLayout={() => requestAnimationFrame(() => measureReaction(type))} className="relative h-14 w-14 items-center justify-center">
-                {isHovered ? <View className="absolute -top-7 z-30 rounded-full px-2 py-1" style={{ backgroundColor: color }}><Text weight="bold" className="text-[10px] text-white">{label}</Text></View> : null}
+              <View key={type} accessibilityLabel={label} ref={(node) => { if (node) reactionRefs.current.set(type, node); }} onLayout={() => requestAnimationFrame(() => measureReaction(type))} className="relative h-14 w-14 items-center justify-center">
                 <Animated.View style={[{ width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: isHovered ? `${color}20` : 'transparent', transform: [{ scale: scales.get(type)! }] }]}>
                   <Icon size={isHovered ? 32 : 27} color={color} fill={type === 'LOVE' && (isHovered || selected === type) ? color : 'transparent'} />
                 </Animated.View>

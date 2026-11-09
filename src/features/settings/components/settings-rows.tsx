@@ -1,5 +1,4 @@
-import { ChevronDown, ChevronRight } from 'lucide-react-native';
-import type { LucideIcon } from 'lucide-react-native';
+import { ChevronDown, ChevronRight, type LucideIcon } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, Switch, View } from 'react-native';
 
@@ -82,25 +81,34 @@ export function SettingsAccordionRow({
 }
 
 export function SettingsToggleItem({
+  icon: Icon,
   title,
+  description,
   value,
   onChange,
 }: {
+  icon?: LucideIcon;
   title: string;
+  description?: string;
   value: boolean;
   onChange: (val: boolean) => void;
 }) {
   return (
-    <View className="min-h-[52px] flex-row items-center justify-between border-b border-line/60 px-4 py-2">
-      <Text weight="medium" className="flex-1 pr-2 text-sm text-ink">
-        {title}
-      </Text>
+    <View className="min-h-16 flex-row items-center gap-3 px-4 py-3">
+      {Icon ? <Icon size={22} color={colors.accentDeep} /> : null}
+      <View className="flex-1">
+        <Text weight="bold" className="text-base text-ink">
+          {title}
+        </Text>
+        {description ? <Text className="mt-0.5 text-sm text-muted">{description}</Text> : null}
+      </View>
       <Switch
         accessibilityLabel={title}
         value={value}
         onValueChange={onChange}
-        trackColor={{ false: colors.line, true: colors.accentSoft }}
-        thumbColor={value ? colors.accent : colors.muted}
+        trackColor={{ false: colors.line, true: colors.accent }}
+        thumbColor={colors.surface}
+        ios_backgroundColor={colors.line}
       />
     </View>
   );

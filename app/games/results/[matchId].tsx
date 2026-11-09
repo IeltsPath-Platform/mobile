@@ -13,6 +13,8 @@ import { StarRating } from '@/src/components/effects/star-rating';
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
 import { StatCard } from '@/src/components/ui/stat-card';
+import { getReview } from '@/src/features/games/review-log';
+import { ReviewList } from '@/src/features/games/ui/review-list';
 import { Text } from '@/src/components/ui/text';
 import { useCurrentUser } from '@/src/features/auth/auth-provider';
 import { gameApi } from '@/src/features/games/api';
@@ -119,6 +121,8 @@ export default function GameResultScreen() {
             <StatCard key={card.label} label={card.label} value={card.value} tone={card.tone} icon={card.icon} />
           ))}
         </View>
+
+        <ReviewList items={getReview(matchId)} />
 
         {players && players.length > 1 ? (
           <Card className="mt-5 p-4">

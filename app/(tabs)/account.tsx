@@ -1,6 +1,5 @@
 import Constants from 'expo-constants';
 import {
-  Bell,
   BookOpen,
   CircleHelp,
   Palette,
@@ -37,7 +36,7 @@ import { useUnread } from '@/src/features/community/use-unread';
 import { profileApi, profileQueryKeys } from '@/src/features/profile/api';
 import { ProfileHero } from '@/src/features/profile/components/profile-hero';
 import { ProfileRewardsCard } from '@/src/features/profile/components/profile-rewards-card';
-import { THEME_LABEL, ThemeSheet } from '@/src/features/settings/components/theme-sheet';
+import { THEME_LABEL, openThemeSheet } from '@/src/features/settings/components/theme-sheet';
 import { AppSettingsPanel } from '@/src/features/settings/components/app-settings-panel';
 import {
   SettingsAccordionRow,
@@ -102,7 +101,6 @@ export default function AccountScreen() {
   const [busy, setBusy] = useState<'signout' | 'cache' | null>(null);
   const [pullRefreshing, setPullRefreshing] = useState(false);
   const [tabRefreshing, setTabRefreshing] = useState(false);
-  const [themeSheetOpen, setThemeSheetOpen] = useState(false);
   const [expandedSection, setExpandedSection] = useState<ExpandableSection>(null);
   const scrollRef = useRef<ScrollViewInstance>(null);
   const refreshPrimed = useRef(false);
@@ -171,12 +169,6 @@ export default function AccountScreen() {
     setExpandedSection((prev) => (prev === section ? null : section));
   };
 
-  const openNotifications = () => {
-    void queryClient.invalidateQueries({ queryKey: ['community', 'notifications'] });
-    void queryClient.invalidateQueries({ queryKey: ['community', 'unread'] });
-    router.push('/community/notifications' as never);
-  };
-
   const signOutPrompt = () => {
     const run = async () => {
       setBusy('signout');
@@ -234,7 +226,6 @@ export default function AccountScreen() {
   const followersCount = relationshipsQuery.data?.followerCount ?? (relationshipsQuery.isPending ? '…' : '—');
   const achievementItems = achievementsQuery.data?.items;
   const completedAchievements = achievementItems?.filter((item) => item.achieved).length ?? 0;
-  const unreadCount = unread.data?.count ?? 0;
   const hasSummaryError =
     learnerQuery.isError || relationshipsQuery.isError || achievementsQuery.isError || studySummary.isError;
   const retrySummary = () => {
@@ -250,43 +241,21 @@ export default function AccountScreen() {
       onScroll={handleTabBarScroll}
       scrollEventThrottle={16}
       className="flex-1 bg-canvas"
-      contentContainerClassName="px-4 pb-12 pt-2"
+      contentContainerClassName="px-4 pb-28 pt-3"
       showsVerticalScrollIndicator={false}
       refreshControl={
         signedIn ? (
           <RefreshControl
-            refreshing={pullRefreshing}
+            refreshing={pullRefreshing || tabRefreshing}
             onRefresh={() => void refreshProfileByPull()}
             tintColor={colors.accent}
           />
         ) : undefined
       }
     >
-      <View className="mb-3.5 flex-row items-center justify-between px-1 pt-1">
-        <Text accessibilityRole="header" weight="black" className="text-[23px] text-ink">
-          Hồ sơ
-        </Text>
-        {tabRefreshing ? (
-          <ActivityIndicator accessibilityLabel="Đang cập nhật hồ sơ" size="small" color={colors.accent} />
-        ) : null}
-        {authEnabled && user ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={unreadCount > 0 ? `Xem thông báo, ${unreadCount} chưa đọc` : 'Xem thông báo'}
-            onPress={openNotifications}
-            className="relative h-11 w-11 items-center justify-center rounded-full border border-line bg-surface active:opacity-75"
-          >
-            <Bell size={18} color={colors.ink} />
-            {unreadCount > 0 ? (
-              <View className="absolute -right-0.5 -top-0.5 h-3.5 w-3.5 items-center justify-center rounded-full bg-danger">
-                <Text weight="black" className="text-[8px] text-white">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </Text>
-              </View>
-            ) : null}
-          </Pressable>
-        ) : null}
-      </View>
+      <Text accessibilityRole="header" weight="black" className="mb-3 px-1 text-[28px] text-ink">
+        Hồ sơ
+      </Text>
 
       {!authEnabled ? (
         <Card className="items-center rounded-3xl p-6">
@@ -409,18 +378,17 @@ export default function AccountScreen() {
               icon={Palette}
               title="Giao diện"
               value={THEME_LABEL[settings.theme]}
-              onPress={() => setThemeSheetOpen(true)}
+              onPress={openThemeSheet}
             />
             <SettingsAccordionRow
               icon={Settings2}
-              title="Cài đặt & Cấu hình"
+              title="Âm thanh, thông báo & cỡ chữ"
               expanded={expandedSection === 'settings'}
               onToggle={() => toggleSection('settings')}
               isLast
             >
               <AppSettingsPanel />
             </SettingsAccordionRow>
-            <ThemeSheet visible={themeSheetOpen} onClose={() => setThemeSheetOpen(false)} />
           </SettingsSection>
 
           <SettingsSection title="Tài khoản">

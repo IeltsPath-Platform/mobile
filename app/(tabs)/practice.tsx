@@ -67,7 +67,7 @@ export default function PracticeScreen() {
       onScroll={handleTabBarScroll}
       scrollEventThrottle={16}
       className="flex-1 bg-canvas"
-      contentContainerClassName="px-5 pb-8 pt-4"
+      contentContainerClassName="px-5 pb-28 pt-4"
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
       refreshControl={
@@ -87,6 +87,7 @@ export default function PracticeScreen() {
         Luyện tập
       </Text>
       <Text className="mb-5 mt-1 text-sm text-muted">Chơi một ván ngắn để nhớ từ lâu hơn.</Text>
+
 
       {!canFetch ? (
         <Card className="mb-4 border-b-0 bg-surface p-5">

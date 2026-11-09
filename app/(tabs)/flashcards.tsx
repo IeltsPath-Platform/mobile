@@ -131,7 +131,7 @@ export default function FlashcardsScreen() {
         scrollEventThrottle={16}
         data={enabled ? rows : []}
         keyExtractor={(row) => row.id}
-        contentContainerClassName="px-5 pb-10 pt-3"
+        contentContainerClassName="px-5 pb-28 pt-3"
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
@@ -149,11 +149,7 @@ export default function FlashcardsScreen() {
         }
         ListHeaderComponent={
           <View className="gap-3 pb-4">
-            <Text
-              accessibilityRole="header"
-              className="text-[28px]"
-              weight="black"
-            >
+            <Text accessibilityRole="header" className="text-[28px]" weight="black">
               Thẻ từ
             </Text>
 

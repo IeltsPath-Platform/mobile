@@ -15,6 +15,7 @@ import { useCountdown } from '../use-countdown';
 import { useGameSocket } from '../use-game-socket';
 import type { CurrentWord, GameEvent, GameRanking, GuessResponse } from '../types';
 import { mergeRanking } from '../types';
+import { recordReview } from '../review-log';
 import { applyWordHint, hintUnavailableReason } from '../wordly-hint';
 import { normalizeWordlyGuess } from '../wordly-input';
 
@@ -251,6 +252,17 @@ export function useWordlyMatch(matchId: string) {
         pendingGuess.current = null;
         setGuessPending(false);
         celebrate(word, accepted, solved);
+        if (accepted.wordStatus !== 'ACTIVE') {
+          // The word is over: keep it for the result screen. The server only reveals the answer when it was solved.
+          const tries = [...word.guesses.map((item) => item.guess), accepted.guess];
+          recordReview(matchId, {
+            id: word.playerWordId,
+            meaning: word.meaning,
+            correct: solved,
+            answer: solved ? accepted.guess.toUpperCase() : null,
+            yours: solved ? null : (tries[tries.length - 1]?.toUpperCase() ?? null),
+          });
+        }
         if (accepted.nextWord) qc.setQueryData(['games', 'current', matchId], accepted.nextWord);
         else void qc.invalidateQueries({ queryKey: ['games', 'current', matchId] });
         if (accepted.matchFinished) {

@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { createContext, Fragment, useContext, useEffect, useMemo, type ReactNode } from 'react';
 import { Appearance, Platform, useColorScheme, View } from 'react-native';
 
+import { ThemeSheetHost } from '@/src/features/settings/components/theme-sheet';
 import { useAppSettings } from '@/src/features/settings/use-app-settings';
 
 import { darkColors, FONT_SCALE, lightColors, setActivePalette, themeVars } from './runtime';
@@ -83,6 +84,7 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
       <View style={[{ flex: 1 }, vars]} className="flex-1 bg-canvas">
         <StatusBar style={isDark ? 'light' : 'dark'} />
         <NavigationThemeProvider value={navigationTheme}>{children}</NavigationThemeProvider>
+        <ThemeSheetHost />
       </View>
     </ThemeContext.Provider>
   );
