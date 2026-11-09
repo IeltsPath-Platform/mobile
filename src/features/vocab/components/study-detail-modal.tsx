@@ -15,7 +15,7 @@ type PurchaseKind = 'refill' | 'freeze';
 
 /** Detail sheet for XP, streak, hearts refill and study timezone. */
 export function StudyDetailModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  useTheme();
+  const { vars } = useTheme();
   const client = useQueryClient();
   const summary = useQuery({
     queryKey: studyKeys.summary,
@@ -89,7 +89,7 @@ export function StudyDetailModal({ visible, onClose }: { visible: boolean; onClo
         if (!busy) onClose();
       }}
     >
-      <SafeAreaView className="flex-1 bg-canvas">
+      <SafeAreaView className="flex-1 bg-canvas" style={vars}>
         <View className="flex-row items-center justify-between border-b border-line px-5 py-3">
           <Text weight="black" className="text-xl">
             Tiến độ học từ
@@ -99,7 +99,7 @@ export function StudyDetailModal({ visible, onClose }: { visible: boolean; onClo
             accessibilityRole="button"
             accessibilityLabel="Đóng"
             onPress={onClose}
-            className="h-11 w-11 items-center justify-center rounded-full bg-tint"
+            className="h-12 w-12 items-center justify-center rounded-full bg-tint"
           >
             <X color={colors.ink} size={20} />
           </Pressable>

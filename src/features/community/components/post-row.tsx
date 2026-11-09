@@ -28,7 +28,7 @@ type PostRowProps = {
 const DOUBLE_TAP_MS = 260;
 
 /**
- * Edge-to-edge post: no card chrome, a hairline separator, and a compact icon+count action bar.
+ * Post card with the shared 2px frame and thicker bottom edge, and a compact icon+count action bar.
  * Hold the heart for the reaction tray; double-tap the media to love it.
  */
 export const PostRow = memo(function PostRow({ post, authorOverride, onOpen, onOpenProfile, onMenu }: PostRowProps) {
@@ -61,7 +61,10 @@ export const PostRow = memo(function PostRow({ post, authorOverride, onOpen, onO
   const label = `Bài của ${author?.displayName ?? 'thành viên'}, ${CATEGORY_LABELS[post.category] ?? ''}, ${post.commentCount} bình luận`;
 
   return (
-    <View className="border-b border-line bg-canvas pb-1 pt-3" accessibilityLabel={label}>
+    <View
+      className="mx-3 mb-3 rounded-3xl pb-1 pt-3"
+      style={{ borderWidth: 2, borderBottomWidth: 4, borderColor: colors.line, borderBottomColor: colors.edge, backgroundColor: colors.surface }}
+      accessibilityLabel={label}>
       <View className="flex-row items-center px-4">
         <Pressable onPress={() => onOpenProfile(post.authorId)} accessibilityRole="button" accessibilityLabel={`Hồ sơ ${author?.displayName ?? 'thành viên'}`} hitSlop={4}>
           <CommunityAvatar uri={author?.avatarUrl} name={author?.displayName} size={42} />
@@ -146,7 +149,7 @@ function MediaGrid({ urls }: { urls: string[] }) {
 function SinglePostImage({ uri }: { uri: string }) {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
-  const frameWidth = Math.max(1, screenWidth - 32);
+  const frameWidth = Math.max(1, screenWidth - 60);
   const maxHeight = Math.max(240, screenHeight * 0.72);
   const aspectRatio = dimensions ? dimensions.width / dimensions.height : null;
   const imageHeight = aspectRatio ? Math.min(frameWidth / aspectRatio, maxHeight) : Math.min(256, maxHeight);

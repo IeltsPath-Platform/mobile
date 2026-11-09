@@ -23,6 +23,7 @@ import { REPORT_REASONS, reactToPost, reportContent, toggleBookmark, toggleFollo
 import { updateCommunityPostCache } from '@/src/features/community/post-cache';
 import { haptics } from '@/src/lib/haptics';
 import { colors } from '@/src/theme';
+import { useTheme } from '@/src/theme/app-theme';
 
 const MAX_DEEP_LINK_PAGES = 5;
 
@@ -32,6 +33,7 @@ export default function PostDetailScreen() {
   const router = useRouter();
   const qc = useQueryClient();
   const insets = useSafeAreaInsets();
+  const { vars } = useTheme();
   const user = useCurrentUser();
 
   const listRef = useRef<FlatList<Comment>>(null);
@@ -392,7 +394,7 @@ export default function PostDetailScreen() {
       {postMenu.element}
 
       <Modal visible={Boolean(editing)} transparent animationType="fade" onRequestClose={() => setEditing(undefined)}>
-        <KeyboardAvoidingView className="flex-1 justify-center bg-black/50 px-5" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView className="flex-1 justify-center bg-black/50 px-5" style={vars} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View className="rounded-3xl bg-surface p-5">
             <Text weight="extrabold" className="text-lg">Sửa bình luận</Text>
             <TextInput

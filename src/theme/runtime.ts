@@ -20,6 +20,14 @@ export type AppColors = TokenColors & {
   social: string;
   /** Soft elevation tint for cards. */
   shadow: string;
+  /** Darker edge under 3D buttons and tiles, one per fill colour. */
+  accentShade: string;
+  successShade: string;
+  dangerShade: string;
+  xpShade: string;
+  warmShade: string;
+  /** Flat fill of a disabled chunky button. */
+  disabledFill: string;
   /** Reaction accents used by the community reaction tray and summaries. */
   reaction: Record<'like' | 'love' | 'helpful' | 'accurate', string>;
 };
@@ -28,37 +36,44 @@ export const FONT_SCALE = { S: 0.9, M: 1, L: 1.15 } as const;
 
 export const lightColors: AppColors = {
   ...lightTokens,
-  warmSoft: '#fff0df',
+  warmSoft: '#fff1dc',
   listeningSoft: '#e8effa',
   onAccent: '#ffffff',
   warning: '#e6a321',
-  flame: '#ff864b',
-  coin: '#f4c44e',
+  flame: '#ff9600',
+  coin: '#ffc800',
   social: '#d76280',
   absent: '#7d8799',
   shadow: '#14213d',
+  accentShade: '#1257b8',
+  successShade: '#237a34',
+  dangerShade: '#b8272a',
+  xpShade: '#d9a300',
+  warmShade: '#d97c00',
+  disabledFill: '#e3e7ec',
   reaction: { like: '#1877f2', love: '#e41e3f', helpful: '#d97706', accurate: '#059669' },
 };
 
+/** Layered slate night theme: canvas → surface → tint, with visible borders instead of shadows. */
 export const darkColors: AppColors = {
-  canvas: '#11171d',
-  surface: '#192129',
-  surfaceTint: '#222d37',
-  ink: '#f2f4f5',
-  muted: '#adb8c1',
-  line: '#303b44',
-  edge: '#29343d',
-  accent: '#66b7f2',
-  accentDeep: '#8bcaff',
-  accentSoft: '#1d3448',
-  accentEdge: '#315774',
-  accentWarm: '#ffad70',
-  xp: '#f3c369',
-  xpDeep: '#ffd988',
-  danger: '#f18b80',
-  dangerSoft: '#3b292b',
-  success: '#72cda4',
-  successSoft: '#203b32',
+  canvas: '#121c22',
+  surface: '#18262e',
+  surfaceTint: '#213139',
+  ink: '#f1f5f7',
+  muted: '#9eadb7',
+  line: '#2f414b',
+  edge: '#263740',
+  accent: '#3d9bff',
+  accentDeep: '#8cc4ff',
+  accentSoft: '#183349',
+  accentEdge: '#2c5577',
+  accentWarm: '#ffa733',
+  xp: '#ffcf33',
+  xpDeep: '#ffd966',
+  danger: '#ff6b6b',
+  dangerSoft: '#3a2328',
+  success: '#5fd068',
+  successSoft: '#1d3a27',
   community: {
     general: { foreground: '#a9bfff', background: '#26365e', border: '#40598d' },
     question: { foreground: '#ff9eaa', background: '#492b38', border: '#744252' },
@@ -67,18 +82,24 @@ export const darkColors: AppColors = {
     speaking: { foreground: '#82d6f5', background: '#1d3a4a', border: '#326177' },
     resources: { foreground: '#ffca76', background: '#49391f', border: '#70582e' },
   },
-  heroStart: '#183751',
-  heroEnd: '#246b9b',
+  heroStart: '#173a63',
+  heroEnd: '#1f6bb0',
   skill: lightTokens.skill,
-  warmSoft: '#3a2c21',
+  warmSoft: '#3a2c1c',
   listeningSoft: '#223343',
-  onAccent: '#ffffff',
+  onAccent: '#121c22',
   warning: '#f0b84a',
-  flame: '#ff9c6b',
-  coin: '#f4c44e',
+  flame: '#ffa733',
+  coin: '#ffcf33',
   social: '#e8809a',
   absent: '#4a5260',
   shadow: '#000000',
+  accentShade: '#1f72c9',
+  successShade: '#3c9f45',
+  dangerShade: '#c94747',
+  xpShade: '#c99a00',
+  warmShade: '#c97800',
+  disabledFill: '#2f414b',
   reaction: { like: '#4c9bff', love: '#ff5a78', helpful: '#f0a23a', accurate: '#34c48f' },
 };
 

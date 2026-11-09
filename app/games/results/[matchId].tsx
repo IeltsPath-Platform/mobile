@@ -1,15 +1,18 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { Award, Check, Heart, RotateCcw, WifiOff } from 'lucide-react-native';
+import { Image } from 'expo-image';
+import { Award, Check, Heart, WifiOff, Zap, type LucideIcon } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfettiBurst } from '@/src/components/effects/confetti-burst';
 import { CountUp } from '@/src/components/effects/count-up';
 import { StarRating } from '@/src/components/effects/star-rating';
 import { Button } from '@/src/components/ui/button';
+import { Card } from '@/src/components/ui/card';
+import { StatCard } from '@/src/components/ui/stat-card';
 import { Text } from '@/src/components/ui/text';
 import { useCurrentUser } from '@/src/features/auth/auth-provider';
 import { gameApi } from '@/src/features/games/api';
@@ -19,16 +22,6 @@ import { GameStateScreen } from '@/src/features/games/ui/game-ui';
 import { haptics } from '@/src/lib/haptics';
 import { sound } from '@/src/lib/sound';
 import { colors } from '@/src/theme';
-
-function Stat({ icon, value, label }: { icon: ReactNode; value: string; label: string }) {
-  return (
-    <View className="flex-1 items-center gap-1 rounded-2xl bg-canvas py-3">
-      {icon}
-      <Text weight="black" className="text-lg">{value}</Text>
-      <Text className="text-center text-[11px] text-muted">{label}</Text>
-    </View>
-  );
-}
 
 export default function GameResultScreen() {
   const { matchId, gameType } = useLocalSearchParams<{ matchId: string; gameType?: string }>();
@@ -89,52 +82,57 @@ export default function GameResultScreen() {
   const accuracy = attempted ? solved / attempted : 0;
   const stars = accuracy >= 0.8 ? 3 : accuracy >= 0.5 ? 2 : 1;
 
+  const heading = won ? 'Bạn về nhất!' : stars === 3 ? 'Xuất sắc!' : stars === 2 ? 'Làm tốt lắm!' : 'Hoàn thành ván!';
+  const cards: { label: string; value: string; tone: 'accent' | 'success' | 'xp'; icon: LucideIcon }[] = rocketStats
+    ? [
+        { label: 'Câu đúng', value: `${rocketStats.correctCount}/${rocketStats.totalRounds}`, tone: 'success', icon: Check },
+        { label: 'Mạng còn', value: `${rocketStats.livesRemaining}`, tone: 'accent', icon: Heart },
+      ]
+    : wordlyStats
+      ? [
+          { label: 'Từ giải được', value: `${wordlyStats.player.wordsSolved}/${wordlyStats.player.wordsProcessed}`, tone: 'success', icon: Check },
+          { label: 'Chuỗi tốt nhất', value: `${wordlyStats.player.bestStreak}`, tone: 'accent', icon: Award },
+        ]
+      : [];
+
   return (
     <View className="flex-1 bg-canvas">
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: Math.max(insets.bottom, 16) + 8 }} showsVerticalScrollIndicator={false}>
-        <View className="items-center rounded-[32px] px-6 pb-7 pt-9" style={{ backgroundColor: tone.soft }}>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingTop: Math.max(insets.top, 16) + 8, paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
+        <View style={{ alignItems: 'center' }}>
+          <Animated.View entering={FadeInDown.springify().damping(12)} style={{ alignItems: 'center' }}>
+            <Image source={require('@/assets/images/owl/hero-cheer.webp')} contentFit="contain" style={{ width: 170, height: 170 }} accessibilityIgnoresInvertColors />
+          </Animated.View>
           <StarRating earned={stars} />
-          <Text accessibilityRole="header" weight="black" className="mt-4 text-center text-2xl">
-            {won ? 'Bạn về nhất!' : stars === 3 ? 'Xuất sắc!' : stars === 2 ? 'Làm tốt lắm!' : 'Hoàn thành ván!'}
+          <Text accessibilityRole="header" weight="black" className="mt-4 text-center text-3xl" style={{ color: colors.xp }}>
+            {heading}
           </Text>
           <Text className="mt-1 text-sm text-muted">
             {name} · {minutes} phút
           </Text>
-          <Animated.View entering={FadeInDown.delay(200).springify()} className="mt-5 items-center">
-            <CountUp value={score} weight="black" className="text-6xl leading-[68px]" style={{ color: tone.solid }} />
-            <Text weight="bold" className="text-sm text-muted">điểm</Text>
-          </Animated.View>
         </View>
 
-        <Animated.View entering={FadeInDown.delay(320)} className="mt-3 flex-row gap-3">
-          {rocketStats ? (
-            <>
-              <Stat icon={<Check size={20} color={colors.success} />} value={`${rocketStats.correctCount}/${rocketStats.totalRounds}`} label="Câu đúng" />
-              <Stat icon={<Heart size={20} color={colors.danger} />} value={`${rocketStats.livesRemaining}`} label="Mạng còn" />
-              <Stat icon={<RotateCcw size={20} color={colors.accent} />} value={`${rocketStats.answered}`} label="Đã trả lời" />
-            </>
-          ) : wordlyStats ? (
-            <>
-              <Stat icon={<Check size={20} color={colors.success} />} value={`${wordlyStats.player.wordsSolved}/${wordlyStats.player.wordsProcessed}`} label="Từ giải được" />
-              <Stat icon={<Heart size={20} color={colors.danger} />} value={`${wordlyStats.player.livesRemaining}`} label="Mạng còn" />
-              <Stat icon={<Award size={20} color={colors.accent} />} value={`${wordlyStats.player.bestStreak}`} label="Chuỗi tốt nhất" />
-            </>
-          ) : null}
-        </Animated.View>
+        <View style={{ flexDirection: 'row', gap: 12, marginTop: 24 }}>
+          <StatCard label="Điểm" value={String(score)} tone="xp" icon={Zap}>
+            <CountUp value={score} weight="black" className="text-2xl" style={{ color: colors.xpDeep }} />
+          </StatCard>
+          {cards.map((card) => (
+            <StatCard key={card.label} label={card.label} value={card.value} tone={card.tone} icon={card.icon} />
+          ))}
+        </View>
 
         {players && players.length > 1 ? (
-          <Animated.View entering={FadeInDown.delay(440)} className="mt-3 rounded-3xl border border-line bg-surface p-4">
-            <Text weight="black" className="text-base">Bảng xếp hạng</Text>
-            <View className="mt-2 gap-2">
+          <Card className="mt-5 p-4">
+            <Text weight="black" className="text-lg">Bảng xếp hạng</Text>
+            <View className="mt-3 gap-2">
               {[...players].sort((a, b) => a.rank - b.rank).map((player) => {
                 const mine = player.userId === user.data?.id;
                 return (
                   <View
                     key={player.userId}
                     className="flex-row items-center rounded-2xl px-3 py-2.5"
-                    style={{ backgroundColor: mine ? colors.accentSoft : colors.canvas }}
+                    style={{ backgroundColor: mine ? colors.accentSoft : colors.canvas, borderWidth: 2, borderColor: mine ? colors.accent : 'transparent' }}
                   >
-                    <Text weight="black" className="w-8 text-base" style={{ color: player.rank === 1 ? colors.xp : colors.muted }}>
+                    <Text weight="black" className="w-8 text-base" style={{ color: player.rank === 1 ? colors.xpDeep : colors.muted }}>
                       {player.rank}
                     </Text>
                     <View className="flex-1">
@@ -152,14 +150,14 @@ export default function GameResultScreen() {
                 );
               })}
             </View>
-          </Animated.View>
+          </Card>
         ) : null}
-
-        <View className="mt-5 gap-3">
-          <Button label="Chơi lại" onPress={() => router.replace({ pathname: '/games', params: { gameType: kind } } as never)} />
-          <Button label="Về luyện tập" variant="secondary" onPress={() => router.replace(PRACTICE_HOME)} />
-        </View>
       </ScrollView>
+
+      <View className="gap-3 border-t-2 border-line bg-canvas px-5 pt-3" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
+        <Button label="Chơi lại" onPress={() => router.replace({ pathname: '/games', params: { gameType: kind } } as never)} />
+        <Button label="Về luyện tập" variant="secondary" onPress={() => router.replace(PRACTICE_HOME)} />
+      </View>
       <ConfettiBurst trigger={stars >= 2 || won ? 1 : 0} size="large" originY={0.22} />
     </View>
   );

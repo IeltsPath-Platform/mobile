@@ -5,20 +5,13 @@ type CardProps = ViewProps & {
   className?: string;
 };
 
+/** Tile with a 2px border and a thicker bottom edge, matching the chunky buttons. */
 export function Card({ className, style, ...props }: CardProps) {
   return (
     <View
-      className={`rounded-3xl border border-line bg-surface p-5 ${className ?? ''}`}
-      style={[cardShadow(), style]}
+      className={`rounded-3xl bg-surface p-5 ${className ?? ''}`}
+      style={[{ borderWidth: 2, borderBottomWidth: 4, borderColor: colors.line, borderBottomColor: colors.edge }, style]}
       {...props}
     />
   );
 }
-
-const cardShadow = () => ({
-  shadowColor: colors.shadow,
-  shadowOpacity: 0.045,
-  shadowRadius: 14,
-  shadowOffset: { width: 0, height: 5 },
-  elevation: 1,
-});

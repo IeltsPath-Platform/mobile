@@ -51,8 +51,14 @@ export function RewardToast({ reward, onDone, top = 8, duration = 1900 }: { rewa
         entering={ZoomIn.springify().damping(12)}
         exiting={FadeOutUp.duration(220)}
         accessibilityLiveRegion="polite"
-        className="flex-row items-center gap-3 rounded-full py-2 pl-2 pr-5"
         style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+          borderRadius: 999,
+          paddingVertical: 8,
+          paddingLeft: 8,
+          paddingRight: 20,
           backgroundColor: bg,
           shadowColor: colors.shadow,
           shadowOpacity: 0.18,

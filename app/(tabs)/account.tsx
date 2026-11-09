@@ -1,22 +1,18 @@
 import Constants from 'expo-constants';
-import { Image } from 'expo-image';
 import {
   Bell,
   BookOpen,
-  Camera,
   CircleHelp,
-  Flame,
+  Palette,
   KeyRound,
   LogOut,
   Settings2,
-  Sparkles,
   Trash2,
   Trophy,
   UserRound,
-  UsersRound,
   Zap,
 } from 'lucide-react-native';
-import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -39,6 +35,9 @@ import { useAuth, useCurrentUser } from '@/src/features/auth/auth-provider';
 import { communityApi } from '@/src/features/community/api';
 import { useUnread } from '@/src/features/community/use-unread';
 import { profileApi, profileQueryKeys } from '@/src/features/profile/api';
+import { ProfileHero } from '@/src/features/profile/components/profile-hero';
+import { ProfileRewardsCard } from '@/src/features/profile/components/profile-rewards-card';
+import { THEME_LABEL, ThemeSheet } from '@/src/features/settings/components/theme-sheet';
 import { AppSettingsPanel } from '@/src/features/settings/components/app-settings-panel';
 import {
   SettingsAccordionRow,
@@ -55,7 +54,6 @@ import { useTabBarScrollHandler, useTabReselect } from '@/src/components/navigat
 const XP_PRESETS = [30, 50, 80, 100] as const;
 const APP_VERSION = Constants.expoConfig?.version ?? Constants.nativeAppVersion ?? '1.0.0';
 const SUPPORT_EMAIL = 'theenglishspace01@gmail.com';
-const OWL_AVATAR = require('@/assets/images/owl/nav-owl-stand.webp');
 
 type ExpandableSection = 'goal' | 'settings' | null;
 
@@ -104,6 +102,7 @@ export default function AccountScreen() {
   const [busy, setBusy] = useState<'signout' | 'cache' | null>(null);
   const [pullRefreshing, setPullRefreshing] = useState(false);
   const [tabRefreshing, setTabRefreshing] = useState(false);
+  const [themeSheetOpen, setThemeSheetOpen] = useState(false);
   const [expandedSection, setExpandedSection] = useState<ExpandableSection>(null);
   const scrollRef = useRef<ScrollViewInstance>(null);
   const refreshPrimed = useRef(false);
@@ -318,82 +317,24 @@ export default function AccountScreen() {
         </View>
       ) : user ? (
         <>
-          <View
-            className="mb-4 overflow-hidden rounded-3xl border border-line bg-surface p-4"
-            style={{
-              shadowColor: colors.shadow,
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.05,
-              shadowRadius: 6,
-              elevation: 2,
-            }}
-          >
-            <View className="flex-row items-center gap-3.5">
-              <View className="relative">
-                <View
-                  className="h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 border-accent"
-                  style={{ backgroundColor: colors.accentSoft }}
-                >
-                  <Image
-                    source={avatarReference ? { uri: avatarReference } : OWL_AVATAR}
-                    accessibilityLabel="Avatar học viên"
-                    style={avatarReference ? { width: '100%', height: '100%' } : { width: 44, height: 44 }}
-                    contentFit={avatarReference ? 'cover' : 'contain'}
-                  />
-                </View>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Chỉnh sửa ảnh"
-                  hitSlop={12}
-                  onPress={() => router.push('/profile/edit' as never)}
-                  className="absolute -bottom-1 -right-1 h-6 w-6 items-center justify-center rounded-full border border-line bg-surface shadow-sm active:opacity-75"
-                >
-                  <Camera size={11} color={colors.accentDeep} />
-                </Pressable>
-              </View>
-
-              <View className="flex-1 pr-1">
-                <View className="flex-row items-center gap-2">
-                  <Text weight="black" className="flex-1 text-lg text-ink" numberOfLines={1}>
-                    {displayName}
-                  </Text>
-                  {band ? (
-                    <View className="rounded-full bg-accent-soft px-2 py-0.5">
-                      <Text weight="black" className="text-[10px] text-accent-deep">
-                        {band}
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-                <Text className="mt-0.5 text-xs text-muted" numberOfLines={1}>
-                  {user.email}
-                </Text>
-              </View>
-
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Chỉnh sửa hồ sơ"
-                onPress={() => router.push('/profile/edit' as never)}
-                className="min-h-11 justify-center rounded-xl border border-line bg-canvas px-3 py-1.5 active:opacity-75"
-              >
-                <Text weight="bold" className="text-xs text-accent-deep">
-                  Sửa
-                </Text>
-              </Pressable>
-            </View>
-
-            <View className="mt-3.5 flex-row items-center divide-x divide-line rounded-2xl border border-line bg-canvas py-2.5">
-              <StatCell icon={<Flame size={15} color={colors.flame} />} value={streakDays} label="Ngày streak" />
-              <StatCell icon={<Sparkles size={15} color={colors.coin} />} value={totalXp} label="Tổng XP" />
-              <StatCell
-                icon={<UsersRound size={15} color={colors.social} />}
-                value={followersCount}
-                label="Người theo dõi"
-                accessibilityLabel="Xem hồ sơ cộng đồng và người theo dõi"
-                onPress={() => router.push(`/community/users/${user.id}` as never)}
-              />
-            </View>
-          </View>
+          <ProfileHero
+            name={displayName}
+            email={user.email}
+            band={band}
+            createdAt={user.createdAt}
+            avatarUrl={avatarReference}
+            streak={streakDays}
+            xp={totalXp}
+            followers={followersCount}
+            onEdit={() => router.push('/profile/edit' as never)}
+            onOpenCommunity={() => router.push(`/community/users/${user.id}` as never)}
+          />
+          <Button
+            className="mt-4"
+            variant="secondary"
+            label="Sửa hồ sơ"
+            onPress={() => router.push('/profile/edit' as never)}
+          />
 
           {hasSummaryError ? (
             <View className="mb-4 gap-2">
@@ -402,7 +343,14 @@ export default function AccountScreen() {
             </View>
           ) : null}
 
-          <SettingsSection title="HỌC TẬP">
+          <ProfileRewardsCard
+            items={achievementItems}
+            loading={achievementsQuery.isPending}
+            onOpenAll={() => router.push('/achievements' as never)}
+          />
+
+          <View className="h-5" />
+          <SettingsSection title="Học tập">
             <SettingsAccordionRow
               icon={Zap}
               title="Mục tiêu học mỗi ngày"
@@ -456,7 +404,13 @@ export default function AccountScreen() {
             />
           </SettingsSection>
 
-          <SettingsSection title="CÀI ĐẶT ỨNG DỤNG">
+          <SettingsSection title="Nội dung khác">
+            <SettingsLinkRow
+              icon={Palette}
+              title="Giao diện"
+              value={THEME_LABEL[settings.theme]}
+              onPress={() => setThemeSheetOpen(true)}
+            />
             <SettingsAccordionRow
               icon={Settings2}
               title="Cài đặt & Cấu hình"
@@ -466,9 +420,10 @@ export default function AccountScreen() {
             >
               <AppSettingsPanel />
             </SettingsAccordionRow>
+            <ThemeSheet visible={themeSheetOpen} onClose={() => setThemeSheetOpen(false)} />
           </SettingsSection>
 
-          <SettingsSection title="TÀI KHOẢN">
+          <SettingsSection title="Tài khoản">
             <SettingsLinkRow
               icon={KeyRound}
               title="Đổi mật khẩu"
@@ -499,59 +454,20 @@ export default function AccountScreen() {
             accessibilityRole="button"
             accessibilityLabel="Đăng xuất"
             accessibilityState={{ disabled: busy !== null, busy: busy === 'signout' }}
-            className="mt-1 min-h-12 flex-row items-center justify-center gap-2 rounded-2xl border active:opacity-75"
-            style={{ backgroundColor: colors.dangerSoft, borderColor: colors.danger }}
+            className="min-h-12 flex-row items-center justify-center gap-2 active:opacity-70"
           >
-            {busy === 'signout' ? (
-              <ActivityIndicator color={colors.danger} size="small" />
-            ) : (
-              <LogOut size={16} color={colors.danger} />
-            )}
-            <Text weight="black" className="text-xs" style={{ color: colors.danger }}>
+            {busy === 'signout' ? <ActivityIndicator color={colors.danger} size="small" /> : <LogOut size={18} color={colors.danger} />}
+            <Text weight="black" className="text-base" style={{ color: colors.danger }}>
               Đăng xuất
             </Text>
           </Pressable>
 
+          <View className="my-5 items-center">
+            <View style={{ width: 120, height: 4, borderRadius: 2, backgroundColor: colors.line }} />
+          </View>
           <Text className="mt-4 text-center text-[11px] text-muted">IELTSPath · Phiên bản {APP_VERSION}</Text>
         </>
       ) : null}
     </ScrollView>
-  );
-}
-
-function StatCell({
-  icon,
-  value,
-  label,
-  accessibilityLabel,
-  onPress,
-}: {
-  icon: ReactNode;
-  value: string | number;
-  label: string;
-  accessibilityLabel?: string;
-  onPress?: () => void;
-}) {
-  const body = (
-    <>
-      <View className="flex-row items-center gap-1">
-        {icon}
-        <Text weight="black" className="text-base text-ink">
-          {value}
-        </Text>
-      </View>
-      <Text className="mt-0.5 text-[10px] font-medium text-muted">{label}</Text>
-    </>
-  );
-  if (!onPress) return <View className="flex-1 items-center">{body}</View>;
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel ?? label}
-      onPress={onPress}
-      className="min-h-11 flex-1 items-center justify-center active:opacity-70"
-    >
-      {body}
-    </Pressable>
   );
 }

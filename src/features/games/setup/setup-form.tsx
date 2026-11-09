@@ -22,7 +22,7 @@ const MODES: { value: PlayerMode; label: string; caption: string; Icon: typeof U
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <View className="mt-5">
-      <Text weight="black" className="text-base">{title}</Text>
+      <Text weight="black" className="text-lg">{title}</Text>
       <View className="mt-3">{children}</View>
     </View>
   );
@@ -32,7 +32,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 function AdvancedPanel({ summary, warning, children }: { summary: string; warning?: boolean; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
-    <View className="mt-5 rounded-3xl border border-line bg-surface">
+    <View className="mt-5 rounded-3xl bg-surface" style={{ borderWidth: 2, borderBottomWidth: 4, borderColor: colors.line, borderBottomColor: colors.edge }}>
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
@@ -103,11 +103,11 @@ export function SetupForm({ setup, kind }: { setup: GameSetup; kind: GameKind })
               accessibilityRole="radio"
               accessibilityState={{ selected }}
               onPress={() => setup.setMode(value)}
-              className="flex-1 rounded-2xl border-2 p-3 active:opacity-80"
-              style={{ borderColor: selected ? tone.solid : colors.line, backgroundColor: selected ? tone.soft : colors.surface }}
+              className="flex-1 rounded-2xl p-4 active:opacity-80"
+              style={{ borderWidth: 2, borderBottomWidth: 4, borderColor: selected ? tone.solid : colors.line, borderBottomColor: selected ? tone.solid : colors.edge, backgroundColor: selected ? tone.soft : colors.surface }}
             >
-              <Icon size={22} color={selected ? tone.solid : colors.muted} />
-              <Text weight="black" className="mt-2 text-base">{label}</Text>
+              <Icon size={26} color={selected ? tone.solid : colors.muted} />
+              <Text weight="black" className="mt-2 text-lg">{label}</Text>
               <Text className="text-xs text-muted">{caption}</Text>
             </Pressable>
           );

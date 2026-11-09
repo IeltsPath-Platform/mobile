@@ -12,23 +12,27 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Heart, Volume2, X } from 'lucide-react-native';
+import { Heart, X } from 'lucide-react-native';
 
+import { AnswerOption } from '@/src/components/ui/answer-option';
 import { Button } from '@/src/components/ui/button';
+import { ProgressBar } from '@/src/components/ui/progress-bar';
 import { Text } from '@/src/components/ui/text';
-import { AnswerFeedback } from '@/src/features/session/components/answer-feedback';
 import { sound } from '@/src/lib/sound';
 import { speakVocabularyPronunciation } from '../pronunciation';
 import { studyKeys, vocabularyStudyApi } from '../study-api';
 import { useStudyAttempt } from '../use-study-attempt';
 import type { StartMode, StudyAnswer } from '../study-types';
 import { StudyAccountPanel } from './study-account-panel';
+import { StudyFeedbackFooter } from './study-feedback-footer';
 import {
   CompletionSummary,
   FillStepView,
+  ListenButton,
+  MascotPrompt,
   MatchStepView,
-  OptionButton,
   StepsDoneView,
+  StreakCelebration,
   WordStepCard,
   correctAnswerText,
   type MatchPair,
@@ -38,13 +42,20 @@ import { useTheme } from '@/src/theme/app-theme';
 
 type Props = { unitId: string; visible: boolean; initialMode?: StartMode; onClose: () => void };
 
+function defaultInstruction(type: 'WORD' | 'CHOICE' | 'MATCH' | 'FILL') {
+  if (type === 'FILL') return 'Điền từ vào chỗ trống';
+  if (type === 'CHOICE') return 'Chọn đáp án đúng';
+  if (type === 'MATCH') return 'Nhấn vào các cặp tương ứng';
+  return 'Ghi nhớ từ vựng';
+}
+
 export function ServerTopicStudySheet({
   unitId,
   visible,
   initialMode = 'RESUME_OR_START',
   onClose,
 }: Props) {
-  useTheme();
+  const { vars } = useTheme();
   const study = useStudyAttempt(unitId, initialMode);
   const summary = useQuery({
     queryKey: studyKeys.summary,
@@ -58,6 +69,8 @@ export function ServerTopicStudySheet({
   const [pairs, setPairs] = useState<MatchPair[]>([]);
   const [fill, setFill] = useState('');
   const [audioError, setAudioError] = useState('');
+  const [playing, setPlaying] = useState(false);
+  const [streakSeen, setStreakSeen] = useState(false);
 
   const step = study.attempt?.steps.find((item) => item.stepId === study.attempt?.currentStepId);
   const stepIndex =
@@ -72,6 +85,10 @@ export function ServerTopicStudySheet({
     ? (study.attempt?.steps.length ?? 0)
     : Math.max(0, stepIndex + 1);
   const totalSteps = study.attempt?.steps.length ?? 1;
+  const inProgress = study.attempt?.status === 'IN_PROGRESS';
+  // The streak screen only appears when the server reports the streak went up on this lesson.
+  const streakDays = completion?.reward?.streakIncreased ? completion.reward.summary.streak.currentDays : null;
+  const showStreak = Boolean(completion) && streakDays !== null && !streakSeen;
 
   const resetAnswer = useCallback(() => {
     setSelectedOption(null);
@@ -115,8 +132,9 @@ export function ServerTopicStudySheet({
       (step.type === 'FILL' && fill.trim().length > 0));
 
   const listen = async () => {
-    if (!step) return;
+    if (!step || playing) return;
     setAudioError('');
+    setPlaying(true);
     try {
       if (step.type === 'WORD')
         await speakVocabularyPronunciation(
@@ -127,113 +145,83 @@ export function ServerTopicStudySheet({
         setAudioError('Chưa phát được âm thanh. Bạn vẫn có thể làm bài.');
     } catch {
       setAudioError('Chưa phát được âm thanh. Hãy thử lại.');
+    } finally {
+      setPlaying(false);
     }
   };
 
   const insets = useSafeAreaInsets();
   const topInset = Math.max(insets.top, Platform.OS === 'ios' ? 52 : 16);
   const bottomInset = Math.max(insets.bottom, 16);
+  const listenButton = <ListenButton playing={playing} onPress={() => void listen()} />;
+  const feedback = study.feedback;
+
+  const goNext = () => {
+    resetAnswer();
+    study.continueAfterFeedback();
+  };
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={close}>
-      <View className="flex-1 bg-canvas" style={{ paddingTop: topInset, paddingBottom: bottomInset }}>
-        <KeyboardAvoidingView className="flex-1 px-5" behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-
-          <View className="mb-3 flex-row items-center gap-3">
-            <Pressable
-              disabled={study.busy}
-              accessibilityRole="button"
-              accessibilityLabel="Đóng bài học"
-              className="h-11 w-11 items-center justify-center rounded-full bg-tint active:opacity-75"
-              onPress={close}
-            >
-              <X size={20} color={colors.ink} />
-            </Pressable>
-
-
-            <View
-              accessible
-              accessibilityRole="progressbar"
-              accessibilityLabel="Tiến độ bài học"
-              accessibilityValue={{
-                min: 0,
-                max: Math.max(totalSteps, 1),
-                now: Math.min(progressValue, Math.max(totalSteps, 1)),
-                text: `${progressValue} trên ${totalSteps} bước`,
-              }}
-              className="h-3 flex-1 overflow-hidden rounded-full bg-line"
-            >
-              <View
-                className="h-full rounded-full"
-                style={{
-                  width: `${totalSteps > 0 ? (progressValue * 100) / totalSteps : 0}%`,
-                  backgroundColor: colors.success,
-                }}
-              />
-            </View>
-
-
-            {study.attempt?.mode === 'REPLAY' ? (
-               <View className="rounded-full bg-accent-soft px-2.5 py-1">
-                 <Text weight="bold" className="text-[11px] text-accent-deep">
-                  Ôn tập
-                </Text>
+      <View className="flex-1 bg-canvas" style={[vars, { paddingTop: topInset }]}>
+        <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          {/* Header: close, progress, hearts. Hidden on the summary so it stays calm. */}
+          {!completion ? (
+            <View className="flex-row items-center gap-3 px-5 pb-3">
+              <Pressable
+                disabled={study.busy}
+                accessibilityRole="button"
+                accessibilityLabel="Đóng bài học"
+                hitSlop={8}
+                className="h-12 w-12 items-center justify-center active:opacity-60"
+                onPress={close}>
+                <X size={28} color={colors.muted} strokeWidth={3} />
+              </Pressable>
+              <View className="flex-1">
+                <ProgressBar
+                  value={progressValue}
+                  max={totalSteps}
+                  tone="xp"
+                  height={16}
+                  accessibilityLabel="Tiến độ bài học"
+                  valueText={`${progressValue} trên ${totalSteps} bước`}
+                />
               </View>
-            ) : (
-              <View
-                accessible
-                accessibilityLabel={
-                  summary.data
-                    ? `Số tim còn lại: ${summary.data.hearts.hearts}`
-                    : 'Số tim chưa tải'
-                }
-                accessibilityValue={
-                  summary.data ? { text: `${summary.data.hearts.hearts} tim` } : undefined
-                }
-                className="flex-row items-center gap-1.5 rounded-full px-2.5 py-1 border"
-                style={{
-                  backgroundColor: colors.dangerSoft,
-                  borderColor: colors.danger,
-                }}
-              >
-                <Heart size={15} color={colors.danger} fill={colors.danger} />
-                <Text weight="black" className="text-xs text-danger">
-                  {summary.data ? `${summary.data.hearts.hearts}` : '—'}
+              {study.attempt?.mode === 'REPLAY' ? (
+                <Text weight="black" className="text-sm text-accent-deep">
+                  ÔN TẬP
                 </Text>
-              </View>
-            )}
-          </View>
-
-
-          {study.attempt?.status === 'IN_PROGRESS' && step ? (
-            <View className="mb-3 flex-row items-center justify-between px-1">
-              <Text accessibilityRole="header" weight="bold" className="text-xs text-muted">
-                {stepIndex >= 0 ? `BƯỚC ${stepIndex + 1} / ${totalSteps}` : 'BÀI TẬP'}
-              </Text>
-              <Text weight="bold" className="ml-3 flex-1 text-right text-xs text-accent-deep">
-                {step.instructionVi ||
-                  (step.type === 'FILL'
-                    ? 'Điền từ vào chỗ trống'
-                    : step.type === 'CHOICE'
-                    ? 'Chọn đáp án đúng'
-                    : step.type === 'MATCH'
-                    ? 'Nối từ tương ứng'
-                    : 'Ghi nhớ từ vựng')}
-              </Text>
+              ) : (
+                <View
+                  accessible
+                  accessibilityLabel={
+                    summary.data ? `Số tim còn lại: ${summary.data.hearts.hearts}` : 'Số tim chưa tải'
+                  }
+                  className="min-w-12 flex-row items-center justify-end gap-1.5">
+                  <Heart size={22} color={colors.danger} fill={colors.danger} />
+                  <Text weight="black" className="text-lg" style={{ color: colors.danger }}>
+                    {summary.data ? summary.data.hearts.hearts : '—'}
+                  </Text>
+                </View>
+              )}
             </View>
           ) : null}
 
-
           <ScrollView
-            className="flex-1"
+            className="flex-1 px-5"
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
-            contentContainerClassName="pb-6"
-            showsVerticalScrollIndicator={false}
-          >
+            contentContainerClassName="pb-8"
+            showsVerticalScrollIndicator={false}>
+            {inProgress && step && step.type !== 'FILL' ? (
+              <Text accessibilityRole="header" weight="black" className="mb-5 text-2xl leading-8 text-ink">
+                {step.instructionVi || defaultInstruction(step.type)}
+              </Text>
+            ) : null}
+
             {!study.attempt && study.busy ? (
-              <View className="items-center py-10">
-                <ActivityIndicator color={colors.accent} />
+              <View className="items-center py-16">
+                <ActivityIndicator color={colors.accent} size="large" />
                 <Text className="mt-3 text-muted">Đang mở bài học…</Text>
               </View>
             ) : null}
@@ -247,7 +235,7 @@ export function ServerTopicStudySheet({
                   <>
                     <StudyAccountPanel heartOnly />
                     <Button
-                      variant="ghost"
+                      variant="secondary"
                       label="Đã hồi tim · Thử lại"
                       disabled={study.busy}
                       onPress={() => {
@@ -263,8 +251,8 @@ export function ServerTopicStudySheet({
                       study.recovery === 'replay'
                         ? 'Học lại bài này'
                         : study.recovery === 'sync'
-                        ? 'Tải lại phiên học'
-                        : 'Mở lại bài học'
+                          ? 'Tải lại phiên học'
+                          : 'Mở lại bài học'
                     }
                     loading={study.busy}
                     onPress={() => void study.recover()}
@@ -286,7 +274,7 @@ export function ServerTopicStudySheet({
               </View>
             ) : null}
 
-            {step && study.attempt?.status === 'IN_PROGRESS' ? (
+            {step && inProgress ? (
               <>
                 {step.type !== 'WORD' && step.imageUrl ? (
                   <Image
@@ -297,37 +285,41 @@ export function ServerTopicStudySheet({
                   />
                 ) : null}
 
-                {(step.type === 'WORD' || step.audioUrl) ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Nghe phát âm"
-                    onPress={() => void listen()}
-                     className="mb-4 h-12 w-12 items-center justify-center self-center rounded-full border border-accent-edge bg-accent-soft active:opacity-75"
-                  >
-                    <Volume2 color={colors.accentDeep} size={22} />
-                  </Pressable>
-                ) : null}
+                {audioError ? <Text className="mb-3 text-sm text-muted">{audioError}</Text> : null}
 
-                {audioError ? <Text className="mb-2 text-center text-xs text-muted">{audioError}</Text> : null}
-
-                {step.type === 'WORD' ? <WordStepCard step={step} /> : null}
-
-
+                {step.type === 'WORD' ? <WordStepCard step={step} listen={listenButton} /> : null}
 
                 {step.type === 'CHOICE' ? (
-                  <View className="gap-2">
-                    <Text weight="black" className="mb-4 text-center text-[22px] leading-8 text-ink">
-                      {step.prompt}
-                    </Text>
-                    {step.options.map((option) => (
-                      <OptionButton
-                        key={option.optionId}
-                        option={option}
-                        selected={selectedOption === option.optionId}
-                        disabled={blocked}
-                        onPress={() => setSelectedOption(option.optionId)}
-                      />
-                    ))}
+                  <View>
+                    <MascotPrompt trailing={step.audioUrl ? listenButton : undefined}>
+                      <Text weight="black" className="text-xl leading-7 text-ink">
+                        {step.prompt}
+                      </Text>
+                    </MascotPrompt>
+                    {step.options.map((option) => {
+                      const correctId =
+                        feedback?.correctAnswer?.type === 'CHOICE' ? feedback.correctAnswer.optionId : null;
+                      const state =
+                        feedback && correctId === option.optionId
+                          ? 'correct'
+                          : feedback && feedback.outcome !== 'INCORRECT' && selectedOption === option.optionId
+                            ? 'correct'
+                            : feedback?.outcome === 'INCORRECT' && selectedOption === option.optionId
+                              ? 'wrong'
+                              : selectedOption === option.optionId
+                                ? 'selected'
+                                : 'default';
+                      return (
+                        <AnswerOption
+                          key={option.optionId}
+                          text={option.text}
+                          imageUrl={option.imageUrl}
+                          state={state}
+                          disabled={blocked}
+                          onPress={() => setSelectedOption(option.optionId)}
+                        />
+                      );
+                    })}
                   </View>
                 ) : null}
 
@@ -359,95 +351,70 @@ export function ServerTopicStudySheet({
                     step={step}
                     value={fill}
                     disabled={blocked}
+                    listen={step.audioUrl ? listenButton : undefined}
                     onChange={setFill}
                     onSubmit={submit}
                   />
-                ) : null}
-
-
-                {study.feedback ? (
-                  <View className="mt-4">
-                    <AnswerFeedback
-                      key={study.feedback.submissionId}
-                      correct={study.feedback.outcome !== 'INCORRECT'}
-                      detail={study.feedback.explanationVi}
-                    />
-                    {study.feedback.outcome === 'INCORRECT' ? (
-                      <Text className="mt-3 text-sm leading-6 text-danger">
-                        Đáp án:{' '}
-                        {correctAnswerText(step, study.feedback.correctAnswer) ?? 'Xem giải thích phía trên.'}
-                        {study.feedback.heartLost ? '\nBạn vừa mất 1 tim ở câu này.' : ''}
-                      </Text>
-                    ) : null}
-                  </View>
                 ) : null}
               </>
             ) : null}
 
             {study.canComplete && !completion ? <StepsDoneView /> : null}
 
-            {completion ? (
-              <View>
-                <CompletionSummary completion={completion} />
-                <Button label="Quay lại lộ trình" onPress={close} />
-              </View>
-            ) : null}
+            {completion && !showStreak ? <CompletionSummary completion={completion} /> : null}
+            {completion && showStreak && streakDays !== null ? <StreakCelebration days={streakDays} /> : null}
           </ScrollView>
 
-
-          {study.attempt?.status === 'IN_PROGRESS' && !study.recovery ? (
-            <View className="border-t border-line bg-canvas pb-4 pt-3">
-              {study.feedback ? (
+          {/* Bottom action area, pinned inside the safe area. */}
+          {feedback && step && inProgress && !study.recovery ? (
+            <StudyFeedbackFooter
+              key={feedback.submissionId}
+              correct={feedback.outcome !== 'INCORRECT'}
+              correctText={correctAnswerText(step, feedback.correctAnswer)}
+              explanation={feedback.explanationVi}
+              heartLost={feedback.heartLost}
+              buttonLabel={feedback.outcome === 'INCORRECT' ? 'Thử lại câu này' : 'Tiếp tục'}
+              busy={study.busy}
+              bottomInset={bottomInset}
+              onContinue={goNext}
+            />
+          ) : (
+            <View className="border-t-2 border-line px-5 pt-3" style={{ paddingBottom: bottomInset }}>
+              {completion ? (
                 <Button
-                  label={study.feedback.outcome === 'INCORRECT' ? 'Thử lại câu này' : 'Tiếp tục'}
-                  variant={study.feedback.outcome === 'INCORRECT' ? 'danger' : 'primary'}
-                  disabled={study.busy}
-                  onPress={() => {
-                    resetAnswer();
-                    study.continueAfterFeedback();
-                  }}
-                  className="min-h-14 w-full"
+                  label={showStreak ? 'Tiếp tục' : 'Về lộ trình'}
+                  onPress={() => (showStreak ? setStreakSeen(true) : close())}
                 />
-              ) : study.pendingAnswer ? (
-                <Button
-                  label="Gửi lại đáp án"
-                  loading={study.busy}
-                  onPress={() => void study.answer(study.pendingAnswer!.answer)}
-                />
-              ) : study.canComplete ? (
-                <Button
-                  label="Hoàn thành bài học"
-                  loadingLabel="Đang lưu kết quả…"
-                  loading={study.busy}
-                  onPress={() => void study.complete()}
-                  className="min-h-14 w-full"
-                />
-              ) : step ? (
-                <Button
-                  label={step.type === 'WORD' ? 'Đã hiểu · Tiếp tục' : 'Kiểm tra đáp án'}
-                  loadingLabel="Đang gửi đáp án…"
-                  loading={study.busy}
-                  disabled={!ready}
-                  onPress={submit}
-                  className="min-h-14 w-full"
-                />
+              ) : inProgress && !study.recovery ? (
+                study.pendingAnswer ? (
+                  <Button
+                    label="Gửi lại đáp án"
+                    loading={study.busy}
+                    onPress={() => void study.answer(study.pendingAnswer!.answer)}
+                  />
+                ) : study.canComplete ? (
+                  <Button
+                    label="Hoàn thành bài học"
+                    loadingLabel="Đang lưu kết quả…"
+                    loading={study.busy}
+                    onPress={() => void study.complete()}
+                  />
+                ) : step ? (
+                  <Button
+                    label={step.type === 'WORD' ? 'Đã hiểu' : 'Kiểm tra'}
+                    loadingLabel="Đang gửi đáp án…"
+                    loading={study.busy}
+                    disabled={!ready}
+                    onPress={submit}
+                  />
+                ) : (
+                  <Button label="Tải lại phiên học" loading={study.busy} onPress={() => void study.sync()} />
+                )
               ) : (
-                <Button label="Tải lại phiên học" loading={study.busy} onPress={() => void study.sync()} />
+                <View style={{ height: 50 }} />
               )}
-
-              {!study.feedback && !study.pendingAnswer && step?.type !== 'WORD' && !study.canComplete ? (
-                <Text className="mt-2 text-center text-xs text-muted">
-                  {step?.type === 'MATCH'
-                    ? `${pairs.length}/${step.left.length} cặp đã chọn`
-                    : step?.type === 'FILL'
-                    ? 'Nhập đáp án rồi chạm Kiểm tra'
-                    : selectedOption
-                    ? 'Đáp án đã chọn'
-                    : 'Chọn một đáp án để tiếp tục'}
-                </Text>
-              ) : null}
             </View>
-          ) : null}
+          )}
         </KeyboardAvoidingView>
       </View>
     </Modal>

@@ -3,6 +3,7 @@ import { BookOpen, BookOpenCheck, GraduationCap, Play } from 'lucide-react-nativ
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 
+import { ProgressBar } from '@/src/components/ui/progress-bar';
 import { Text } from '@/src/components/ui/text';
 import { useAuth } from '@/src/features/auth/auth-provider';
 import type { VocabularyTopic } from '@/src/features/vocab/api';
@@ -63,23 +64,14 @@ export function TopicCourseSection({ topic, progressQuery }: { topic: Vocabulary
   const items = signedIn ? units.data?.items ?? [] : lessons;
 
   return (
-    <View
-      className="mb-6 overflow-hidden rounded-3xl border border-line bg-surface"
-      style={{
-        shadowColor: colors.shadow,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-        elevation: 2,
-      }}
-    >
+    <View className="mb-8">
       <TopicBanner
         cover={cover}
         title={topic.nameVi || topic.name}
         subtitle={`${lessonCountLabel} · ${topic.wordCount} từ vựng`}
       />
 
-      <View className="border-b border-line px-5 py-3.5">
+      <View className="px-1 pb-1 pt-4">
         <View className="flex-row items-center justify-between">
           <View className="flex-1 pr-2">
             <Text weight="black" className="text-base text-ink">
@@ -107,18 +99,19 @@ export function TopicCourseSection({ topic, progressQuery }: { topic: Vocabulary
         </View>
 
 
-        <View className="mt-2.5 h-2 w-full overflow-hidden rounded-full" style={{ backgroundColor: colors.line }}>
-          <View
-            className="h-full rounded-full"
-            style={{
-              width: `${progressPercent}%`,
-              backgroundColor: progressPercent === 100 ? colors.success : colors.accent,
-            }}
+        <View className="mt-2.5">
+          <ProgressBar
+            value={progressPercent}
+            max={100}
+            height={8}
+            tone={progressPercent === 100 ? 'success' : 'accent'}
+            accessibilityLabel="Tiến độ chủ đề"
+            valueText={progressReady ? `${progressPercent}%` : 'Chưa tải'}
           />
         </View>
       </View>
 
-      <View className="px-3 pb-3 pt-5">
+      <View className="pt-4">
         {signedIn && units.isPending ? <ActivityIndicator className="py-6" color={colors.accent} /> : null}
         {signedIn && units.isSuccess && items.length === 0 ? (
           <Text className="mb-4 text-center text-sm text-muted">Chủ đề chưa có bài học được xuất bản.</Text>
@@ -141,6 +134,8 @@ export function TopicCourseSection({ topic, progressQuery }: { topic: Vocabulary
                   done={done}
                   unlocked={unlocked}
                   disabled={serverProgress.isPending || !unlocked}
+                  current={serverProgress.data?.currentUnitId === lesson.unitId && !done}
+                  ratio={state && state.totalStepCount > 0 ? state.completedStepCount / state.totalStepCount : 0}
                   onPress={() => setActiveUnit(lesson)}
                 />
               );
@@ -157,6 +152,7 @@ export function TopicCourseSection({ topic, progressQuery }: { topic: Vocabulary
                 done={done}
                 unlocked={unlocked}
                 disabled={progress.isLoading || !unlocked}
+                current={unlocked && !done}
                 onPress={() => setActiveLesson(lesson)}
               />
             );
@@ -167,7 +163,7 @@ export function TopicCourseSection({ topic, progressQuery }: { topic: Vocabulary
       {signedIn && (units.isError || progressFailed) ? (
         <View className="mx-4 mb-4 rounded-2xl border border-line bg-surface p-3">
           <Text className="text-xs text-danger">{units.error?.message ?? serverProgress.error?.message}</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="Thử tải lại" onPress={() => { void units.refetch(); void serverProgress.refetch(); }} className="mt-1 min-h-11 justify-center">
+          <Pressable accessibilityRole="button" accessibilityLabel="Thử tải lại" onPress={() => { void units.refetch(); void serverProgress.refetch(); }} className="mt-1 min-h-12 justify-center">
             <Text weight="bold" className="text-xs text-accent-deep">Thử tải lại</Text>
           </Pressable>
         </View>

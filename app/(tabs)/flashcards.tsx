@@ -5,6 +5,7 @@ import {
   BookMarked,
   BookOpen,
   ChartNoAxesColumn,
+  Check,
   ChevronRight,
   Layers3,
   Plus,
@@ -150,7 +151,7 @@ export default function FlashcardsScreen() {
           <View className="gap-3 pb-4">
             <Text
               accessibilityRole="header"
-              className="text-[24px]"
+              className="text-[28px]"
               weight="black"
             >
               Thẻ từ
@@ -163,27 +164,26 @@ export default function FlashcardsScreen() {
               <Pressable
                 accessibilityRole="button"
                 onPress={() => open('/flashcards/notebook')}
-                className="overflow-hidden rounded-3xl border border-line bg-surface"
+                className="rounded-3xl active:opacity-80"
+                style={{ borderWidth: 2, borderBottomWidth: 4, borderColor: colors.line, borderBottomColor: colors.edge, backgroundColor: colors.surface }}
               >
                 <View className="flex-row items-center gap-3 p-4">
                   <View
-                    className="h-12 w-12 items-center justify-center rounded-2xl"
+                    className="h-14 w-14 items-center justify-center rounded-2xl"
                     style={{ backgroundColor: colors.accentSoft }}
                   >
-                    <BookMarked size={22} color={colors.accentDeep} />
+                    <BookMarked size={26} color={colors.accentDeep} />
                   </View>
                   <View className="flex-1">
-                    <Text weight="bold" className="text-base">
+                    <Text weight="black" className="text-lg">
                       Sổ từ của bạn
                     </Text>
                     <Text className="mt-0.5 text-sm text-muted">
                       {notebookSummary.data!.total} từ đã lưu
-                      {notebookDue > 0
-                        ? ` · ${notebookDue} từ cần ôn`
-                        : ' · Đã ôn hết'}
+                      {notebookDue > 0 ? ` · ${notebookDue} từ cần ôn` : ' · Đã ôn hết'}
                     </Text>
                   </View>
-                  <ChevronRight size={18} color={colors.muted} />
+                  <ChevronRight size={22} color={colors.muted} />
                 </View>
               </Pressable>
             ) : null}
@@ -191,31 +191,46 @@ export default function FlashcardsScreen() {
             {/* Banner thẻ deck đến hạn */}
             {enabled ? (
               <View
-                className="rounded-3xl p-4"
-                style={{ backgroundColor: colors.warmSoft }}
+                className="overflow-hidden rounded-3xl"
+                style={{ backgroundColor: due.data && due.data.total > 0 ? colors.accentWarm : colors.success }}
               >
-                <View className="flex-row items-center gap-3">
-                  <RotateCcw size={22} color={colors.accentWarm} />
-                  <Text className="flex-1 text-base" weight="bold">
-                    {due.data ? `${due.data.total} thẻ đến hạn` : 'Thẻ đến hạn'}
-                  </Text>
-                  {due.data && due.data.total > 0 ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => router.push('/flashcards/study')}
-                      className="min-h-10 justify-center"
-                    >
-                      <Text weight="bold" className="text-accent-deep">
-                        Ôn ngay →
+                <View style={{ position: 'absolute', right: -30, top: -36, width: 140, height: 140, borderRadius: 70, backgroundColor: '#ffffff', opacity: 0.15 }} />
+                <View className="p-5">
+                  <View className="flex-row items-center gap-3">
+                    <View style={{ width: 52, height: 52, borderRadius: 16, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center' }}>
+                      {due.data && due.data.total === 0 ? (
+                        <Check size={28} color={colors.success} strokeWidth={3.5} />
+                      ) : (
+                        <RotateCcw size={26} color={colors.accentWarm} strokeWidth={2.8} />
+                      )}
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-xs uppercase tracking-wider" weight="black" style={{ color: '#ffffff', opacity: 0.85 }}>
+                        Ôn tập hôm nay
                       </Text>
-                    </Pressable>
+                      <Text className="text-xl" weight="black" style={{ color: '#ffffff' }}>
+                        {due.data
+                          ? due.data.total > 0
+                            ? `${due.data.total} thẻ đến hạn`
+                            : 'Đã ôn hết thẻ!'
+                          : 'Thẻ đến hạn'}
+                      </Text>
+                    </View>
+                  </View>
+                  {due.data && due.data.total > 0 ? (
+                    <Button
+                      className="mt-4"
+                      variant="secondary"
+                      label="Ôn ngay"
+                      onPress={() => router.push('/flashcards/study')}
+                    />
                   ) : null}
+                  <QueryState
+                    pending={due.isPending}
+                    error={due.error}
+                    retry={() => void due.refetch()}
+                  />
                 </View>
-                <QueryState
-                  pending={due.isPending}
-                  error={due.error}
-                  retry={() => void due.refetch()}
-                />
               </View>
             ) : (
               <FlashcardSignIn />
@@ -233,72 +248,68 @@ export default function FlashcardsScreen() {
               <Pressable
                 accessibilityRole="button"
                 onPress={() => open('/flashcards/notebook')}
-                className="min-h-12 flex-1 flex-row items-center justify-center gap-2 rounded-2xl border border-line bg-surface"
+                className="min-h-14 flex-1 flex-row items-center justify-center gap-2 rounded-2xl active:opacity-80"
+                style={{ borderWidth: 2, borderBottomWidth: 4, borderColor: colors.line, borderBottomColor: colors.edge, backgroundColor: colors.surface }}
               >
-                <BookOpen size={18} color={colors.accentDeep} />
-                <Text weight="bold" className="text-sm">
+                <BookOpen size={20} color={colors.accentDeep} />
+                <Text weight="extrabold" className="text-sm">
                   Sổ từ
                 </Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
                 onPress={() => open('/flashcards/progress')}
-                className="min-h-12 flex-1 flex-row items-center justify-center gap-2 rounded-2xl border border-line bg-surface"
+                className="min-h-14 flex-1 flex-row items-center justify-center gap-2 rounded-2xl active:opacity-80"
+                style={{ borderWidth: 2, borderBottomWidth: 4, borderColor: colors.line, borderBottomColor: colors.edge, backgroundColor: colors.surface }}
               >
-                <ChartNoAxesColumn size={18} color={colors.accentDeep} />
-                <Text weight="bold" className="text-sm">
+                <ChartNoAxesColumn size={20} color={colors.accentDeep} />
+                <Text weight="extrabold" className="text-sm">
                   Tiến độ
                 </Text>
               </Pressable>
             </View>
 
             {/* Tab Bộ thẻ / Thẻ của tôi */}
-            <View className="flex-row items-center border-b border-line">
+            <View className="flex-row items-center gap-2">
               {(
                 [
                   { id: 'decks', label: 'Bộ thẻ' },
                   { id: 'cards', label: 'Thẻ của tôi' },
                 ] as const
-              ).map((item) => (
-                <Pressable
-                  key={item.id}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: tab === item.id }}
-                  onPress={() => {
-                    setTab(item.id);
-                    listRef.current?.scrollToOffset({
-                      offset: 0,
-                      animated: false,
-                    });
-                  }}
-                  className="min-h-12 flex-1 items-center justify-center"
-                >
-                  <Text
-                    weight="bold"
-                    className={
-                      tab === item.id ? 'text-accent-deep' : 'text-muted'
-                    }
+              ).map((item) => {
+                const selected = tab === item.id;
+                return (
+                  <Pressable
+                    key={item.id}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected }}
+                    onPress={() => {
+                      setTab(item.id);
+                      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+                    }}
+                    className="min-h-12 flex-1 items-center justify-center rounded-2xl active:opacity-80"
+                    style={{
+                      borderWidth: 2,
+                      borderBottomWidth: 4,
+                      borderColor: selected ? colors.accent : colors.line,
+                      borderBottomColor: selected ? colors.accentShade : colors.edge,
+                      backgroundColor: selected ? colors.accentSoft : colors.surface,
+                    }}
                   >
-                    {item.label}
-                  </Text>
-                  {tab === item.id ? (
-                    <View className="absolute bottom-0 h-[3px] w-10 rounded-full bg-accent" />
-                  ) : null}
-                </Pressable>
-              ))}
+                    <Text weight="extrabold" style={{ color: selected ? colors.accentDeep : colors.muted }}>
+                      {item.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={tab === 'decks' ? 'Tạo bộ thẻ' : 'Tạo thẻ'}
-                onPress={() =>
-                  open(
-                    tab === 'decks'
-                      ? '/flashcards/deck/edit'
-                      : '/flashcards/card/edit',
-                  )
-                }
-                className="h-12 w-12 items-center justify-center"
+                onPress={() => open(tab === 'decks' ? '/flashcards/deck/edit' : '/flashcards/card/edit')}
+                className="h-12 w-12 items-center justify-center rounded-2xl active:opacity-80"
+                style={{ backgroundColor: colors.accent, borderBottomWidth: 4, borderBottomColor: colors.accentShade }}
               >
-                <Plus size={23} color={colors.accentDeep} />
+                <Plus size={24} color={colors.canvas} strokeWidth={3} />
               </Pressable>
             </View>
             {enabled ? (
@@ -318,8 +329,9 @@ export default function FlashcardsScreen() {
         )}
         ListEmptyComponent={
           enabled && active.isSuccess ? (
-            <View className="gap-3 rounded-3xl bg-surface p-6">
-              <Text weight="bold">
+            <View className="items-center gap-3 rounded-3xl p-6" style={{ borderWidth: 2, borderBottomWidth: 4, borderColor: colors.line, borderBottomColor: colors.edge, backgroundColor: colors.surface }}>
+              <Image source={require('@/assets/images/owl/nav-owl-stand.webp')} contentFit="contain" style={{ width: 96, height: 96 }} accessibilityIgnoresInvertColors />
+              <Text weight="black" className="text-lg">
                 {tab === 'decks'
                   ? 'Tạo bộ thẻ đầu tiên'
                   : 'Thêm thẻ đầu tiên của bạn'}
@@ -364,7 +376,8 @@ const LibraryRowItem = memo(function LibraryRowItem({
       accessibilityRole="button"
       accessibilityLabel={`${row.title}. ${row.detail}`}
       onPress={() => onPress(row.id)}
-      className="mb-3 min-h-11 flex-row items-center gap-3 rounded-3xl border border-line bg-surface p-4"
+      className="mb-3 min-h-11 flex-row items-center gap-3 rounded-3xl p-4 active:opacity-80"
+      style={{ borderWidth: 2, borderBottomWidth: 4, borderColor: colors.line, borderBottomColor: colors.edge, backgroundColor: colors.surface }}
     >
       {row.imageUrl ? (
         <Image

@@ -1,4 +1,4 @@
-import { Bell, ChevronRight, Moon, Sun, Volume2 } from 'lucide-react-native';
+import { Bell, ChevronRight, Volume2 } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -46,7 +46,7 @@ export function AppSettingsPanel() {
         accessibilityRole="button"
         accessibilityLabel="Thông báo cộng đồng"
         onPress={() => router.push('/community/notification-preferences' as never)}
-        className="min-h-11 flex-row items-center justify-between border-b border-line/60 px-4 py-2.5 active:bg-canvas"
+        className="min-h-12 flex-row items-center justify-between border-b border-line/60 px-4 py-2.5 active:bg-canvas"
       >
         <Text weight="bold" className="text-sm text-ink">
           Thông báo cộng đồng
@@ -66,30 +66,6 @@ export function AppSettingsPanel() {
         onChange={toggle('musicEnabled')}
       />
 
-      <View className="flex-row items-center justify-between border-b border-line/60 px-4 py-2.5">
-        <Text weight="bold" className="text-xs text-ink">
-          Giao diện ứng dụng
-        </Text>
-        <View className="flex-row rounded-xl border border-line bg-surface p-0.5">
-          <ThemeOption
-            label="Sáng"
-            a11yLabel="Giao diện sáng"
-            icon={Sun}
-            activeColor={colors.coin}
-            selected={settings.theme === 'light'}
-            onPress={() => void update({ theme: 'light' })}
-          />
-          <ThemeOption
-            label="Tối"
-            a11yLabel="Giao diện tối"
-            icon={Moon}
-            activeColor={colors.accent}
-            selected={settings.theme === 'dark'}
-            onPress={() => void update({ theme: 'dark' })}
-          />
-        </View>
-      </View>
-
       <View className="flex-row items-center justify-between px-4 py-2.5">
         <Text weight="bold" className="text-xs text-ink">
           Cỡ chữ hiển thị
@@ -104,7 +80,7 @@ export function AppSettingsPanel() {
                 accessibilityLabel={`Cỡ chữ ${label}`}
                 accessibilityState={{ checked: selected }}
                 onPress={() => void update({ fontSize: value })}
-                className="h-11 w-11 items-center justify-center rounded-lg border active:opacity-75"
+                className="h-12 w-12 items-center justify-center rounded-lg border active:opacity-75"
                 style={{
                   backgroundColor: selected ? colors.accentSoft : colors.surface,
                   borderColor: selected ? colors.accent : colors.line,
@@ -123,37 +99,5 @@ export function AppSettingsPanel() {
         </View>
       </View>
     </View>
-  );
-}
-
-function ThemeOption({
-  label,
-  a11yLabel,
-  icon: Icon,
-  activeColor,
-  selected,
-  onPress,
-}: {
-  label: string;
-  a11yLabel: string;
-  icon: typeof Sun;
-  activeColor: string;
-  selected: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="radio"
-      accessibilityLabel={a11yLabel}
-      accessibilityState={{ checked: selected }}
-      onPress={onPress}
-      className="min-h-11 flex-row items-center gap-1 rounded-lg px-2.5 py-1"
-      style={{ backgroundColor: selected ? colors.canvas : 'transparent' }}
-    >
-      <Icon size={12} color={selected ? activeColor : colors.muted} />
-      <Text weight="bold" className="text-xs" style={{ color: selected ? colors.ink : colors.muted }}>
-        {label}
-      </Text>
-    </Pressable>
   );
 }

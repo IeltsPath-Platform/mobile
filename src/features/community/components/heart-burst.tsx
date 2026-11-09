@@ -25,7 +25,7 @@ export function HeartBurst({ burst }: { burst: number }) {
 
   const style = useAnimatedStyle(() => ({ opacity: opacity.value, transform: [{ scale: scale.value }] }));
   return (
-    <Animated.View pointerEvents="none" className="absolute inset-0 items-center justify-center" style={style}>
+    <Animated.View pointerEvents="none" style={[{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center' }, style]}>
       <Heart size={84} color={colors.reaction.love} fill={colors.reaction.love} />
     </Animated.View>
   );

@@ -271,16 +271,16 @@ export const RocketArena = memo(function RocketArena({
       className="overflow-hidden rounded-3xl border"
       style={{ height: ARENA_HEIGHT, backgroundColor: colors.listeningSoft, borderColor: colors.accentEdge }}
     >
-      <Animated.View className="absolute top-4 h-5 w-14 rounded-full" style={[{ backgroundColor: colors.surface, opacity: 0.8 }, cloudStyle]} />
-      <Animated.View className="absolute top-12 h-4 w-10 rounded-full" style={[{ backgroundColor: colors.surface, opacity: 0.55, left: 50 }, cloudStyle]} />
+      <Animated.View style={[{ position: 'absolute', top: 16, width: 56, height: 20, borderRadius: 10, backgroundColor: colors.surface, opacity: 0.8 }, cloudStyle]} />
+      <Animated.View style={[{ position: 'absolute', top: 48, width: 40, height: 16, borderRadius: 8, backgroundColor: colors.surface, opacity: 0.55, left: 50 }, cloudStyle]} />
 
       <View className="absolute bottom-0 left-0 right-0" style={{ height: GROUND, backgroundColor: colors.accentSoft, borderTopWidth: 2, borderTopColor: colors.accentEdge }} />
 
-      <Animated.View className="absolute items-center justify-end" style={[{ bottom: GROUND - 2, left: obstacleX }, obstacleStyle]}>
+      <Animated.View style={[{ position: 'absolute', alignItems: 'center', justifyContent: 'flex-end', bottom: GROUND - 2, left: obstacleX }, obstacleStyle]}>
         <Obstacle variant={(Math.max(1, roundNumber) - 1) % 3} />
       </Animated.View>
 
-      <Animated.View className="absolute" style={[{ bottom: GROUND - 3, width: OWL_SIZE, height: OWL_SIZE }, owlStyle]}>
+      <Animated.View style={[{ position: 'absolute', bottom: GROUND - 3, width: OWL_SIZE, height: OWL_SIZE }, owlStyle]}>
         <OwlSprite walking={pose === 'walk'} />
       </Animated.View>
 

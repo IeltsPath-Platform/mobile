@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useState } from 'react';
 
 export type FontSizeOption = 'S' | 'M' | 'L';
-export type ThemeOption = 'light' | 'dark';
+export type ThemeOption = 'light' | 'dark' | 'system';
 
 export type AppSettings = {
   dailyXpGoal: number;
@@ -17,7 +17,7 @@ export type AppSettings = {
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   dailyXpGoal: 50,
   fontSize: 'M',
-  theme: 'light',
+  theme: 'system',
   soundEnabled: true,
   musicEnabled: true,
 };
@@ -45,7 +45,7 @@ async function readSettings(): Promise<AppSettings> {
       dailyXpGoal: typeof parsed.dailyXpGoal === 'number' ? parsed.dailyXpGoal : DEFAULT_APP_SETTINGS.dailyXpGoal,
       soundEnabled: typeof parsed.soundEnabled === 'boolean' ? parsed.soundEnabled : DEFAULT_APP_SETTINGS.soundEnabled,
       musicEnabled: typeof parsed.musicEnabled === 'boolean' ? parsed.musicEnabled : DEFAULT_APP_SETTINGS.musicEnabled,
-      theme: parsed.theme === 'dark' ? 'dark' : 'light',
+      theme: parsed.theme === 'dark' || parsed.theme === 'light' ? parsed.theme : 'system',
       fontSize: parsed.fontSize === 'S' || parsed.fontSize === 'L' ? parsed.fontSize : 'M',
     };
     return memoryCache;
@@ -108,7 +108,7 @@ export function useAppSettings() {
   const update = useCallback(async (patch: Partial<AppSettings>) => {
     const current = await readSettings();
     const next: AppSettings = { ...current, ...patch };
-    if (next.theme !== 'dark') next.theme = 'light';
+    if (next.theme !== 'dark' && next.theme !== 'light') next.theme = 'system';
     await writeSettings(next);
     setSettings(next);
   }, []);

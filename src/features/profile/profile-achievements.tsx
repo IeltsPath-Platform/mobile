@@ -8,7 +8,7 @@ import { useTheme } from '@/src/theme/app-theme';
 
 type AchievementTone = 'accent' | 'warm' | 'success';
 
-const ACHIEVEMENT_COPY: Record<string, { title: string; detail: string; tone: AchievementTone }> = {
+export const ACHIEVEMENT_COPY: Record<string, { title: string; detail: string; tone: AchievementTone }> = {
   REVIEW_STREAK_7: {
     title: 'Bền bỉ 7 ngày',
     detail: 'Ôn từ liên tục một tuần',

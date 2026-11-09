@@ -29,6 +29,7 @@ import { CATEGORY_LABELS } from '@/src/features/community/format';
 import { postBackgroundColor } from '@/src/features/community/post-background';
 import { haptics } from '@/src/lib/haptics';
 import { colors } from '@/src/theme';
+import { useTheme } from '@/src/theme/app-theme';
 
 type PickedImage = { uri: string; name: string; type: string; size: number; url?: string };
 
@@ -68,6 +69,7 @@ export default function ComposerScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
+  const { vars } = useTheme();
   const currentUser = useCurrentUser();
   const { id } = useLocalSearchParams<{ id?: string }>();
 
@@ -327,7 +329,7 @@ export default function ComposerScreen() {
     <SafeAreaView className="flex-1 bg-canvas" edges={[]}>
       <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'web' ? undefined : 'padding'}>
         <View className="flex-row items-center border-b border-line bg-surface px-3 pb-2" style={{ paddingTop: Math.max(insets.top, 12) }}>
-          <Pressable onPress={close} disabled={busy} className="h-11 w-11 items-center justify-center rounded-full active:bg-tint" accessibilityRole="button" accessibilityLabel="Đóng trình soạn bài">
+          <Pressable onPress={close} disabled={busy} className="h-12 w-12 items-center justify-center rounded-full active:bg-tint" accessibilityRole="button" accessibilityLabel="Đóng trình soạn bài">
             <X size={24} color={colors.ink} />
           </Pressable>
           <Text accessibilityRole="header" weight="extrabold" className="flex-1 text-center text-base">{id ? 'Sửa bài viết' : 'Bài viết mới'}</Text>
@@ -335,7 +337,7 @@ export default function ComposerScreen() {
             onPress={() => void submit()}
             disabled={!canPost}
             hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-            className="min-h-11 min-w-[76px] items-center justify-center rounded-full px-5 active:opacity-80"
+            className="min-h-12 min-w-[76px] items-center justify-center rounded-full px-5 active:opacity-80"
             style={{ backgroundColor: canPost ? colors.accent : colors.surfaceTint }}
             accessibilityRole="button"
             accessibilityLabel={busy ? (id ? 'Đang lưu bài viết' : 'Đang đăng bài viết') : (id ? 'Lưu bài viết' : 'Đăng bài viết')}
@@ -355,7 +357,7 @@ export default function ComposerScreen() {
           {id && existing.isError ? (
             <View className="mb-4 rounded-2xl p-4" style={{ backgroundColor: colors.dangerSoft }}>
               <Text accessibilityRole="alert" className="text-sm" style={{ color: colors.danger }}>Không tải được bài viết để sửa.</Text>
-              <Pressable onPress={() => void existing.refetch()} className="mt-2 min-h-11 justify-center"><Text weight="bold" className="text-accent">Thử lại</Text></Pressable>
+              <Pressable onPress={() => void existing.refetch()} className="mt-2 min-h-12 justify-center"><Text weight="bold" className="text-accent">Thử lại</Text></Pressable>
             </View>
           ) : null}
           {error ? <Text accessibilityRole="alert" className="mb-4 rounded-xl px-3 py-2.5 text-sm leading-5" style={{ backgroundColor: colors.dangerSoft, color: colors.danger }}>{error}</Text> : null}
@@ -455,7 +457,7 @@ export default function ComposerScreen() {
           <View className="border-t border-line bg-surface">
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="items-center gap-3 px-4 py-3">
               <Pressable onPress={() => { markDirty(); setBackground(undefined); }} className="items-center" accessibilityRole="button" accessibilityLabel="Không dùng nền màu" accessibilityState={{ selected: !background }}>
-                <View className="h-11 w-11 items-center justify-center rounded-full border-2" style={{ borderColor: !background ? colors.accent : colors.line }}><X size={16} color={colors.muted} /></View>
+                <View className="h-12 w-12 items-center justify-center rounded-full border-2" style={{ borderColor: !background ? colors.accent : colors.line }}><X size={16} color={colors.muted} /></View>
               </Pressable>
               {BACKGROUNDS.map((item) => (
                 <Pressable
@@ -469,7 +471,7 @@ export default function ComposerScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={`Nền ${item.label}`}
                   accessibilityState={{ selected: background === item.key }}>
-                  <View className="h-11 w-11 rounded-full border-2" style={{ backgroundColor: postBackgroundColor(item.key), borderColor: background === item.key ? colors.accent : 'transparent' }} />
+                  <View className="h-12 w-12 rounded-full border-2" style={{ backgroundColor: postBackgroundColor(item.key), borderColor: background === item.key ? colors.accent : 'transparent' }} />
                 </Pressable>
               ))}
             </ScrollView>
@@ -506,7 +508,7 @@ export default function ComposerScreen() {
       />
 
       <Modal visible={sheet === 'options'} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setSheet('none')}>
-        <KeyboardAvoidingView className="flex-1 justify-end bg-black/50" behavior={Platform.OS === 'web' ? undefined : 'padding'}>
+        <KeyboardAvoidingView className="flex-1 justify-end bg-black/50" style={vars} behavior={Platform.OS === 'web' ? undefined : 'padding'}>
           <Pressable className="flex-1" onPress={() => setSheet('none')} accessibilityRole="button" accessibilityLabel="Đóng tùy chọn" />
           <View className="rounded-t-[28px] bg-surface px-5 pt-3" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
             <View className="mb-3 h-1 w-10 self-center rounded-full bg-line" />

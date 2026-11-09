@@ -4,7 +4,9 @@ import { useCallback, useMemo, useRef } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, View } from 'react-native';
 
 import { Button } from '@/src/components/ui/button';
+import { EmptyState } from '@/src/components/ui/empty-state';
 import { Text } from '@/src/components/ui/text';
+import { ContinueCard } from '@/src/features/vocab/components/continue-card';
 import { useAuth } from '@/src/features/auth/auth-provider';
 import { vocabApi, type VocabularyTopic } from '@/src/features/vocab/api';
 import { TodayHeader } from '@/src/features/vocab/components/study-account-panel';
@@ -112,7 +114,7 @@ export default function HomeScreen() {
           <View className="pb-1 pt-1">
 
             <TodayHeader signedIn={signedIn} />
-
+            {signedIn && progressQuery.data ? <ContinueCard topics={topics} progress={progressQuery.data} /> : null}
 
             {topics.length > 0 ? (
               <View className="mb-3 mt-1 flex-row items-center justify-between">
@@ -127,27 +129,22 @@ export default function HomeScreen() {
           </View>
         }
         ListEmptyComponent={
-          <View className="rounded-3xl border border-line bg-surface p-6">
-            {isPending ? (
-              <View className="items-center py-7">
-                <ActivityIndicator color={colors.accent} />
-                <Text className="mt-3 text-sm text-muted">Đang tải chủ đề…</Text>
-              </View>
-            ) : hasError ? (
-              <>
-                <Text weight="bold">Chưa tải được chủ đề từ vựng</Text>
-                <Text className="mt-2 text-sm leading-5 text-muted">Kiểm tra kết nối máy chủ rồi thử lại.</Text>
-                <Button className="mt-4" variant="secondary" label="Thử lại" onPress={refreshAll} />
-              </>
-            ) : (
-              <>
-                <Text weight="bold">Chưa có chủ đề từ vựng</Text>
-                <Text className="mt-2 text-sm text-muted">Các chủ đề sẽ xuất hiện sau khi được xuất bản.</Text>
-              </>
-            )}
-          </View>
+          isPending ? (
+            <View className="items-center rounded-3xl border border-line bg-surface py-10">
+              <ActivityIndicator color={colors.accent} />
+              <Text className="mt-3 text-sm text-muted">Đang tải chủ đề…</Text>
+            </View>
+          ) : hasError ? (
+            <EmptyState
+              title="Chưa tải được chủ đề từ vựng"
+              message="Kiểm tra kết nối máy chủ rồi thử lại."
+              action={<Button variant="secondary" label="Thử lại" onPress={refreshAll} />}
+            />
+          ) : (
+            <EmptyState title="Chưa có chủ đề từ vựng" message="Các chủ đề sẽ xuất hiện sau khi được xuất bản." />
+          )
         }
-        contentContainerClassName="px-4 pb-12 pt-1"
+        contentContainerClassName="px-4 pb-28 pt-1"
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshAll} tintColor={colors.accent} />}
         initialNumToRender={2}

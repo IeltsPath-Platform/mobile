@@ -19,9 +19,9 @@ type GameType = 'WORDLY' | 'ROCKET';
 type PlayerMode = 'SOLO' | 'MULTIPLAYER';
 type GameEntry = GameCatalog['games'][number];
 
-const gameInfo = (): Record<GameType, { title: string; subtitle: string; Icon: typeof Gamepad2; tint: string; foreground: string }> => ({
-  WORDLY: { title: 'Wordly', subtitle: 'Đoán từ qua gợi ý, rèn phản xạ và vốn từ.', Icon: Gamepad2, tint: colors.accentSoft, foreground: colors.accent },
-  ROCKET: { title: 'Rocket', subtitle: 'Chọn đáp án thật nhanh, thi đua cùng bạn bè.', Icon: Rocket, tint: colors.warmSoft, foreground: colors.accentWarm },
+const gameInfo = (): Record<GameType, { title: string; subtitle: string; Icon: typeof Gamepad2; tint: string; foreground: string; solid: string }> => ({
+  WORDLY: { title: 'Wordly', subtitle: 'Đoán từ qua gợi ý, rèn phản xạ và vốn từ.', Icon: Gamepad2, tint: colors.accentSoft, foreground: colors.accent, solid: colors.success },
+  ROCKET: { title: 'Rocket', subtitle: 'Chọn đáp án thật nhanh, thi đua cùng bạn bè.', Icon: Rocket, tint: colors.warmSoft, foreground: colors.accentWarm, solid: colors.accentWarm },
 });
 
 function availability(status: string) {
@@ -83,9 +83,10 @@ export default function PracticeScreen() {
         ) : undefined
       }
     >
-      <Text accessibilityRole="header" className="mb-4 text-[24px]" weight="black">
+      <Text accessibilityRole="header" className="text-[28px] text-ink" weight="black">
         Luyện tập
       </Text>
+      <Text className="mb-5 mt-1 text-sm text-muted">Chơi một ván ngắn để nhớ từ lâu hơn.</Text>
 
       {!canFetch ? (
         <Card className="mb-4 border-b-0 bg-surface p-5">
@@ -104,13 +105,13 @@ export default function PracticeScreen() {
           onPress={() => router.push(activeRoute)}
           className="mb-4"
         >
-          <Card className="overflow-hidden border-0 p-4" style={{ backgroundColor: colors.accentSoft }}>
+          <Card className="overflow-hidden p-4" style={{ backgroundColor: colors.successSoft, borderColor: colors.success, borderBottomColor: colors.successShade }}>
             <View className="flex-row items-center">
-              <View className="h-11 w-11 items-center justify-center rounded-2xl bg-surface">
-                <Gamepad2 size={21} color={colors.accent} />
+              <View className="h-12 w-12 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.success }}>
+                <Gamepad2 size={22} color={colors.canvas} />
               </View>
               <View className="ml-3 flex-1">
-                <Text className="text-xs uppercase tracking-wider text-accent" weight="bold">
+                <Text className="text-xs uppercase tracking-wider" weight="black" style={{ color: colors.success }}>
                   ĐANG CHƠI
                 </Text>
                 <Text className="mt-1 text-base" weight="black">
@@ -119,7 +120,7 @@ export default function PracticeScreen() {
                 </Text>
                 <Text className="mt-1 text-xs text-muted">Chạm để quay lại ván của bạn</Text>
               </View>
-              <ChevronRight size={20} color={colors.accent} />
+              <ChevronRight size={22} color={colors.success} />
             </View>
           </Card>
         </Pressable>
@@ -160,41 +161,56 @@ export default function PracticeScreen() {
             const playable = game.status === 'AVAILABLE' && !active.isPending && !activeGame;
             const name = game.name || meta.title;
             return (
-              <Card key={game.gameType} className="mb-3 overflow-hidden border-b-0 bg-surface p-0">
-                <View className="flex-row items-center p-4">
-                  <View className="h-12 w-12 items-center justify-center rounded-2xl" style={{ backgroundColor: meta.tint }}>
-                    <meta.Icon size={23} color={meta.foreground} />
+              <View key={game.gameType} className="mb-5">
+                <View
+                  style={{
+                    borderRadius: 28,
+                    borderWidth: 2,
+                    borderBottomWidth: 4,
+                    borderColor: colors.line,
+                    borderBottomColor: colors.edge,
+                    backgroundColor: colors.surface,
+                    overflow: 'hidden',
+                  }}>
+                  <View style={{ backgroundColor: meta.solid, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 18, overflow: 'hidden' }}>
+                    <View style={{ position: 'absolute', right: -30, top: -34, width: 140, height: 140, borderRadius: 70, backgroundColor: '#ffffff', opacity: 0.14 }} />
+                    <View style={{ position: 'absolute', right: 40, bottom: -50, width: 100, height: 100, borderRadius: 50, backgroundColor: '#ffffff', opacity: 0.1 }} />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                      <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center' }}>
+                        <meta.Icon size={32} color={meta.solid} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text className="text-2xl" weight="black" style={{ color: '#ffffff' }}>
+                          {name}
+                        </Text>
+                        <View style={{ alignSelf: 'flex-start', marginTop: 4, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 2, backgroundColor: 'rgba(0,0,0,0.25)' }}>
+                          <Text className="text-[11px]" weight="black" style={{ color: '#ffffff' }}>
+                            {state.label}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
                   </View>
-                  <View className="ml-3 flex-1">
-                    <Text className="text-lg" weight="black">
-                      {name}
-                    </Text>
-                    <Text className="mt-1 text-xs leading-5 text-muted">{game.description || meta.subtitle}</Text>
-                  </View>
-                  <View className="rounded-full px-2.5 py-1" style={{ backgroundColor: state.bg }}>
-                    <Text className="text-[9px]" weight="bold" style={{ color: state.color }}>
-                      {state.label}
-                    </Text>
+                  <View style={{ padding: 16, gap: 12 }}>
+                    <Text className="text-sm leading-5 text-muted">{game.description || meta.subtitle}</Text>
+                    <Button
+                      label="Chơi một mình"
+                      disabled={!playable}
+                      icon={<Flame size={18} color={playable ? colors.canvas : colors.muted} />}
+                      accessibilityLabel={`${name}: chơi một mình`}
+                      onPress={() => openGame(type, 'SOLO')}
+                    />
+                    <Button
+                      variant="secondary"
+                      label="Chơi cùng bạn"
+                      disabled={!playable}
+                      icon={<Users size={18} color={playable ? colors.accentDeep : colors.muted} />}
+                      accessibilityLabel={`${name}: chơi cùng bạn`}
+                      onPress={() => openGame(type, 'MULTIPLAYER')}
+                    />
                   </View>
                 </View>
-                <View className="flex-row border-t border-line px-3 py-2">
-                  <ModeButton
-                    label="Chơi một mình"
-                    a11yLabel={`${name}: chơi một mình`}
-                    disabled={!playable}
-                    icon={<Flame size={16} color={playable ? colors.accentWarm : colors.muted} />}
-                    onPress={() => openGame(type, 'SOLO')}
-                  />
-                  <View className="my-2 w-px bg-line" />
-                  <ModeButton
-                    label="Chơi cùng bạn"
-                    a11yLabel={`${name}: chơi cùng bạn`}
-                    disabled={!playable}
-                    icon={<Users size={16} color={playable ? colors.accent : colors.muted} />}
-                    onPress={() => openGame(type, 'MULTIPLAYER')}
-                  />
-                </View>
-              </Card>
+              </View>
             );
           })
         : null}
@@ -206,35 +222,5 @@ export default function PracticeScreen() {
         <Button className="mb-4" variant="secondary" label="Cập nhật trạng thái ván" onPress={() => void active.refetch()} />
       ) : null}
     </ScrollView>
-  );
-}
-
-function ModeButton({
-  label,
-  a11yLabel,
-  disabled,
-  icon,
-  onPress,
-}: {
-  label: string;
-  a11yLabel: string;
-  disabled: boolean;
-  icon: React.ReactElement;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={a11yLabel}
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      className="min-h-11 flex-1 flex-row items-center justify-center gap-2 rounded-xl"
-    >
-      {icon}
-      <Text className="text-xs" weight="bold" style={{ color: disabled ? colors.muted : colors.ink }}>
-        {label}
-      </Text>
-    </Pressable>
   );
 }

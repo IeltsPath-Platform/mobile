@@ -19,17 +19,17 @@ export type TileMode = 'empty' | 'typed' | 'hint' | LetterStatus;
 function tileColors(mode: TileMode) {
   switch (mode) {
     case 'CORRECT':
-      return { bg: colors.success, border: colors.success, fg: colors.onAccent };
+      return { bg: colors.success, border: colors.success, edge: colors.successShade, fg: colors.onAccent };
     case 'PRESENT':
-      return { bg: colors.warning, border: colors.warning, fg: colors.onAccent };
+      return { bg: colors.warning, border: colors.warning, edge: colors.warmShade, fg: colors.onAccent };
     case 'ABSENT':
-      return { bg: colors.absent, border: colors.absent, fg: colors.onAccent };
+      return { bg: colors.absent, border: colors.absent, edge: colors.edge, fg: colors.onAccent };
     case 'typed':
-      return { bg: colors.surface, border: colors.ink, fg: colors.ink };
+      return { bg: colors.surface, border: colors.ink, edge: colors.ink, fg: colors.ink };
     case 'hint':
-      return { bg: colors.accentSoft, border: colors.accent, fg: colors.accentDeep };
+      return { bg: colors.accentSoft, border: colors.accent, edge: colors.accentShade, fg: colors.accentDeep };
     default:
-      return { bg: colors.surface, border: colors.line, fg: colors.ink };
+      return { bg: colors.surface, border: colors.line, edge: colors.edge, fg: colors.ink };
   }
 }
 
@@ -101,6 +101,7 @@ export const LetterTile = memo(function LetterTile({
           borderWidth: cursor ? 3 : 2,
           borderBottomWidth: shown === 'empty' ? 2 : 4,
           borderColor: cursor ? colors.accent : palette.border,
+          borderBottomColor: cursor ? colors.accentShade : palette.edge,
           backgroundColor: palette.bg,
           alignItems: 'center',
           justifyContent: 'center',

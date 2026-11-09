@@ -16,6 +16,7 @@ import { Text } from '@/src/components/ui/text';
 import { vocabApi, type VocabularyCatalogWord, type VocabularyTopic } from '@/src/features/vocab/api';
 import { resolveMatchTap, type MatchSide, type MatchTap } from '@/src/features/vocab/match-selection';
 import { colors } from '@/src/theme';
+import { useTheme } from '@/src/theme/app-theme';
 
 const PAGE_SIZE = 30;
 const MODES = [
@@ -186,16 +187,17 @@ export function TopicStudySheet({ topic, setId, setTitle, topicPage, topicPageSi
   })();
 
   const insets = useSafeAreaInsets();
+  const { vars } = useTheme();
   const topInset = Math.max(insets.top, Platform.OS === 'ios' ? 52 : 16);
   const bottomInset = Math.max(insets.bottom, 16);
 
   return (
     <Modal visible={visible} transparent={false} animationType="fade" presentationStyle="fullScreen" onRequestClose={onClose}>
-      <KeyboardAvoidingView className="flex-1 bg-canvas px-5" style={{ paddingTop: topInset, paddingBottom: bottomInset }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView className="flex-1 bg-canvas px-5" style={[vars, { paddingTop: topInset, paddingBottom: bottomInset }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View className="mb-2 h-10 flex-row items-center justify-between">
-          <Pressable accessibilityRole="button" accessibilityLabel="Đóng bài học" onPress={() => { sound.stopSpeaking(); onClose(); }} className="h-11 w-11 items-center justify-center rounded-full"><X size={29} color={colors.ink} /></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Đóng bài học" onPress={() => { sound.stopSpeaking(); onClose(); }} className="h-12 w-12 items-center justify-center rounded-full"><X size={29} color={colors.ink} /></Pressable>
           <Text weight="black" className="text-sm tracking-[1.3px] text-accent-deep">IELTSPATH</Text>
-          <View className="flex-row items-center gap-1"><SoundToggle /><Pressable accessibilityRole="button" accessibilityLabel="Lưu từ trong bài" onPress={() => { setLessonComplete(false); if (mode === 'flashcards') setMode(previousMode); else { setPreviousMode(mode); setMode('flashcards'); } }} className="h-11 w-11 items-center justify-center rounded-full"><BookOpenCheck size={20} color={colors.accentDeep} /></Pressable></View>
+          <View className="flex-row items-center gap-1"><SoundToggle /><Pressable accessibilityRole="button" accessibilityLabel="Lưu từ trong bài" onPress={() => { setLessonComplete(false); if (mode === 'flashcards') setMode(previousMode); else { setPreviousMode(mode); setMode('flashcards'); } }} className="h-12 w-12 items-center justify-center rounded-full"><BookOpenCheck size={20} color={colors.accentDeep} /></Pressable></View>
         </View>
 
         {lessonStarted ? <View className="mb-2 flex-row gap-1.5">{LESSON_STEPS.map((item, index) => { const currentIndex = LESSON_STEPS.findIndex((step) => step.id === mode); const complete = lessonComplete || (currentIndex >= 0 && index < currentIndex); const active = item.id === mode; return <View key={item.id} accessibilityLabel={`Bước ${index + 1}: ${item.label}${complete ? ', hoàn thành' : active ? ', hiện tại' : ', đang chờ'}`} className="h-1.5 flex-1 overflow-hidden rounded-full" style={{ backgroundColor: complete || active ? colors.accent : colors.line }} />; })}</View> : <View className="mb-2 h-1.5 rounded-full bg-line" />}
@@ -227,7 +229,7 @@ export function TopicStudySheet({ topic, setId, setTitle, topicPage, topicPageSi
               <View className="mb-6 flex-row items-center justify-center gap-3"><View className="h-px flex-1 bg-line"/><Text weight="bold" className="text-xs uppercase tracking-[2px] text-muted">{item.sense.partOfSpeech || 'TỪ VỰNG'}</Text><View className="h-px flex-1 bg-line"/></View>
               <View className="flex-row items-center justify-center gap-3">
                 <Text weight="black" className="text-center text-[34px] text-accent-deep">{item.word.lemma}</Text>
-                <Pressable accessibilityRole="button" accessibilityLabel={`Nghe phát âm ${item.word.lemma}`} hitSlop={8} onPress={() => { haptics.tap(); void speakVocabularyPronunciation(item.word.lemma, undefined); }} className="h-11 w-11 items-center justify-center rounded-full active:opacity-70" style={{ backgroundColor: colors.accentSoft }}><Volume2 size={21} color={colors.accentDeep} /></Pressable>
+                <Pressable accessibilityRole="button" accessibilityLabel={`Nghe phát âm ${item.word.lemma}`} hitSlop={8} onPress={() => { haptics.tap(); void speakVocabularyPronunciation(item.word.lemma, undefined); }} className="h-12 w-12 items-center justify-center rounded-full active:opacity-70" style={{ backgroundColor: colors.accentSoft }}><Volume2 size={21} color={colors.accentDeep} /></Pressable>
               </View>
               {item.word.ipa ? <Text className="mt-1 text-center text-base text-muted">/{item.word.ipa}/</Text> : null}
               <Text className="mt-7 text-center text-[20px] leading-9 text-ink"><Text weight="black" className="text-accent-deep">{item.word.lemma}</Text> có nghĩa là “{item.meaning}”.</Text>
@@ -251,9 +253,9 @@ export function TopicStudySheet({ topic, setId, setTitle, topicPage, topicPageSi
           {lessonStarted && !lessonComplete && mode !== 'flashcards' ? <View className="mb-3 h-1.5 overflow-hidden rounded-full bg-line"><View className="h-full rounded-full bg-accent" style={{ width: `${Math.max(5, (LESSON_STEPS.findIndex((item) => item.id === mode) / LESSON_STEPS.length) * 100)}%` }} /></View> : null}
           <View className="flex-row items-center">
             {lessonStarted && !lessonComplete && mode !== 'flashcards' ? <Pressable accessibilityRole="button" accessibilityLabel="Chia sẻ bài học" onPress={() => void Share.share({ message: `Mình đang học chủ đề ${topic?.nameVi || topic?.name || 'từ vựng'} trên IELTSPath!` })} className="h-[58px] w-[58px] items-center justify-center rounded-2xl border-2 border-accent"><Share2 size={21} color={colors.accentDeep} /></Pressable> : <View className="h-[58px] w-[58px]" />}
-            <Button className="ml-3 min-h-[58px] flex-1" label={action.label} loading={savingCompletion} loadingLabel="Đang lưu tiến độ…" disabled={action.disabled} onPress={() => { haptics.tap(); action.onPress(); }} icon={!lessonComplete && mode !== 'flashcards' && !action.disabled ? <ArrowRight size={20} color={colors.onAccent} /> : undefined} />
+            <Button className="ml-3 flex-1" label={action.label} loading={savingCompletion} loadingLabel="Đang lưu tiến độ…" disabled={action.disabled} onPress={() => { haptics.tap(); action.onPress(); }} icon={!lessonComplete && mode !== 'flashcards' && !action.disabled ? <ArrowRight size={20} color={colors.onAccent} /> : undefined} />
           </View>
-          {lessonComplete ? <Pressable accessibilityRole="button" onPress={onClose} className="mt-2 min-h-11 items-center justify-center py-2"><Text weight="bold" className="text-sm text-accent-deep">Quay lại lộ trình</Text></Pressable> : null}
+          {lessonComplete ? <Pressable accessibilityRole="button" onPress={onClose} className="mt-2 min-h-12 items-center justify-center py-2"><Text weight="bold" className="text-sm text-accent-deep">Quay lại lộ trình</Text></Pressable> : null}
         </View>
       </KeyboardAvoidingView>
     </Modal>

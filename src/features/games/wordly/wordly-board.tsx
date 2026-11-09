@@ -12,7 +12,7 @@ import { LetterTile, type TileMode } from '../letter-tile';
 import type { CurrentWord } from '../types';
 
 const MAX_TILE = 52;
-const MIN_TILE = 28;
+const MIN_TILE = 20;
 
 function ShakeRow({ shakeKey, gap, children }: { shakeKey: number; gap: number; children: React.ReactNode }) {
   const reduceMotion = useReducedMotion();
@@ -57,7 +57,7 @@ export const WordlyBoard = memo(function WordlyBoard({
   const rows = Math.min(word.maxAttempts, activeRow + 1);
   const byWidth = Math.floor((area.width - 32 - (word.columns - 1) * gap) / word.columns);
   const size = area.width ? Math.max(MIN_TILE, Math.min(MAX_TILE, byWidth)) : MAX_TILE;
-  const historySize = Math.max(24, Math.round(size * 0.66));
+  const historySize = Math.max(18, Math.round(size * 0.66));
   const hintCell = word.hint?.revealedCell;
   const scroller = useRef<ScrollViewInstance>(null);
 

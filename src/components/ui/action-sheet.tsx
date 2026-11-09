@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/src/components/ui/text';
 import { colors } from '@/src/theme';
+import { useTheme } from '@/src/theme/app-theme';
 
 export type ActionSheetItem = {
   label: string;
@@ -28,17 +29,17 @@ type ActionSheetProps = {
  */
 export function ActionSheet({ visible, title, items, onClose }: ActionSheetProps) {
   const insets = useSafeAreaInsets();
+  const { vars } = useTheme();
   return (
     <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
-      <View className="flex-1 justify-end">
-        <Animated.View entering={FadeIn.duration(160).reduceMotion(ReduceMotion.System)} className="absolute inset-0 bg-black/50">
+      <View className="flex-1 justify-end" style={vars}>
+        <Animated.View entering={FadeIn.duration(160).reduceMotion(ReduceMotion.System)} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <Pressable className="flex-1" onPress={onClose} accessibilityRole="button" accessibilityLabel="Đóng" />
         </Animated.View>
         <Animated.View
           entering={SlideInDown.duration(220).reduceMotion(ReduceMotion.System)}
           accessibilityViewIsModal
-          className="rounded-t-[28px] bg-surface px-4 pt-2"
-          style={{ paddingBottom: Math.max(insets.bottom, 12) + 4 }}>
+          style={{ backgroundColor: colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 16, paddingTop: 8, paddingBottom: Math.max(insets.bottom, 12) + 4 }}>
           <View className="mb-2 h-1 w-10 self-center rounded-full bg-line" />
           {title ? <Text weight="bold" className="px-2 pb-2 pt-1 text-xs uppercase tracking-wider text-muted">{title}</Text> : null}
           {items.map((item) => {

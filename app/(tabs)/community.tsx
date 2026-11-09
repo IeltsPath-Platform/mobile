@@ -204,7 +204,7 @@ export default function CommunityScreen() {
   const closeSearch = () => { setSearching(false); setSearch(''); };
   const listHeader = (
     <View className="bg-canvas">
-      <View className="flex-row border-b border-line px-2">
+      <View className="flex-row gap-2 px-4 pb-1 pt-2">
         {SCOPES.map(({ key, label }) => {
           const active = scope === key;
           return (
@@ -213,14 +213,14 @@ export default function CommunityScreen() {
               onPress={() => { if (!active) { haptics.select(); setScope(key); } }}
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
-              className="min-h-12 flex-1 items-center justify-center">
-              <Text weight={active ? 'extrabold' : 'semibold'} className="text-[15px]" style={{ color: active ? colors.ink : colors.muted }}>{label}</Text>
-              {active ? <View className="absolute bottom-0 h-[3px] w-12 rounded-full" style={{ backgroundColor: colors.accent }} /> : null}
+              className="min-h-12 flex-1 items-center justify-center rounded-2xl active:opacity-80"
+              style={{ borderWidth: 2, borderBottomWidth: 4, borderColor: active ? colors.accent : colors.line, borderBottomColor: active ? colors.accentShade : colors.edge, backgroundColor: active ? colors.accentSoft : colors.surface }}>
+              <Text weight="extrabold" className="text-[15px]" style={{ color: active ? colors.accentDeep : colors.muted }}>{label}</Text>
             </Pressable>
           );
         })}
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2 px-4 py-3" className="border-b border-line">
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2 px-4 py-3">
         <Chip label="Tất cả" active={!category} onPress={() => setCategory(undefined)} />
         {CATEGORY_ORDER.map((key) => {
           const palette = communityCategoryColor(key);
@@ -276,12 +276,11 @@ export default function CommunityScreen() {
   return (
     <View className="flex-1 bg-canvas">
       <Animated.View
-        className="bg-canvas"
         pointerEvents="box-none"
-        style={[{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20, elevation: 10 }, headerAnimatedStyle]}>
+        style={[{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20, elevation: 10, backgroundColor: colors.canvas }, headerAnimatedStyle]}>
         <View onLayout={onHeaderLayout} style={{ paddingTop: insets.top, backgroundColor: colors.canvas }}>
           <View className="flex-row items-center px-4 pb-1 pt-1">
-            <Text accessibilityRole="header" weight="black" className="flex-1 text-[24px]">Cộng đồng</Text>
+            <Text accessibilityRole="header" weight="black" className="flex-1 text-[28px]">Cộng đồng</Text>
             {(manualRefreshing || (feed.isRefetching && !feed.isFetchingNextPage)) ? <ActivityIndicator size="small" color={colors.accent} className="mr-2" /> : null}
             {signedIn ? (
               <View className="flex-row">
@@ -361,10 +360,10 @@ export default function CommunityScreen() {
           onPress={compose}
           accessibilityRole="button"
           accessibilityLabel="Viết bài mới"
-          className="absolute right-4 h-14 flex-row items-center gap-2 rounded-full px-5 active:opacity-80"
-          style={{ bottom: Math.max(insets.bottom, 10) + 84, backgroundColor: colors.accent, shadowColor: colors.shadow, shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 6 }}>
-          <PenLine size={20} color={colors.onAccent} />
-          <Text weight="extrabold" className="text-[15px]" style={{ color: colors.onAccent }}>Viết bài</Text>
+          className="absolute right-4 h-14 flex-row items-center gap-2 rounded-2xl px-5 active:opacity-80"
+          style={{ bottom: Math.max(insets.bottom, 10) + 84, backgroundColor: colors.accent, borderBottomWidth: 4, borderBottomColor: colors.accentShade }}>
+          <PenLine size={20} color={colors.onAccent} strokeWidth={2.8} />
+          <Text weight="extrabold" className="text-[15px] uppercase" style={{ color: colors.onAccent, letterSpacing: 0.6 }}>Viết bài</Text>
         </Pressable>
       ) : null}
 
@@ -388,17 +387,17 @@ function Chip({ label, active, onPress, accent = colors.accentDeep, tint = color
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       hitSlop={{ top: 4, bottom: 4 }}
-      className="min-h-9 justify-center rounded-full border px-3.5 active:opacity-70"
-      style={{ backgroundColor: active ? tint : 'transparent', borderColor: active ? accent : colors.line }}>
-      <Text weight="bold" className="text-[13px]" style={{ color: active ? accent : colors.muted }}>{label}</Text>
+      className="min-h-10 justify-center rounded-2xl px-4 active:opacity-70"
+      style={{ borderWidth: 2, borderBottomWidth: 3, backgroundColor: active ? tint : colors.surface, borderColor: active ? accent : colors.line, borderBottomColor: active ? accent : colors.edge }}>
+      <Text weight="extrabold" className="text-[13px]" style={{ color: active ? accent : colors.muted }}>{label}</Text>
     </Pressable>
   );
 }
 
-function EmptyState({ icon, title, body, action }: { icon: React.ReactNode; title: string; body: string; action?: React.ReactNode }) {
+function EmptyState({ title, body, action }: { icon?: React.ReactNode; title: string; body: string; action?: React.ReactNode }) {
   return (
-    <View className="items-center px-8 pt-16">
-      <View className="h-16 w-16 items-center justify-center rounded-full" style={{ backgroundColor: colors.accentSoft }}>{icon}</View>
+    <View className="items-center px-8 pt-10">
+      <CachedImage source={require('@/assets/images/owl/nav-owl-stand.webp')} contentFit="contain" style={{ width: 120, height: 120 }} accessibilityIgnoresInvertColors />
       <Text weight="extrabold" className="mt-4 text-center text-lg">{title}</Text>
       <Text className="mt-2 text-center text-sm leading-5 text-muted">{body}</Text>
       {action ? <View className="mt-5 self-stretch">{action}</View> : null}
@@ -410,7 +409,7 @@ function FeedSkeleton() {
   return (
     <View accessibilityLabel="Đang tải bảng tin" accessibilityRole="progressbar">
       {[0, 1, 2].map((row) => (
-        <View key={row} className="border-b border-line px-4 py-4">
+        <View key={row} className="mx-3 mb-3 rounded-3xl px-4 py-4" style={{ borderWidth: 2, borderBottomWidth: 4, borderColor: colors.line, borderBottomColor: colors.edge, backgroundColor: colors.surface }}>
           <View className="flex-row items-center">
             <Skeleton width={42} height={42} radius={21} />
             <View className="ml-3 gap-2"><Skeleton width={140} height={13} /><Skeleton width={90} height={10} /></View>

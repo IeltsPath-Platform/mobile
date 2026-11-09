@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { Text } from '@/src/components/ui/text';
+import { colors } from '@/src/theme';
 
 type ProgressHeaderProps = {
   index: number;
@@ -26,7 +27,7 @@ export function ProgressHeader({ index, total }: ProgressHeaderProps) {
         Câu {Math.min(index + 1, total)}/{total}
       </Text>
       <View className="mt-2 h-2.5 overflow-hidden rounded-full bg-line">
-        <Animated.View className="h-2.5 rounded-full bg-accent" style={progressStyle} />
+        <Animated.View style={[{ height: 10, borderRadius: 5, backgroundColor: colors.accent }, progressStyle]} />
       </View>
     </View>
   );

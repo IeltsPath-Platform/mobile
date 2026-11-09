@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { useEffect, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import Animated, {
@@ -42,9 +43,9 @@ export function GameHud({
         accessibilityLabel="Rời ván chơi"
         disabled={leaving}
         onPress={onExit}
-        className="h-11 w-11 items-center justify-center rounded-full border border-line bg-surface active:opacity-70"
+        className="h-12 w-12 items-center justify-center rounded-full active:opacity-70"
       >
-        {leaving ? <ActivityIndicator size="small" color={colors.ink} /> : <X size={19} color={colors.ink} strokeWidth={2.5} />}
+        {leaving ? <ActivityIndicator size="small" color={colors.muted} /> : <X size={26} color={colors.muted} strokeWidth={3} />}
       </Pressable>
       <View className="flex-1 flex-row items-center gap-2">
         <View className="h-8 w-8 items-center justify-center rounded-xl" style={{ backgroundColor: tone.soft }}>
@@ -58,10 +59,10 @@ export function GameHud({
       <View
         accessibilityLabel={`${score} điểm`}
         className="h-10 flex-row items-center gap-1.5 rounded-full px-3.5"
-        style={{ backgroundColor: colors.warmSoft }}
+        style={{ backgroundColor: colors.warmSoft, borderWidth: 2, borderColor: colors.xp }}
       >
-        <Award size={15} color={colors.xpDeep} />
-        <Text weight="black" className="text-sm" style={{ color: colors.xpDeep }}>
+        <Award size={16} color={colors.xpDeep} />
+        <Text weight="black" className="text-base" style={{ color: colors.xpDeep }}>
           {score}
         </Text>
       </View>
@@ -117,8 +118,7 @@ export function TimerPill({ seconds, urgentAt = 5 }: { seconds: number; urgentAt
   return (
     <Animated.View
       accessibilityLabel={`Còn ${seconds} giây`}
-      className="h-8 flex-row items-center gap-1 rounded-full px-2.5"
-      style={[{ backgroundColor: urgent ? colors.dangerSoft : colors.accentSoft }, style]}
+      style={[{ height: 32, flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 16, paddingHorizontal: 10, backgroundColor: urgent ? colors.dangerSoft : colors.accentSoft }, style]}
     >
       <Timer size={14} color={tint} />
       <Text weight="black" className="text-xs" style={{ color: tint }}>
@@ -129,7 +129,7 @@ export function TimerPill({ seconds, urgentAt = 5 }: { seconds: number; urgentAt
 }
 
 /** Thin progress bar; `ratio` is 0..1 and eases between updates. */
-export function ProgressBar({ ratio, color = colors.accent, height = 6 }: { ratio: number; color?: string; height?: number }) {
+export function ProgressBar({ ratio, color = colors.xp, height = 14 }: { ratio: number; color?: string; height?: number }) {
   const value = useSharedValue(ratio);
   useEffect(() => {
     value.value = withTiming(Math.min(1, Math.max(0, ratio)), { duration: 900, easing: Easing.linear });
@@ -138,7 +138,7 @@ export function ProgressBar({ ratio, color = colors.accent, height = 6 }: { rati
   const style = useAnimatedStyle(() => ({ transform: [{ scaleX: value.value }] }));
   return (
     <View className="overflow-hidden rounded-full" style={{ height, backgroundColor: colors.line }}>
-      <Animated.View className="h-full w-full rounded-full" style={[{ backgroundColor: color, transformOrigin: 'left' }, style]} />
+      <Animated.View style={[{ height: '100%', width: '100%', borderRadius: 999, backgroundColor: color, transformOrigin: 'left' }, style]} />
     </View>
   );
 }
@@ -167,10 +167,10 @@ export function ChipRow<T extends string | number | null>({
         accessibilityRole="radio"
         accessibilityState={{ selected }}
         onPress={() => onChange(option.value)}
-        className="min-h-11 items-center justify-center rounded-full border px-4 active:opacity-70"
-        style={{ borderColor: selected ? accent : colors.line, backgroundColor: selected ? soft : colors.surface }}
+        className="min-h-12 items-center justify-center rounded-2xl px-4 active:opacity-70"
+        style={{ borderWidth: 2, borderBottomWidth: 4, borderColor: selected ? accent : colors.line, borderBottomColor: selected ? accent : colors.edge, backgroundColor: selected ? soft : colors.surface }}
       >
-        <Text weight={selected ? 'bold' : 'semibold'} className="text-sm" style={{ color: selected ? accent : colors.muted }}>
+        <Text weight="extrabold" className="text-sm" style={{ color: selected ? accent : colors.ink }}>
           {option.label}
         </Text>
       </Pressable>
@@ -230,7 +230,6 @@ type StateAction = { label: string; onPress: () => void; variant?: 'primary' | '
 
 /** Full-screen loading / error state shared by every game screen. */
 export function GameStateScreen({
-  icon: Icon,
   title,
   message,
   loading = false,
@@ -252,9 +251,15 @@ export function GameStateScreen({
         <BackButton fallbackHref={backHref ?? '/(tabs)/practice'} onBack={onBack} />
       </View>
       <View className="flex-1 items-center justify-center px-8">
-        <View className="h-20 w-20 items-center justify-center rounded-[28px]" style={{ backgroundColor: colors.accentSoft }}>
-          {loading ? <ActivityIndicator size="large" color={colors.accent} /> : Icon ? <Icon size={32} color={colors.accent} /> : null}
-        </View>
+        {loading ? (
+          <View className="h-24 w-24 items-center justify-center">
+            <ActivityIndicator size="large" color={colors.accent} />
+          </View>
+        ) : (
+          <View className="items-center">
+            <Image source={require('@/assets/images/owl/nav-owl-stand.webp')} contentFit="contain" style={{ width: 120, height: 120 }} accessibilityIgnoresInvertColors />
+          </View>
+        )}
         <Text accessibilityRole="header" weight="black" className="mt-5 text-center text-xl">
           {title}
         </Text>

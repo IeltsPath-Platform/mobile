@@ -6,26 +6,42 @@ import { ActivityIndicator, Pressable, Switch, View } from 'react-native';
 import { Text } from '@/src/components/ui/text';
 import { colors } from '@/src/theme';
 
+/** Section heading followed by flat rows (no outer frame), like a native settings list. */
 export function SettingsSection({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <View className="mb-4">
-      <Text weight="black" className="mb-1.5 ml-2 text-[10px] uppercase tracking-wider text-muted">
+    <View className="mb-5">
+      <Text accessibilityRole="header" weight="black" className="mb-2 px-1 text-xl text-ink">
         {title}
       </Text>
-      <View className="overflow-hidden rounded-2xl border border-line bg-surface">{children}</View>
+      <View>{children}</View>
+    </View>
+  );
+}
+
+function IconBubble({ icon: Icon, danger }: { icon: LucideIcon; danger?: boolean }) {
+  return (
+    <View
+      style={{
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: danger ? colors.dangerSoft : colors.accentSoft,
+      }}>
+      <Icon size={20} color={danger ? colors.danger : colors.accentDeep} />
     </View>
   );
 }
 
 /** Collapsed-by-default row that reveals grouped options or switches. */
 export function SettingsAccordionRow({
-  icon: Icon,
+  icon,
   title,
   summary,
   expanded,
   onToggle,
   children,
-  isLast = false,
 }: {
   icon: LucideIcon;
   title: string;
@@ -42,27 +58,25 @@ export function SettingsAccordionRow({
         accessibilityLabel={title}
         accessibilityState={{ expanded }}
         onPress={onToggle}
-        className="min-h-[52px] flex-row items-center gap-3 px-4 py-2.5 active:bg-canvas"
-      >
-        <Icon size={18} color={colors.accentDeep} />
+        className="min-h-[60px] flex-row items-center gap-3 px-1 py-2 active:opacity-70">
+        <IconBubble icon={icon} />
         <View className="flex-1 pr-2">
-          <Text weight="bold" className="text-sm text-ink" numberOfLines={1}>
+          <Text weight="bold" className="text-base text-ink" numberOfLines={1}>
             {title}
           </Text>
           {summary ? (
-            <Text className="mt-0.5 text-[11px] text-muted" numberOfLines={1}>
+            <Text className="mt-0.5 text-xs text-muted" numberOfLines={1}>
               {summary}
             </Text>
           ) : null}
         </View>
-        <ChevronDown
-          size={16}
-          color={colors.muted}
-          style={{ transform: [{ rotate: expanded ? '180deg' : '0deg' }] }}
-        />
+        <ChevronDown size={20} color={colors.muted} style={{ transform: [{ rotate: expanded ? '180deg' : '0deg' }] }} />
       </Pressable>
-      {expanded ? <View className="border-t border-line">{children}</View> : null}
-      {!isLast ? <View className="ml-4 h-px bg-line" /> : null}
+      {expanded ? (
+        <View style={{ borderWidth: 2, borderBottomWidth: 4, borderColor: colors.line, borderBottomColor: colors.edge, borderRadius: 20, overflow: 'hidden', marginBottom: 8 }}>
+          {children}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -77,8 +91,8 @@ export function SettingsToggleItem({
   onChange: (val: boolean) => void;
 }) {
   return (
-    <View className="min-h-[46px] flex-row items-center justify-between border-b border-line/60 px-4 py-2">
-      <Text weight="medium" className="flex-1 pr-2 text-xs text-ink">
+    <View className="min-h-[52px] flex-row items-center justify-between border-b border-line/60 px-4 py-2">
+      <Text weight="medium" className="flex-1 pr-2 text-sm text-ink">
         {title}
       </Text>
       <Switch
@@ -93,16 +107,18 @@ export function SettingsToggleItem({
 }
 
 export function SettingsLinkRow({
-  icon: Icon,
+  icon,
   title,
+  value,
   badgeText,
   danger = false,
   busy = false,
-  isLast = false,
   onPress,
 }: {
   icon: LucideIcon;
   title: string;
+  /** Current choice shown on the right, e.g. the selected theme. */
+  value?: string;
   badgeText?: string;
   danger?: boolean;
   busy?: boolean;
@@ -110,37 +126,30 @@ export function SettingsLinkRow({
   onPress: () => void;
 }) {
   return (
-    <View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={title}
-        accessibilityState={{ disabled: busy, busy }}
-        disabled={busy}
-        onPress={onPress}
-        className="min-h-[50px] flex-row items-center gap-3 px-4 py-2.5 active:bg-canvas"
-      >
-        <Icon size={18} color={danger ? colors.danger : colors.accentDeep} />
-        <Text
-          weight="bold"
-          className="flex-1 text-sm text-ink"
-          style={danger ? { color: colors.danger } : undefined}
-        >
-          {title}
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={value ? `${title}, ${value}` : title}
+      accessibilityState={{ disabled: busy, busy }}
+      disabled={busy}
+      onPress={onPress}
+      className="min-h-[60px] flex-row items-center gap-3 px-1 py-2 active:opacity-70">
+      <IconBubble icon={icon} danger={danger} />
+      <Text weight="bold" className="flex-1 text-base text-ink" style={danger ? { color: colors.danger } : undefined}>
+        {title}
+      </Text>
+      {value ? (
+        <Text className="text-sm text-muted" numberOfLines={1}>
+          {value}
         </Text>
-        {badgeText ? (
-          <View className="rounded-full bg-accent-soft px-2 py-0.5">
-            <Text weight="black" className="text-[10px] text-accent-deep">
-              {badgeText}
-            </Text>
-          </View>
-        ) : null}
-        {busy ? (
-          <ActivityIndicator color={colors.danger} size="small" />
-        ) : (
-          <ChevronRight size={16} color={colors.muted} />
-        )}
-      </Pressable>
-      {!isLast ? <View className="ml-4 h-px bg-line" /> : null}
-    </View>
+      ) : null}
+      {badgeText ? (
+        <View className="rounded-full bg-accent-soft px-2.5 py-0.5">
+          <Text weight="black" className="text-xs text-accent-deep">
+            {badgeText}
+          </Text>
+        </View>
+      ) : null}
+      {busy ? <ActivityIndicator color={colors.danger} size="small" /> : <ChevronRight size={20} color={colors.muted} />}
+    </Pressable>
   );
 }

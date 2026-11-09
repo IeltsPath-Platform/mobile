@@ -1,7 +1,7 @@
 import { DefaultTheme, ThemeProvider as NavigationThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { createContext, Fragment, useContext, useEffect, useMemo, type ReactNode } from 'react';
-import { Appearance, View } from 'react-native';
+import { Appearance, Platform, useColorScheme, View } from 'react-native';
 
 import { useAppSettings } from '@/src/features/settings/use-app-settings';
 
@@ -10,12 +10,16 @@ import { darkColors, FONT_SCALE, lightColors, setActivePalette, themeVars } from
 type ThemeContextValue = {
   isDark: boolean;
   fontScale: number;
+  /** NativeWind CSS variables; a Modal renders outside the root View so it must re-apply them. */
+  vars: ReturnType<typeof themeVars>;
 };
 
-const ThemeContext = createContext<ThemeContextValue>({ isDark: false, fontScale: 1 });
+const ThemeContext = createContext<ThemeContextValue | null>(null);
+
+const FALLBACK_THEME: ThemeContextValue = { isDark: false, fontScale: 1, vars: themeVars(lightColors) };
 
 export function useTheme() {
-  return useContext(ThemeContext);
+  return useContext(ThemeContext) ?? FALLBACK_THEME;
 }
 
 /**
@@ -39,20 +43,24 @@ export const rootScreenLayout = ({ route, children }: { route: { name: string };
 
 export function AppThemeProvider({ children }: { children: ReactNode }) {
   const { settings } = useAppSettings();
-  const isDark = settings.theme === 'dark';
+  const systemScheme = useColorScheme();
+  const isDark = settings.theme === 'dark' || (settings.theme === 'system' && systemScheme === 'dark');
   const palette = isDark ? darkColors : lightColors;
   // Children read `colors` while rendering, so the palette must be active before they render;
   // memoising keeps this to one assignment per theme change instead of one per render.
   useMemo(() => setActivePalette(palette), [palette]);
 
-  // Native chrome (keyboard, alerts, system sheets) follows the in-app choice, not just the OS one.
+  // Native chrome (keyboard, alerts, system sheets) follows the in-app choice. "Theo thiết bị" clears
+  // the override so `useColorScheme` keeps reporting the OS value.
   useEffect(() => {
-    Appearance.setColorScheme(isDark ? 'dark' : 'light');
-  }, [isDark]);
+    // NativeWind owns the colour scheme on web and rejects manual overrides.
+    if (Platform.OS === 'web') return;
+    Appearance.setColorScheme(settings.theme === 'system' ? 'unspecified' : settings.theme);
+  }, [settings.theme]);
 
   const fontScale = FONT_SCALE[settings.fontSize] ?? 1;
-  const themeValue = useMemo(() => ({ isDark, fontScale }), [isDark, fontScale]);
   const vars = useMemo(() => themeVars(palette, fontScale), [palette, fontScale]);
+  const themeValue = useMemo(() => ({ isDark, fontScale, vars }), [isDark, fontScale, vars]);
 
   const navigationTheme = useMemo(
     () => ({

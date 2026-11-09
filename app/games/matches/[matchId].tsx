@@ -111,7 +111,7 @@ export default function WordlyMatchScreen() {
 
   return (
     <View ref={rootRef} collapsable={false} className="flex-1 bg-canvas">
-    <Animated.View className="flex-1" style={liftStyle}>
+    <Animated.View style={[{ flex: 1 }, liftStyle]}>
       <WordlyTopBar
         wordNumber={word.wordNumber}
         wordLimit={word.wordLimit}
@@ -123,7 +123,7 @@ export default function WordlyMatchScreen() {
       />
       {game.seconds !== null && totalSeconds ? (
         <View className="px-4 pb-2">
-          <ProgressBar ratio={game.seconds / totalSeconds} color={urgent ? colors.danger : colors.accent} height={4} />
+          <ProgressBar ratio={game.seconds / totalSeconds} color={urgent ? colors.danger : colors.accent} height={6} />
         </View>
       ) : null}
       {game.multiplayer && game.ranking.data ? <StandingsStrip players={game.ranking.data.players} meId={user.data?.id} /> : null}
@@ -142,7 +142,7 @@ export default function WordlyMatchScreen() {
             accessibilityState={{ disabled: game.hintDisabled }}
             disabled={game.hintDisabled}
             onPress={() => void game.useHint()}
-            className="h-11 w-11 items-center justify-center rounded-full active:opacity-70"
+            className="h-12 w-12 items-center justify-center rounded-full active:opacity-70"
             style={{ backgroundColor: hinted ? colors.successSoft : colors.warmSoft, opacity: game.hintDisabled && !hinted ? 0.5 : 1 }}
           >
             {hinted ? <Check size={18} color={hintTint} strokeWidth={3} /> : <Lightbulb size={19} color={hintTint} />}
