@@ -63,3 +63,6 @@ yarn-error.*
 coverage/
 Thumbs.db
 *.log
+# Local Expo export output and task notes
+.expo-*/
+CODEX_TASK_*.md
