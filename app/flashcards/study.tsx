@@ -1,0 +1,66 @@
+import { router } from 'expo-router';
+
+import { ActivityIndicator, View } from 'react-native';
+import { BackHeader } from '@/src/components/navigation/back-header';
+import { Button } from '@/src/components/ui/button';
+import { FormAlert } from '@/src/components/ui/form-alert';
+import { Text } from '@/src/components/ui/text';
+import { StudySession } from '@/src/features/flashcards/components/study-session';
+
+import {
+  useDueStudy,
+  toStudyCards,
+} from '@/src/features/flashcards/use-due-study';
+import { FlashcardSignIn } from '@/src/features/flashcards/components/query-state';
+import { colors } from '@/src/theme';
+export default function AllCardsStudyScreen() {
+  const { due, review, loadMore, enabled } = useDueStudy();
+  if (!enabled)
+    return (
+      <View className="flex-1 bg-canvas">
+        <FlashcardSignIn />
+      </View>
+    );
+  if (due.isPending)
+    return (
+      <View className="flex-1 bg-canvas">
+        <BackHeader title="Ôn tất cả thẻ" fallbackHref="/(tabs)/flashcards" />
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator color={colors.accent} />
+          <Text className="mt-3 text-sm text-muted">Đang tải thẻ đến hạn…</Text>
+        </View>
+      </View>
+    );
+  if (due.isError)
+    return (
+      <View className="flex-1 bg-canvas">
+        <BackHeader title="Ôn tất cả thẻ" fallbackHref="/(tabs)/flashcards" />
+        <View className="p-5">
+          <FormAlert tone="error" message={due.error.message} />
+          <Button
+            className="mt-4"
+            label="Thử lại"
+            onPress={() => void due.refetch()}
+          />
+        </View>
+      </View>
+    );
+  const exit = () => router.back();
+  return (
+    <View className="flex-1 bg-canvas">
+      <BackHeader
+        title="Ôn tất cả thẻ"
+        subtitle={`${due.data.total} thẻ đang đến hạn`}
+        fallbackHref="/(tabs)/flashcards"
+      />
+      <StudySession
+        key="all-due"
+        cards={toStudyCards(due.data.items)}
+        onReview={review}
+        hasMoreCards={due.data.total > due.data.items.length}
+        onLoadMore={loadMore}
+        onExit={exit}
+      />
+    </View>
+  );
+}

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "IELTS Mobile",
+    "name": "IELTSPath",
     "slug": "ielts-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -13,13 +13,13 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#eef8f6",
+        "backgroundColor": "#123ab5",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.doan.ieltsmobile"
+      "package": "com.doan.ieltsmobile",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",
@@ -29,13 +29,40 @@
     "plugins": [
       "expo-router",
       [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/android-icon-monochrome.png",
+          "color": "#123ab5",
+          "defaultChannel": "default"
+        }
+      ],
+      [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/owl/hero-cheer.png",
           "resizeMode": "contain",
-          "backgroundColor": "#eef8f6"
+          "imageWidth": 220,
+          "backgroundColor": "#123ab5"
         }
-      ]
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Cho phép IELTSPath truy cập ảnh để bạn chia sẻ trong cộng đồng.",
+          "microphonePermission": false
+        }
+      ],
+      "expo-secure-store",
+      "expo-font",
+      "expo-status-bar",
+      "expo-web-browser",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false
+        }
+      ],
+      "expo-image"
     ],
     "experiments": {
       "typedRoutes": true

@@ -1,0 +1,26 @@
+export declare const colors: {
+  canvas: string;
+  surface: string;
+  surfaceTint: string;
+  ink: string;
+  muted: string;
+  line: string;
+  edge: string;
+  accent: string;
+  accentDeep: string;
+  accentSoft: string;
+  accentEdge: string;
+  accentWarm: string;
+  xp: string;
+  xpDeep: string;
+  danger: string;
+  dangerSoft: string;
+  success: string;
+  successSoft: string;
+  community: Record<'general' | 'question' | 'discussion' | 'writing' | 'speaking' | 'resources', { foreground: string; background: string; border: string }>;
+  heroStart: string;
+  heroEnd: string;
+  skill: Record<'listening' | 'reading' | 'writing' | 'speaking' | 'full', string>;
+};
+
+export declare const fonts: Record<'regular' | 'medium' | 'semibold' | 'bold' | 'extrabold' | 'black', string>;

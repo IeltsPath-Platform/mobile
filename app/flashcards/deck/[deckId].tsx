@@ -1,0 +1,317 @@
+import {
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
+import { Image } from 'expo-image';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useMemo } from 'react';
+import {
+  BookOpenCheck,
+  MoreVertical,
+  Plus,
+  RotateCcw,
+  Trash2,
+} from 'lucide-react-native';
+import {
+  ActivityIndicator,
+  Alert,
+
+  Pressable,
+  FlatList,
+  View,
+} from 'react-native';
+import { BackHeader } from '@/src/components/navigation/back-header';
+import { Button } from '@/src/components/ui/button';
+import { Card } from '@/src/components/ui/card';
+import { Text } from '@/src/components/ui/text';
+import { haptics } from '@/src/lib/haptics';
+import { vocabApi } from '@/src/features/vocab/api';
+import { nextPage } from '@/src/features/flashcards/queries';
+import { colors } from '@/src/theme';
+
+export default function DeckDetailScreen() {
+  const { deckId } = useLocalSearchParams<{ deckId: string }>();
+  const client = useQueryClient();
+  const deck = useQuery({
+    queryKey: ['flashcards', 'deck', deckId],
+    queryFn: () => vocabApi.getDeck(deckId),
+    enabled: !!deckId,
+  });
+  const items = useInfiniteQuery({
+    queryKey: ['flashcards', 'deck-item-pages', deckId],
+    queryFn: ({ pageParam, signal }) =>
+      vocabApi.listDeckItems(deckId, pageParam, 30, signal),
+    initialPageParam: 0,
+    getNextPageParam: nextPage,
+    enabled: !!deckId,
+  });
+  const remove = (cardId: string) =>
+    Alert.alert('Bỏ thẻ khỏi bộ?', 'Thẻ vẫn được giữ trong thư viện của bạn.', [
+      { text: 'Hủy', style: 'cancel' },
+      {
+        text: 'Bỏ khỏi bộ',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await vocabApi.removeDeckItem(deckId, cardId);
+            await client.invalidateQueries({ queryKey: ['flashcards'] });
+            haptics.tap();
+          } catch (e) {
+            haptics.error();
+            Alert.alert(
+              'Không thể bỏ thẻ',
+              e instanceof Error ? e.message : 'Vui lòng thử lại.',
+            );
+          }
+        },
+      },
+    ]);
+  const deleteDeck = () =>
+    Alert.alert('Xóa bộ thẻ?', 'Các thẻ vẫn còn trong thư viện cá nhân.', [
+      { text: 'Hủy', style: 'cancel' },
+      {
+        text: 'Xóa bộ',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await vocabApi.deleteDeck(deckId);
+            // Leave first and drop this deck's queries so nothing refetches a deleted deck.
+            router.back();
+            client.removeQueries({ queryKey: ['flashcards', 'deck', deckId] });
+            client.removeQueries({
+              queryKey: ['flashcards', 'deck-item-pages', deckId],
+            });
+            client.removeQueries({
+              queryKey: ['flashcards', 'deck-items', deckId],
+            });
+            client.removeQueries({ queryKey: ['flashcards', 'due', deckId] });
+            void client.invalidateQueries({ queryKey: ['flashcards'] });
+          } catch (e) {
+            haptics.error();
+            Alert.alert(
+              'Không thể xóa bộ thẻ',
+              e instanceof Error ? e.message : 'Vui lòng thử lại.',
+            );
+          }
+        },
+      },
+    ]);
+  const allItems = useMemo(() => items.data?.pages.flatMap((page) => page.items) ?? [], [items.data]);
+  if (deck.isPending || items.isPending)
+    return (
+      <View className="flex-1 bg-canvas">
+        <BackHeader title="Bộ thẻ" fallbackHref="/(tabs)/flashcards" />
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator color={colors.accent} />
+          <Text className="mt-3 text-sm text-muted">Đang tải bộ thẻ…</Text>
+        </View>
+      </View>
+    );
+  if (deck.isError || items.isError)
+    return (
+      <View className="flex-1 bg-canvas">
+        <BackHeader title="Bộ thẻ" fallbackHref="/(tabs)/flashcards" />
+        <View className="p-5">
+          <Text className="text-danger">
+            {deck.error?.message ?? items.error?.message}
+          </Text>
+          <Button
+            className="mt-4"
+            label="Thử lại"
+            onPress={() => {
+              void deck.refetch();
+              void items.refetch();
+            }}
+          />
+        </View>
+      </View>
+    );
+  return (
+    <View className="flex-1 bg-canvas">
+      <BackHeader
+        title={deck.data.name}
+        subtitle={`${items.data.pages[0].total} thẻ · ${deck.data.dueCount} đến hạn`}
+        fallbackHref="/(tabs)/flashcards"
+        rightAction={
+          <Pressable
+            onPress={() =>
+              router.push({
+                pathname: '/flashcards/deck/edit',
+                params: { deckId },
+              })
+            }
+            accessibilityRole="button"
+            accessibilityLabel="Chỉnh sửa bộ thẻ"
+            className="h-11 w-11 items-center justify-center rounded-full active:opacity-70"
+          >
+            <MoreVertical color={colors.muted} />
+          </Pressable>
+        }
+      />
+      <FlatList
+        data={allItems}
+        keyExtractor={(item) => item.flashcardId}
+        className="flex-1"
+        contentContainerClassName="px-5 pb-12 pt-4"
+        refreshing={items.isRefetching && !items.isFetchingNextPage}
+        onRefresh={() => {
+          void deck.refetch();
+          void items.refetch();
+        }}
+        ListHeaderComponent={
+          <>
+            {deck.data.description ? (
+              <Text className="mb-4 text-sm leading-5 text-muted">
+                {deck.data.description}
+              </Text>
+            ) : null}
+            <Button
+              label={
+                deck.data.dueCount
+                  ? `Ôn ${deck.data.dueCount} thẻ đến hạn`
+                  : 'Chưa có thẻ đến hạn'
+              }
+              disabled={!deck.data.dueCount}
+              icon={<RotateCcw size={18} color="white" />}
+              onPress={() =>
+                router.push({
+                  pathname: '/flashcards/[deckId]',
+                  params: { deckId },
+                })
+              }
+            />
+            <View className="mb-3 mt-6 flex-row items-center justify-between">
+              <View>
+                <Text className="text-xl" weight="black">
+                  Thẻ trong bộ
+                </Text>
+                <Text className="mt-1 text-sm text-muted">
+                  Chạm thẻ để chỉnh sửa nội dung
+                </Text>
+              </View>
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: '/flashcards/deck/add-cards',
+                    params: { deckId },
+                  })
+                }
+                accessibilityRole="button"
+                accessibilityLabel="Thêm thẻ vào bộ"
+                className="h-11 w-11 items-center justify-center rounded-2xl active:opacity-80"
+                style={{ backgroundColor: colors.accent }}
+              >
+                <Plus size={22} color="white" />
+              </Pressable>
+            </View>
+          </>
+        }
+        ListEmptyComponent={
+          <Card className="items-center border-b-0 bg-surface px-5 py-7">
+            <BookOpenCheck size={28} color={colors.accent} />
+            <Text className="mt-3" weight="bold">
+              Bộ này chưa có thẻ
+            </Text>
+            <Text className="mt-1 text-center text-sm text-muted">
+              Thêm thẻ từ thư viện hoặc tạo thẻ mới.
+            </Text>
+            <Button
+              className="mt-4"
+              label="Thêm thẻ có sẵn"
+              onPress={() =>
+                router.push({
+                  pathname: '/flashcards/deck/add-cards',
+                  params: { deckId },
+                })
+              }
+            />
+            <Pressable
+              onPress={() =>
+                router.push({
+                  pathname: '/flashcards/card/edit',
+                  params: { deckId },
+                })
+              }
+              accessibilityRole="button"
+              className="mt-2 min-h-11 justify-center"
+            >
+              <Text weight="bold" className="text-accent">
+                Tạo thẻ mới
+              </Text>
+            </Pressable>
+          </Card>
+        }
+        renderItem={({ item }) => (
+          <Card
+
+            className="mb-3 border-b-0 bg-surface p-4"
+          >
+            <View className="flex-row items-start gap-3">
+              {item.imageUrl ? (
+                <Image
+                  source={{ uri: item.imageUrl }}
+                  accessibilityLabel={`Ảnh minh họa ${item.front}`}
+                  style={{ width: 64, height: 64, borderRadius: 12 }}
+                  contentFit="cover"
+                />
+              ) : null}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Sửa thẻ ${item.front}`}
+                className="min-h-11 flex-1 justify-center"
+                onPress={() =>
+                  router.push({
+                    pathname: '/flashcards/card/edit',
+                    params: { cardId: item.flashcardId },
+                  })
+                }
+              >
+                <Text weight="bold">{item.front}</Text>
+                <Text className="mt-1 text-sm leading-5 text-muted">
+                  {item.back}
+                </Text>
+                {item.exampleSentence ? (
+                  <Text className="mt-2 text-xs italic text-muted">
+                    {item.exampleSentence}
+                  </Text>
+                ) : null}
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => remove(item.flashcardId)}
+                accessibilityLabel={`Bỏ thẻ ${item.front} khỏi bộ`}
+                className="ml-2 h-11 w-11 items-center justify-center"
+              >
+                <Trash2 size={18} color={colors.danger} />
+              </Pressable>
+            </View>
+          </Card>
+        )}
+        ListFooterComponent={
+          <>
+            {items.hasNextPage ? (
+              <Button
+                label="Tải thêm thẻ"
+                loading={items.isFetchingNextPage}
+                variant="secondary"
+                onPress={() => void items.fetchNextPage()}
+              />
+            ) : null}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Xóa bộ thẻ"
+              onPress={deleteDeck}
+              className="mt-4 min-h-12 flex-row items-center justify-center gap-2"
+            >
+              <Trash2 size={17} color={colors.danger} />
+              <Text className="text-danger" weight="bold">
+                Xóa bộ thẻ
+              </Text>
+            </Pressable>
+          </>
+        }
+      />
+    </View>
+  );
+}
