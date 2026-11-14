@@ -3,24 +3,19 @@ import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
+import { createRequestId } from '@/src/lib/request-id';
+
 import { communityApi } from './api';
 
 const INSTALLATION_ID_KEY = 'ieltspath.notificationInstallationId';
 const ANDROID_CHANNEL_ID = 'default';
 const registrationsInFlight = new Map<string, Promise<boolean>>();
 
-function createInstallationId() {
-  // This ID is a device binding key, not a credential. Keep it stable across account changes.
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/gu, (character) => {
-    const random = Math.floor(Math.random() * 16);
-    return (character === 'x' ? random : (random & 0x3) | 0x8).toString(16);
-  });
-}
-
 async function getInstallationId() {
   const existing = await SecureStore.getItemAsync(INSTALLATION_ID_KEY);
   if (existing) return existing;
-  const installationId = createInstallationId();
+  // A device binding key, not a credential: keep it stable across account changes.
+  const installationId = createRequestId();
   await SecureStore.setItemAsync(INSTALLATION_ID_KEY, installationId, {
     keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
   });

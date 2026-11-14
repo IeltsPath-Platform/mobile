@@ -8,33 +8,27 @@ type ErrorBody = {
   code?: string;
   path?: string;
   details?: Record<string, string> | null;
-  reviews?: unknown;
-};
-
-export type ApiReviewRef = {
-  reviewId: string;
-  lessonId: string;
-  knowledgePointId: string;
 };
 
 export class ApiError extends Error {
   readonly status: number;
   readonly details: Record<string, string>;
   readonly code?: string;
-  readonly reviews: ApiReviewRef[];
+  /** Seconds from the Retry-After header of a 429, when the server sent one. */
+  readonly retryAfterSeconds?: number;
 
   constructor(
     status: number,
     message: string,
     details?: Record<string, string> | null,
-    extras?: { code?: string; reviews?: ApiReviewRef[] },
+    extras?: { code?: string; retryAfterSeconds?: number },
   ) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.details = details ?? {};
     this.code = extras?.code ?? details?.code;
-    this.reviews = extras?.reviews ?? [];
+    this.retryAfterSeconds = extras?.retryAfterSeconds;
   }
 
   get isNetworkError() {
@@ -118,26 +112,15 @@ async function parse<T>(response: Response): Promise<T> {
     const fallback = response.status === 503 ? 'Dịch vụ tạm chưa sẵn sàng. Kiểm tra backend rồi thử lại.' : FALLBACK_ERROR_MESSAGE;
     throw new ApiError(response.status, body.message || body.detail || fallback, body.details, {
       code: body.code,
-      reviews: readReviews(body.reviews),
+      retryAfterSeconds: readRetryAfter(response.headers.get('Retry-After')),
     });
   }
   return data as T;
 }
 
-function readReviews(value: unknown): ApiReviewRef[] {
-  if (!Array.isArray(value)) return [];
-  const reviews: ApiReviewRef[] = [];
-  for (const item of value) {
-    if (!item || typeof item !== 'object') continue;
-    const row = item as Record<string, unknown>;
-    if (typeof row.reviewId !== 'string' || typeof row.lessonId !== 'string') continue;
-    reviews.push({
-      reviewId: row.reviewId,
-      lessonId: row.lessonId,
-      knowledgePointId: typeof row.knowledgePointId === 'string' ? row.knowledgePointId : '',
-    });
-  }
-  return reviews;
+function readRetryAfter(value: string | null): number | undefined {
+  const seconds = value ? Number(value) : NaN;
+  return Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : undefined;
 }
 
 function safeJson(text: string): unknown {

@@ -11,7 +11,6 @@ export const studyKeys = {
   unitLists: ['vocabulary-study', 'units'] as const,
   progress: ['vocabulary-study', 'progress'] as const,
   units: (topicId: string) => ['vocabulary-study', 'units', topicId] as const,
-  content: (unitId: string) => ['vocabulary-study', 'content', unitId] as const,
 };
 export const vocabularyStudyApi = {
   units: (topicId: string, signal?: AbortSignal) => apiRequest<TopicUnits>(`${content}/topics/${id(topicId)}/units`, { auth: false, signal }),

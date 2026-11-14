@@ -45,6 +45,11 @@ export const resetPasswordSchema = z
     message: 'Mật khẩu nhập lại không khớp',
   });
 
+export const verifyEmailSchema = z.object({
+  token: z.string().trim().min(1, 'Mã xác minh không được để trống'),
+});
+
+export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;

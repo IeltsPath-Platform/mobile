@@ -5,6 +5,7 @@ import {
   Palette,
   KeyRound,
   LogOut,
+  MailCheck,
   Settings2,
   Trash2,
   Trophy,
@@ -305,6 +306,15 @@ export default function AccountScreen() {
             onPress={() => router.push('/profile/edit' as never)}
           />
 
+          {user.emailVerified === false ? (
+            <Card className="mt-4 gap-3 p-4">
+              <Text className="text-sm leading-5 text-muted">
+                Email của bạn chưa được xác minh. Hãy xác minh để mua gói và đổi mật khẩu.
+              </Text>
+              <Button variant="secondary" label="Xác minh email" onPress={() => router.push('/profile/verify-email' as never)} />
+            </Card>
+          ) : null}
+
           {hasSummaryError ? (
             <View className="mb-4 gap-2">
               <Text className="text-xs text-danger">Chưa tải được một phần thông tin hồ sơ.</Text>
@@ -394,9 +404,17 @@ export default function AccountScreen() {
           <SettingsSection title="Tài khoản">
             <SettingsLinkRow
               icon={KeyRound}
-              title="Đổi mật khẩu"
+              title={user?.hasPassword === false ? 'Tạo mật khẩu' : 'Đổi mật khẩu'}
               onPress={() => router.push('/profile/change-password' as never)}
             />
+            {user?.emailVerified === false ? (
+              <SettingsLinkRow
+                icon={MailCheck}
+                title="Xác minh email"
+                badgeText="Chưa xác minh"
+                onPress={() => router.push('/profile/verify-email' as never)}
+              />
+            ) : null}
             <SettingsLinkRow
               icon={CircleHelp}
               title="Trợ giúp & Hỗ trợ"

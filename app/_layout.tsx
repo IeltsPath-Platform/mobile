@@ -173,8 +173,8 @@ function RootNavigator() {
           <Stack.Screen name="achievements" />
           <Stack.Screen name="profile/edit" options={{ headerShown: false }} />
           <Stack.Screen name="profile/change-password" options={{ headerShown: false }} />
+          <Stack.Screen name="profile/verify-email" options={{ headerShown: false }} />
           <Stack.Screen name="games" />
-          <Stack.Screen name="learn" options={{ headerShown: false }} />
           <Stack.Screen name="flashcards" options={{ headerShown: false }} />
           <Stack.Screen name="community/[postId]" options={{ headerShown: false }} />
           <Stack.Screen name="community/bookmarked" options={{ headerShown: false }} />

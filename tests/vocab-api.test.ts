@@ -15,7 +15,7 @@ vi.mock('expo-file-system', () => ({
   },
 }));
 
-import { listActiveDecks, normalizeDeckList, vocabApi, type FlashcardDeck } from '@/src/features/vocab/api';
+import { vocabApi } from '@/src/features/vocab/api';
 
 class FormDataStub {
   readonly fields: unknown[][] = [];
@@ -45,29 +45,6 @@ describe('vocabulary topic catalog API', () => {
   it('removes deck membership without deleting the flashcard itself', async () => {
     await vocabApi.removeDeckItem('deck-1', 'card-1');
     expect(apiRequestMock).toHaveBeenCalledWith('/api/learning-support/decks/deck-1/items/card-1', { method: 'DELETE', auth: true });
-  });
-
-  it('keeps loading deck pages past the first 50 records', async () => {
-    const first = Array.from({ length: 50 }, (_, index) => ({ id: `deck-${index}` }));
-    apiRequestMock.mockResolvedValueOnce({ items: first, page: 0, size: 50, total: 51 })
-      .mockResolvedValueOnce({ items: [{ id: 'deck-50' }], page: 1, size: 50, total: 51 });
-    const decks = await listActiveDecks();
-    expect(decks).toHaveLength(51);
-    expect(decks[50].id).toBe('deck-50');
-    expect(apiRequestMock.mock.calls[1][0]).toContain('page=1');
-  });
-
-  it('stops paging if deletion makes a later page empty', async () => {
-    apiRequestMock.mockResolvedValueOnce({ items: [{ id: 'deck-1' }], page: 0, size: 50, total: 80 })
-      .mockResolvedValueOnce({ items: [], page: 1, size: 50, total: 80 });
-    expect(await listActiveDecks()).toEqual([{ id: 'deck-1' }]);
-    expect(apiRequestMock).toHaveBeenCalledTimes(2);
-  });
-
-  it('propagates a later page failure rather than showing a truncated library as complete', async () => {
-    apiRequestMock.mockResolvedValueOnce({ items: [{ id: 'deck-1' }], page: 0, size: 50, total: 80 })
-      .mockRejectedValueOnce(new Error('Network unavailable'));
-    await expect(listActiveDecks()).rejects.toThrow('Network unavailable');
   });
 
   it('preserves the session and submission IDs when a review request is retried', async () => {
@@ -109,10 +86,4 @@ describe('vocabulary topic catalog API', () => {
     expect(await part.bytes()).toEqual(new Uint8Array([74, 80, 69, 71]));
   });
 
-  it('normalizes legacy paged deck cache entries before list consumers reduce or map them', () => {
-    const deck = { id: 'deck-1' } as FlashcardDeck;
-    expect(normalizeDeckList([deck])).toEqual([deck]);
-    expect(normalizeDeckList({ items: [deck], page: 0, size: 50, total: 1 })).toEqual([deck]);
-    expect(normalizeDeckList({ items: null })).toEqual([]);
-  });
 });

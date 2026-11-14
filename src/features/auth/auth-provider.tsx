@@ -5,6 +5,7 @@ import { onSessionExpired } from '@/src/lib/api-client';
 import { AUTH_ENABLED } from '@/src/lib/env';
 import { tokenStorage } from '@/src/lib/token-storage';
 import * as Notifications from 'expo-notifications';
+import { signOutGoogle } from './components/google-sign-in-button';
 import { registerCurrentInstallation, unregisterCurrentInstallation } from '@/src/features/community/push-notifications';
 
 import { authApi } from './api';
@@ -16,6 +17,7 @@ type AuthContextValue = {
   status: AuthStatus;
   authEnabled: boolean;
   signIn: (input: LoginInput) => Promise<void>;
+  signInWithGoogle: (idToken: string) => Promise<void>;
   signUp: (input: RegisterInput) => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -62,16 +64,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => tokenSubscription.remove();
   }, [status]);
 
-  const signIn = useCallback(
-    async ({ email, password }: LoginInput) => {
-      if (!AUTH_ENABLED) return;
-      const tokens = await authApi.login({ email: email.trim(), password });
+  const startSession = useCallback(
+    async (tokens: { accessToken: string; refreshToken: string }) => {
       await tokenStorage.save({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken });
       void queryClient.cancelQueries();
       queryClient.clear();
       setStatus('authenticated');
     },
     [queryClient],
+  );
+
+  const signIn = useCallback(
+    async ({ email, password }: LoginInput) => {
+      if (!AUTH_ENABLED) return;
+      await startSession(await authApi.login({ email: email.trim(), password }));
+    },
+    [startSession],
+  );
+
+  const signInWithGoogle = useCallback(
+    async (idToken: string) => {
+      if (!AUTH_ENABLED) return;
+      await startSession(await authApi.google(idToken));
+    },
+    [startSession],
   );
 
   const signUp = useCallback(
@@ -104,14 +120,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ]);
     await Promise.race([serverCleanup, new Promise((resolve) => setTimeout(resolve, 3_000))]);
     await tokenStorage.clear();
+    void signOutGoogle();
     void queryClient.cancelQueries();
     queryClient.clear();
     setStatus('unauthenticated');
   }, [queryClient]);
 
   const value = useMemo(
-    () => ({ status, authEnabled: AUTH_ENABLED, signIn, signUp, signOut }),
-    [status, signIn, signUp, signOut],
+    () => ({ status, authEnabled: AUTH_ENABLED, signIn, signInWithGoogle, signUp, signOut }),
+    [status, signIn, signInWithGoogle, signUp, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

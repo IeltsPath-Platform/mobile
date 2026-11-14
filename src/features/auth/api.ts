@@ -6,6 +6,15 @@ export const authApi = {
   login: (body: { email: string; password: string }) =>
     apiRequest<AuthTokenResponse>('/auth/login', { method: 'POST', body }),
 
+  google: (idToken: string) =>
+    apiRequest<AuthTokenResponse>('/auth/google', { method: 'POST', body: { idToken } }),
+
+  verifyEmail: (token: string) =>
+    apiRequest<MessageResponse>('/auth/verify-email', { method: 'POST', body: { token } }),
+
+  resendVerification: (email: string) =>
+    apiRequest<MessageResponse>('/auth/resend-verification', { method: 'POST', body: { email } }),
+
   register: (body: { email: string; password: string; fullName: string; phoneNumber?: string }) =>
     apiRequest<UserResponse>('/api/users/register', { method: 'POST', body }),
 

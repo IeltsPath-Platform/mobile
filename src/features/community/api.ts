@@ -35,7 +35,6 @@ const page = <T,>(value: unknown): CursorPage<T> => {
   const result = (value ?? {}) as Partial<CursorPage<T>>;
   return { content: Array.isArray(result.content) ? result.content : [], nextCursor: result.nextCursor ?? null, hasNext: Boolean(result.hasNext), size: result.size ?? result.content?.length ?? 0 };
 };
-const profilePage = async (path: string) => page<PublicProfile>(await apiRequest(path, { auth: true }));
 export function parseOffsetPage<T>(value: unknown, pageNumber: number, size: number): OffsetPage<T> {
   const data = (value ?? {}) as Partial<OffsetPage<T>>;
   const content = Array.isArray(data.content) ? data.content : [];
@@ -61,6 +60,7 @@ export function insertMention(body: string, mention: PublicProfile) {
   if (parseMentionMarkup(body).filter((part) => part.userId).length >= 5) return null;
   return body.replace(/@[^\s@]*$/u, `@[${mention.displayName}](${mention.id}) `);
 }
+const profilePage = async (path: string) => page<PublicProfile>(await apiRequest(path, { auth: true }));
 const offsetPage = async <T,>(path: string, pageNumber: number, size = 20) => parseOffsetPage<T>(await apiRequest(path, { auth: true }), pageNumber, size);
 
 export const communityApi = {

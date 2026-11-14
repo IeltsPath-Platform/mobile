@@ -100,24 +100,6 @@ export const vocabApi = {
   },
 };
 
-/** Normalize deck-list cache values shared between screens (legacy cache may hold the paged response). */
-export function normalizeDeckList(value: unknown): FlashcardDeck[] {
-  if (Array.isArray(value)) return value as FlashcardDeck[];
-  if (value && typeof value === 'object' && 'items' in value && Array.isArray(value.items)) {
-    return value.items as FlashcardDeck[];
-  }
-  return [];
-}
-
-export async function listActiveDecks(): Promise<FlashcardDeck[]> {
-  const decks: FlashcardDeck[] = [];
-  for (let page = 0; ; page++) {
-    const response = await vocabApi.listDecks(page, 50);
-    decks.push(...response.items);
-    if (!response.items.length || decks.length >= response.total) return decks;
-  }
-}
-
 export async function listAllDeckItems(deckId: string, signal?: AbortSignal): Promise<DeckItem[]> {
   const result: DeckItem[] = [];
   for (let page = 0; ; page++) {
