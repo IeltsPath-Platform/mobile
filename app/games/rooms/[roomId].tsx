@@ -144,11 +144,21 @@ export default function GameRoomScreen() {
     [qc, roomId, roomKey],
   );
 
+  // The server closes a waiting room when its host leaves it, so the host is closing it for everyone.
+  const closesRoom = isHost === true && waiting;
   const askLeave = () =>
-    Alert.alert('Rời phòng?', room?.status === 'IN_MATCH' ? 'Bạn sẽ rời ván đang chơi và giữ lại điểm đã đạt.' : 'Bạn có thể vào lại bằng mã phòng nếu phòng còn chỗ.', [
-      { text: 'Ở lại', style: 'cancel' },
-      { text: 'Rời phòng', style: 'destructive', onPress: () => leave.mutate() },
-    ]);
+    Alert.alert(
+      closesRoom ? 'Đóng phòng?' : 'Rời phòng?',
+      room?.status === 'IN_MATCH'
+        ? 'Bạn sẽ rời ván đang chơi và giữ lại điểm đã đạt.'
+        : closesRoom
+          ? 'Bạn là chủ phòng nên phòng sẽ đóng lại và mọi người trong phòng phải thoát.'
+          : 'Bạn có thể vào lại bằng mã phòng nếu phòng còn chỗ.',
+      [
+        { text: 'Ở lại', style: 'cancel' },
+        { text: closesRoom ? 'Đóng phòng' : 'Rời phòng', style: 'destructive', onPress: () => leave.mutate() },
+      ],
+    );
 
   const tone = gameTone(kind);
   const inMatch = room?.status === 'IN_MATCH' && room.activeMatchId;
@@ -249,7 +259,7 @@ export default function GameRoomScreen() {
               className="min-h-11 flex-row items-center justify-center gap-2"
             >
               <LogOut size={16} color={colors.danger} />
-              <Text weight="bold" className="text-sm text-danger">Rời {room.status === 'IN_MATCH' ? 'ván' : 'phòng'}</Text>
+              <Text weight="bold" className="text-sm text-danger">{room.status === 'IN_MATCH' ? 'Rời ván' : closesRoom ? 'Đóng phòng' : 'Rời phòng'}</Text>
             </Pressable>
           </View>
         </>

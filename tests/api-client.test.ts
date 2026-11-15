@@ -74,3 +74,42 @@ describe('refresh token contract', () => {
     expect(state.tokens).toBeNull();
   });
 });
+
+describe('error messages', () => {
+  it('replaces the English gateway 429 body with a Vietnamese message and keeps Retry-After', async () => {
+    vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ status: 429, message: 'Request rate limit exceeded' }), { status: 429, headers: { 'Retry-After': '3' } }));
+    await expect(apiRequest('/feed')).rejects.toMatchObject({ status: 429, retryAfterSeconds: 3, message: 'Bạn thao tác quá nhanh. Vui lòng thử lại sau 3 giây.' });
+  });
+  it('still surfaces the server message for other errors', async () => {
+    vi.stubGlobal('fetch', async () => json(409, { message: 'Hết tim', code: 'VOCAB_NO_HEARTS' }));
+    await expect(apiRequest('/x', { method: 'POST' })).rejects.toMatchObject({ status: 409, code: 'VOCAB_NO_HEARTS', message: 'Hết tim' });
+  });
+});
+
+describe('401 that rejects user input, not the session', () => {
+  it('surfaces CURRENT_PASSWORD_INVALID without refreshing or signing out', async () => {
+    const calls: string[] = [];
+    vi.stubGlobal('fetch', async (url: string) => {
+      calls.push(url);
+      if (url.endsWith('/auth/refresh')) return json(200, { accessToken: 'new', refreshToken: 'refresh-new' });
+      return json(401, { status: 401, message: 'Mật khẩu hiện tại không chính xác', details: { code: 'CURRENT_PASSWORD_INVALID' } });
+    });
+    await expect(apiRequest('/api/users/me/password', { method: 'POST', auth: true, body: {} }))
+      .rejects.toMatchObject({ status: 401, code: 'CURRENT_PASSWORD_INVALID', message: 'Mật khẩu hiện tại không chính xác' });
+    expect(calls.some((url) => url.endsWith('/auth/refresh'))).toBe(false);
+    expect(state.tokens).toEqual({ accessToken: 'old', refreshToken: 'refresh-old' });
+  });
+
+  it('still refreshes when the 401 is a bare token rejection from the gateway', async () => {
+    const calls: string[] = [];
+    vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
+      calls.push(url);
+      if (url.endsWith('/auth/refresh')) return json(200, { accessToken: 'new', refreshToken: 'refresh-new' });
+      const auth = (init.headers as Record<string, string>).Authorization;
+      return auth === 'Bearer new' ? json(200, { ok: true }) : json(401, { status: 401, error: 'Unauthorized', message: 'Unauthorized', details: null });
+    });
+    await expect(apiRequest('/api/users/me', { auth: true })).resolves.toEqual({ ok: true });
+    expect(calls.filter((url) => url.endsWith('/auth/refresh'))).toHaveLength(1);
+    expect(state.tokens?.refreshToken).toBe('refresh-new');
+  });
+});

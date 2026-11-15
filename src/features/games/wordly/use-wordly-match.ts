@@ -282,7 +282,8 @@ export function useWordlyMatch(matchId: string) {
       setShakeKey((key) => key + 1);
       void current.refetch();
       const message = cause instanceof Error ? cause.message : '';
-      const dictionaryRejected = /word was not found in this match's dictionary/i.test(message);
+      const dictionaryRejected = (cause instanceof ApiError && cause.code === 'WORD_NOT_FOUND')
+        || /word was not found in this match's dictionary|không có trong từ điển của ván chơi/i.test(message);
       const definitive = isDefinitiveRejection(cause, dictionaryRejected);
       if (definitive) {
         // The server rejected this answer for good; release the lock so it can be edited.

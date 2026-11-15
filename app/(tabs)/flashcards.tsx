@@ -175,7 +175,7 @@ export default function FlashcardsScreen() {
                       Sổ từ của bạn
                     </Text>
                     <Text className="mt-0.5 text-sm text-muted">
-                      {notebookSummary.data!.total} từ đã lưu
+                      {notebookSummary.data?.total ?? 0} từ đã lưu
                       {notebookDue > 0 ? ` · ${notebookDue} từ cần ôn` : ' · Đã ôn hết'}
                     </Text>
                   </View>

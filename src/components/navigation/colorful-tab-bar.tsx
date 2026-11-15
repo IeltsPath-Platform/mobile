@@ -102,16 +102,16 @@ export function ColorfulTabBar({ state, emitter, navigateToTab }: BottomTabBarPr
                   height: 54,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  borderRadius: 30,
                 }}>
+                {/* Radius must be exactly half the size: Android draws a square when it is larger. */}
                 <View
                   style={{
-                    width: '100%',
-                    maxWidth: 58,
-                    height: 54,
+                    width: 52,
+                    height: 52,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    borderRadius: 30,
+                    borderRadius: 26,
+                    overflow: 'hidden',
                     backgroundColor: focused ? (isDark ? '#41474c' : '#e9edf1') : 'transparent',
                   }}>
                   <Icon

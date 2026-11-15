@@ -1,8 +1,8 @@
 import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Image } from 'expo-image';
-import { AtSign, CheckCheck, CornerDownRight, Heart, MessageCircle, Settings, UserPlus, type LucideIcon } from 'lucide-react-native';
-import { memo, useCallback, useMemo, useState } from 'react';
+import { AtSign, CheckCheck, CornerDownRight, Heart, MessageCircle, Settings, Trash2, UserPlus, type LucideIcon } from 'lucide-react-native';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, SectionList, View } from 'react-native';
 
 import { BackHeader } from '@/src/components/navigation/back-header';
@@ -13,7 +13,9 @@ import { Text } from '@/src/components/ui/text';
 import { communityApi, notificationHasNext, type Notification } from '@/src/features/community/api';
 import { CommunityAvatar } from '@/src/features/community/components/community-image';
 import { timeAgo } from '@/src/features/community/format';
+import { isReadNotification, removeNotifications } from '@/src/features/community/notification-cache';
 import { useUnread } from '@/src/features/community/use-unread';
+import { ApiError } from '@/src/lib/api-client';
 import { haptics } from '@/src/lib/haptics';
 import { colors } from '@/src/theme';
 import { useTheme } from '@/src/theme/app-theme';
@@ -77,7 +79,7 @@ function groupByDay(items: Notification[]): Section[] {
   return buckets.filter((bucket) => bucket.data.length > 0);
 }
 
-const NotificationRow = memo(function NotificationRow({ item, onOpen }: { item: Notification; onOpen: (item: Notification) => void }) {
+const NotificationRow = memo(function NotificationRow({ item, onOpen, onDelete }: { item: Notification; onOpen: (item: Notification) => void; onDelete: (item: Notification) => void }) {
   const actorQuery = useQuery({
     queryKey: ['community', 'profile', item.actorId],
     queryFn: () => communityApi.profile(item.actorId),
@@ -95,7 +97,9 @@ const NotificationRow = memo(function NotificationRow({ item, onOpen }: { item: 
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${unread ? 'Chưa đọc. ' : ''}${name} ${label}`}
+      accessibilityHint="Nhấn giữ để xóa thông báo"
       onPress={() => onOpen(item)}
+      onLongPress={() => onDelete(item)}
       className="mx-4 mb-2.5 min-h-[80px] flex-row items-center rounded-3xl px-4 py-3 active:opacity-80"
       style={frameStyle(unread)}>
       <View>
@@ -192,6 +196,61 @@ export default function NotificationsScreen({ inTab = false }: { inTab?: boolean
     }
   }, [queryClient]);
 
+  const deleting = useRef(false);
+  const hasRead = useMemo(() => (list.data?.pages.flat() ?? []).some(isReadNotification), [list.data]);
+
+  /** Removes rows right away, restores them if the server rejects, and resyncs paging afterwards. */
+  const deleteOptimistically = useCallback(async (
+    shouldRemove: (row: Notification) => boolean,
+    request: () => Promise<unknown>,
+    failureTitle: string,
+  ) => {
+    if (deleting.current) return;
+    deleting.current = true;
+    try {
+      await queryClient.cancelQueries({ queryKey: notificationsKey });
+      await queryClient.cancelQueries({ queryKey: unreadKey });
+      const previousList = queryClient.getQueryData<InfiniteData<Notification[]>>(notificationsKey);
+      const previousUnread = queryClient.getQueryData<{ count: number }>(unreadKey);
+      const removedUnread = (previousList?.pages.flat() ?? []).filter((row) => shouldRemove(row) && !row.readAt).length;
+      queryClient.setQueryData<InfiniteData<Notification[]>>(notificationsKey, (data) => removeNotifications(data, shouldRemove));
+      if (removedUnread > 0) queryClient.setQueryData<{ count: number }>(unreadKey, (data) => data && ({ count: Math.max(0, data.count - removedUnread) }));
+      try {
+        await request();
+        haptics.tap();
+      } catch (error) {
+        // 404 means it is already gone on the server, which is the state the user asked for.
+        if (!(error instanceof ApiError && error.status === 404)) {
+          queryClient.setQueryData(notificationsKey, previousList);
+          queryClient.setQueryData(unreadKey, previousUnread);
+          haptics.error();
+          Alert.alert(failureTitle, error instanceof Error ? error.message : 'Vui lòng thử lại.');
+        }
+      } finally {
+        // Pages shrink after a delete, so reload them to keep cursor paging correct.
+        void queryClient.invalidateQueries({ queryKey: notificationsKey }, { cancelRefetch: false });
+        void queryClient.invalidateQueries({ queryKey: unreadKey }, { cancelRefetch: false });
+      }
+    } finally {
+      deleting.current = false;
+    }
+  }, [queryClient]);
+
+  const confirmDelete = useCallback((item: Notification) => {
+    haptics.tap();
+    Alert.alert('Xóa thông báo?', 'Thông báo này sẽ bị xóa khỏi hộp thư của bạn.', [
+      { text: 'Hủy', style: 'cancel' },
+      { text: 'Xóa', style: 'destructive', onPress: () => void deleteOptimistically((row) => row.id === item.id, () => communityApi.deleteNotification(item.id), 'Không thể xóa thông báo') },
+    ]);
+  }, [deleteOptimistically]);
+
+  const confirmDeleteRead = useCallback(() => {
+    Alert.alert('Xóa thông báo đã đọc?', 'Tất cả thông báo đã đọc sẽ bị xóa. Thông báo chưa đọc được giữ lại.', [
+      { text: 'Hủy', style: 'cancel' },
+      { text: 'Xóa', style: 'destructive', onPress: () => void deleteOptimistically(isReadNotification, () => communityApi.deleteReadNotifications(), 'Không thể xóa thông báo đã đọc') },
+    ]);
+  }, [deleteOptimistically]);
+
   const openNotification = useCallback((item: Notification) => {
     if (!item.readAt) {
       // Reflect the read state immediately and mark read in the background; navigation never waits on it.
@@ -257,6 +316,11 @@ export default function NotificationsScreen({ inTab = false }: { inTab?: boolean
           <CheckCheck size={22} color={colors.accentDeep} />
         </IconAction>
       ) : null}
+      {hasRead ? (
+        <IconAction label="Xóa thông báo đã đọc" onPress={confirmDeleteRead}>
+          <Trash2 size={22} color={colors.ink} />
+        </IconAction>
+      ) : null}
       <IconAction label="Tuỳ chọn thông báo" onPress={() => router.push('/community/notification-preferences' as never)}>
         <Settings size={22} color={colors.ink} />
       </IconAction>
@@ -299,7 +363,7 @@ export default function NotificationsScreen({ inTab = false }: { inTab?: boolean
         onScroll={handleTabBarScroll}
         scrollEventThrottle={16}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <NotificationRow item={item} onOpen={openNotification} />}
+        renderItem={({ item }) => <NotificationRow item={item} onOpen={openNotification} onDelete={confirmDelete} />}
         renderSectionHeader={({ section }) => (
           <Text weight="black" className="bg-canvas px-5 pb-2 pt-3 text-lg text-ink">{section.title}</Text>
         )}

@@ -1,4 +1,3 @@
-import { GoogleSignin, isErrorWithCode, isSuccessResponse, statusCodes } from '@react-native-google-signin/google-signin';
 import { useState } from 'react';
 import { Platform, View } from 'react-native';
 
@@ -18,23 +17,44 @@ const GOOGLE_ERRORS: Record<string, string> = {
   GOOGLE_SIGNIN_UNAVAILABLE: 'Đăng nhập Google tạm chưa sẵn sàng. Vui lòng thử lại sau.',
 };
 
+type GoogleSigninModule = typeof import('@react-native-google-signin/google-signin');
+
+const EXPO_GO_MESSAGE = 'Đăng nhập Google cần bản dev build của ứng dụng, không chạy trong Expo Go. Hãy dùng email và mật khẩu.';
+
+let googleModule: GoogleSigninModule | null | undefined;
+
+/**
+ * The library has a native module that Expo Go does not ship, so importing it at the top of the
+ * file would crash the whole app on launch. Load it on first use and treat a failure as "unavailable".
+ */
+function loadGoogleSignin(): GoogleSigninModule | null {
+  if (googleModule !== undefined) return googleModule;
+  try {
+    googleModule = require('@react-native-google-signin/google-signin') as GoogleSigninModule;
+  } catch {
+    googleModule = null;
+  }
+  return googleModule;
+}
+
 let configured = false;
 
-function configureGoogle() {
+function configureGoogle(google: GoogleSigninModule) {
   if (configured || !GOOGLE_WEB_CLIENT_ID) return;
-  GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID });
+  google.GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID });
   configured = true;
 }
 
 /** Clears the cached Google account so the next sign-in shows the account chooser. */
 export async function signOutGoogle() {
   if (Platform.OS === 'web' || !configured) return;
-  await GoogleSignin.signOut().catch(() => undefined);
+  await loadGoogleSignin()?.GoogleSignin.signOut().catch(() => undefined);
 }
 
-function describe(error: unknown): string | null {
+function describe(error: unknown, google: GoogleSigninModule | null): string | null {
   if (error instanceof ApiError) return (error.code && GOOGLE_ERRORS[error.code]) || error.message;
-  if (isErrorWithCode(error)) {
+  if (google?.isErrorWithCode(error)) {
+    const { statusCodes } = google;
     if (error.code === statusCodes.SIGN_IN_CANCELLED || error.code === statusCodes.IN_PROGRESS) return null;
     if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) return 'Thiết bị chưa có Google Play Services.';
   }
@@ -51,17 +71,22 @@ export function GoogleSignInButton() {
   const onPress = async () => {
     if (!available || loading) return;
     setError(null);
+    const google = loadGoogleSignin();
+    if (!google) {
+      setError(EXPO_GO_MESSAGE);
+      return;
+    }
     setLoading(true);
     try {
-      configureGoogle();
-      await GoogleSignin.hasPlayServices();
-      const response = await GoogleSignin.signIn();
-      if (!isSuccessResponse(response)) return;
+      configureGoogle(google);
+      await google.GoogleSignin.hasPlayServices();
+      const response = await google.GoogleSignin.signIn();
+      if (!google.isSuccessResponse(response)) return;
       const idToken = response.data.idToken;
       if (!idToken) throw new Error('Missing Google ID token');
       await signInWithGoogle(idToken);
     } catch (cause) {
-      const message = describe(cause);
+      const message = describe(cause, google);
       if (message) {
         haptics.error();
         setError(message);

@@ -109,13 +109,20 @@ async function parse<T>(response: Response): Promise<T> {
 
   if (!response.ok) {
     const body = (data ?? {}) as ErrorBody;
-    const fallback = response.status === 503 ? 'Dịch vụ tạm chưa sẵn sàng. Kiểm tra backend rồi thử lại.' : FALLBACK_ERROR_MESSAGE;
-    throw new ApiError(response.status, body.message || body.detail || fallback, body.details, {
-      code: body.code,
-      retryAfterSeconds: readRetryAfter(response.headers.get('Retry-After')),
-    });
+    const retryAfterSeconds = readRetryAfter(response.headers.get('Retry-After'));
+    // The gateway's rate-limit body is English; show a Vietnamese message instead.
+    const message = response.status === 429
+      ? rateLimitMessage(retryAfterSeconds)
+      : body.message || body.detail || (response.status === 503 ? 'Dịch vụ tạm chưa sẵn sàng. Kiểm tra backend rồi thử lại.' : FALLBACK_ERROR_MESSAGE);
+    throw new ApiError(response.status, message, body.details, { code: body.code, retryAfterSeconds });
   }
   return data as T;
+}
+
+function rateLimitMessage(retryAfterSeconds?: number): string {
+  return retryAfterSeconds
+    ? `Bạn thao tác quá nhanh. Vui lòng thử lại sau ${retryAfterSeconds} giây.`
+    : 'Bạn thao tác quá nhanh. Vui lòng thử lại sau ít giây.';
 }
 
 function readRetryAfter(value: string | null): number | undefined {
@@ -151,6 +158,16 @@ async function refreshTokens(): Promise<SessionTokens | null> {
   }
 }
 
+/**
+ * A 401 that carries an error code rejects something the user typed (e.g. CURRENT_PASSWORD_INVALID
+ * on password change), not the session. Token failures from the gateway and services have no code.
+ * Treating those as session expiry would refresh, fail again and sign the user out.
+ */
+async function isBusinessRejection(response: Response): Promise<boolean> {
+  const body = safeJson(await response.clone().text().catch(() => '')) as ErrorBody | null;
+  return Boolean(body?.code || body?.details?.code);
+}
+
 // Refresh tokens rotate, so concurrent 401s must share a single refresh call.
 function refreshOnce() {
   refreshInFlight ??= refreshTokens().finally(() => {
@@ -169,7 +186,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   }
 
   const response = await send(path, options, tokens.accessToken);
-  if (response.status !== 401) return parse<T>(response);
+  if (response.status !== 401 || await isBusinessRejection(response)) return parse<T>(response);
 
   const latest = await tokenStorage.load();
   const refreshed = latest && latest.accessToken !== tokens.accessToken ? latest : await refreshOnce();
@@ -178,7 +195,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     throw new ApiError(401, 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.');
   }
   const retry = await send(path, options, refreshed.accessToken);
-  if (retry.status === 401) {
+  if (retry.status === 401 && !await isBusinessRejection(retry)) {
     // A freshly issued token was rejected too: the session cannot be recovered.
     await tokenStorage.clear();
     sessionExpiredListener?.();
