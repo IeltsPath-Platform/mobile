@@ -83,11 +83,9 @@ export default function PracticeScreen() {
         ) : undefined
       }
     >
-      <Text accessibilityRole="header" className="text-[28px] text-ink" weight="black">
+      <Text accessibilityRole="header" className="mb-5 text-[28px] text-ink" weight="black">
         Luyện tập
       </Text>
-      <Text className="mb-5 mt-1 text-sm text-muted">Chơi một ván ngắn để nhớ từ lâu hơn.</Text>
-
 
       {!canFetch ? (
         <Card className="mb-4 border-b-0 bg-surface p-5">
