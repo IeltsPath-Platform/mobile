@@ -1,12 +1,11 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { Bookmark } from 'lucide-react-native';
 import { useCallback, useMemo } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, View } from 'react-native';
 
 import { BackHeader } from '@/src/components/navigation/back-header';
 import { Button } from '@/src/components/ui/button';
-import { FormAlert } from '@/src/components/ui/form-alert';
+import { EmptyState } from '@/src/components/ui/empty-state';
 import { Skeleton } from '@/src/components/ui/skeleton';
 import { Text } from '@/src/components/ui/text';
 import { useCurrentUser } from '@/src/features/auth/auth-provider';
@@ -43,19 +42,22 @@ export default function BookmarkedScreen() {
     );
   } else if (query.isError) {
     empty = (
-      <View className="px-4 pt-6">
-        <FormAlert tone="error" message={query.error instanceof Error ? query.error.message : 'Không tải được bài viết đã lưu.'} />
-        <View className="mt-3"><Button label="Thử lại" onPress={() => void query.refetch()} /></View>
-      </View>
+      <EmptyState
+        framed={false}
+        mood="oops"
+        title="Ối, chưa tải được bài đã lưu"
+        message={query.error instanceof Error ? query.error.message : 'Hãy kiểm tra kết nối rồi thử lại.'}
+        action={<Button label="Thử lại" onPress={() => void query.refetch()} />}
+      />
     );
   } else {
     empty = (
-      <View className="items-center px-8 pt-20">
-        <View className="h-16 w-16 items-center justify-center rounded-full" style={{ backgroundColor: colors.accentSoft }}><Bookmark size={28} color={colors.accent} /></View>
-        <Text weight="extrabold" className="mt-4 text-center text-lg">Chưa lưu bài nào</Text>
-        <Text className="mt-2 text-center text-sm leading-5 text-muted">Chạm biểu tượng dấu trang dưới mỗi bài để giữ lại đọc sau.</Text>
-        <View className="mt-5 self-stretch"><Button variant="secondary" label="Về bảng tin" onPress={() => router.replace('/(tabs)/community' as never)} /></View>
-      </View>
+      <EmptyState
+        framed={false}
+        title="Chưa lưu bài nào"
+        message="Chạm biểu tượng dấu trang dưới mỗi bài để giữ lại đọc sau."
+        action={<Button variant="secondary" label="Về bảng tin" onPress={() => router.replace('/(tabs)/community' as never)} />}
+      />
     );
   }
 

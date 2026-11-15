@@ -1,4 +1,4 @@
-import { Bell, BookOpenCheck, House, Layers, UserRound, Users } from 'lucide-react-native';
+import { Bell, BookOpenCheck, Gamepad2, House, UserRound, Users } from 'lucide-react-native';
 import { Animated, Pressable, View } from 'react-native';
 import { useEffect, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,8 +12,8 @@ import { useNotifyTabReselect, useTabBarControls } from './tab-reselect-context'
 const tabs = {
   index: { label: 'Hôm nay', Icon: House },
   flashcards: { label: 'Thẻ từ', Icon: BookOpenCheck },
+  practice: { label: 'Trò chơi', Icon: Gamepad2 },
   community: { label: 'Cộng đồng', Icon: Users },
-  practice: { label: 'Luyện', Icon: Layers },
   notifications: { label: 'Thông báo', Icon: Bell },
   account: { label: 'Hồ sơ', Icon: UserRound },
 };

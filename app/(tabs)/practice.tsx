@@ -84,7 +84,7 @@ export default function PracticeScreen() {
       }
     >
       <Text accessibilityRole="header" className="mb-5 text-[28px] text-ink" weight="black">
-        Luyện tập
+        Trò chơi
       </Text>
 
       {!canFetch ? (

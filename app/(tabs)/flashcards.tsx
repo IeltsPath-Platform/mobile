@@ -14,6 +14,7 @@ import {
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
 import { Button } from '@/src/components/ui/button';
+import { OwlMascot } from '@/src/components/ui/owl-mascot';
 import { Text } from '@/src/components/ui/text';
 import { DictionaryLookup } from '@/src/features/flashcards/components/dictionary-lookup';
 import {
@@ -326,7 +327,7 @@ export default function FlashcardsScreen() {
         ListEmptyComponent={
           enabled && active.isSuccess ? (
             <View className="items-center gap-3 rounded-3xl p-6" style={{ borderWidth: 2, borderBottomWidth: 4, borderColor: colors.line, borderBottomColor: colors.edge, backgroundColor: colors.surface }}>
-              <Image source={require('@/assets/images/owl/nav-owl-stand.webp')} contentFit="contain" style={{ width: 96, height: 96 }} accessibilityIgnoresInvertColors />
+              <OwlMascot size={104} />
               <Text weight="black" className="text-lg">
                 {tab === 'decks'
                   ? 'Tạo bộ thẻ đầu tiên'

@@ -23,8 +23,8 @@ export default function TabLayout() {
         }}>
         <Tabs.Screen name="index" options={{ title: 'Hôm nay' }} />
         <Tabs.Screen name="flashcards" options={{ title: 'Flashcards' }} />
+        <Tabs.Screen name="practice" options={{ title: 'Trò chơi' }} />
         <Tabs.Screen name="community" options={{ title: 'Cộng đồng', sceneStyle: { backgroundColor: colors.canvas, paddingTop: 0 } }} />
-        <Tabs.Screen name="practice" options={{ title: 'Luyện' }} />
         <Tabs.Screen name="notifications" options={{ title: 'Thông báo' }} />
         <Tabs.Screen name="account" options={{ title: 'Hồ sơ' }} />
       </Tabs>

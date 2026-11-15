@@ -7,7 +7,6 @@ import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo } from 'react';
 import {
-  BookOpenCheck,
   MoreVertical,
   Plus,
   RotateCcw,
@@ -23,6 +22,7 @@ import {
 } from 'react-native';
 import { BackHeader } from '@/src/components/navigation/back-header';
 import { Button } from '@/src/components/ui/button';
+import { OwlMascot } from '@/src/components/ui/owl-mascot';
 import { Card } from '@/src/components/ui/card';
 import { Text } from '@/src/components/ui/text';
 import { haptics } from '@/src/lib/haptics';
@@ -209,7 +209,7 @@ export default function DeckDetailScreen() {
         }
         ListEmptyComponent={
           <Card className="items-center border-b-0 bg-surface px-5 py-7">
-            <BookOpenCheck size={28} color={colors.accent} />
+            <OwlMascot size={96} />
             <Text className="mt-3" weight="bold">
               Bộ này chưa có thẻ
             </Text>

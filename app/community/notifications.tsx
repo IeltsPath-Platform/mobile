@@ -1,6 +1,5 @@
 import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Image } from 'expo-image';
 import { AtSign, CheckCheck, CornerDownRight, Heart, MessageCircle, Settings, Trash2, UserPlus, type LucideIcon } from 'lucide-react-native';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, SectionList, View } from 'react-native';
@@ -8,6 +7,7 @@ import { ActivityIndicator, Alert, Pressable, RefreshControl, SectionList, View 
 import { BackHeader } from '@/src/components/navigation/back-header';
 import { useTabBarScrollHandler } from '@/src/components/navigation/tab-reselect-context';
 import { Button } from '@/src/components/ui/button';
+import { EmptyState } from '@/src/components/ui/empty-state';
 import { Skeleton } from '@/src/components/ui/skeleton';
 import { Text } from '@/src/components/ui/text';
 import { communityApi, notificationHasNext, type Notification } from '@/src/features/community/api';
@@ -289,23 +289,22 @@ export default function NotificationsScreen({ inTab = false }: { inTab?: boolean
     );
   } else if (list.isError) {
     empty = (
-      <View className="items-center px-6 pt-10">
-        <Text weight="black" className="text-lg">Không tải được thông báo</Text>
-        <Text className="mt-1 text-center text-sm text-muted">{list.error instanceof Error ? list.error.message : 'Hãy kiểm tra kết nối rồi thử lại.'}</Text>
-        <Button className="mt-4 w-full" label="Thử lại" onPress={() => void refresh()} />
-      </View>
+      <EmptyState
+        framed={false}
+        mood="oops"
+        title="Ối, chưa tải được thông báo"
+        message={list.error instanceof Error ? list.error.message : 'Hãy kiểm tra kết nối rồi thử lại.'}
+        action={<Button label="Thử lại" onPress={() => void refresh()} />}
+      />
     );
   } else {
     empty = (
-      <View className="items-center px-8 pt-12">
-        <Image source={require('@/assets/images/owl/nav-owl-stand.webp')} contentFit="contain" style={{ width: 120, height: 120 }} accessibilityIgnoresInvertColors />
-        <Text weight="black" className="mt-3 text-center text-xl">
-          {filter === 'unread' ? 'Bạn đã đọc hết rồi' : 'Chưa có thông báo'}
-        </Text>
-        <Text className="mt-2 text-center text-base leading-6 text-muted">
-          {filter === 'unread' ? 'Không còn thông báo nào chưa đọc.' : 'Khi ai đó thích, bình luận hoặc theo dõi bạn, bạn sẽ thấy ở đây.'}
-        </Text>
-      </View>
+      <EmptyState
+        framed={false}
+        mood={filter === 'unread' ? 'cheer' : 'wave'}
+        title={filter === 'unread' ? 'Bạn đã đọc hết rồi!' : 'Chưa có thông báo'}
+        message={filter === 'unread' ? 'Không còn thông báo nào chưa đọc.' : 'Khi ai đó thích, bình luận hoặc theo dõi bạn, bạn sẽ thấy ở đây.'}
+      />
     );
   }
 

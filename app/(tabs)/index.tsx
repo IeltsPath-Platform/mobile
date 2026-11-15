@@ -136,6 +136,7 @@ export default function HomeScreen() {
             </View>
           ) : hasError ? (
             <EmptyState
+              mood="oops"
               title="Chưa tải được chủ đề từ vựng"
               message="Kiểm tra kết nối máy chủ rồi thử lại."
               action={<Button variant="secondary" label="Thử lại" onPress={refreshAll} />}

@@ -1,14 +1,15 @@
 import { keepPreviousData, useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Image as CachedImage } from 'expo-image';
-import { PenLine, Search, Users, X } from 'lucide-react-native';
+import { PenLine, Search, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, TextInput, View, type FlatList as NativeFlatList, type LayoutChangeEvent, type ListViewToken } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { interpolate, runOnJS, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 
 import { Button } from '@/src/components/ui/button';
-import { FormAlert } from '@/src/components/ui/form-alert';
+import { EmptyState as SharedEmptyState } from '@/src/components/ui/empty-state';
+import type { OwlMood } from '@/src/components/ui/owl-mascot';
 import { Skeleton } from '@/src/components/ui/skeleton';
 import { Text } from '@/src/components/ui/text';
 import { useAuth, useCurrentUser } from '@/src/features/auth/auth-provider';
@@ -227,7 +228,6 @@ export default function CommunityScreen() {
       ? <FeedSkeleton />
       : (
         <EmptyState
-          icon={<Users size={30} color={colors.accent} />}
           title="Học cùng người khác sẽ vui hơn"
           body="Đăng nhập để hỏi đáp, chia sẻ bài Writing và tìm bạn luyện Speaking."
           action={<Button label="Đăng nhập" onPress={() => router.push('/(auth)/login' as never)} />}
@@ -237,17 +237,18 @@ export default function CommunityScreen() {
     empty = <FeedSkeleton />;
   } else if (feed.isError) {
     empty = (
-      <View className="px-4 pt-6">
-        <FormAlert tone="error" message={feed.error instanceof Error ? feed.error.message : 'Không tải được bảng tin.'} />
-        <View className="mt-3"><Button label="Thử lại" onPress={() => void feed.refetch()} /></View>
-      </View>
+      <EmptyState
+        mood="oops"
+        title="Ối, chưa tải được bảng tin"
+        body={feed.error instanceof Error ? feed.error.message : 'Hãy kiểm tra kết nối rồi thử lại.'}
+        action={<Button label="Thử lại" onPress={() => void feed.refetch()} />}
+      />
     );
   } else if (query) {
-    empty = <EmptyState icon={<Search size={28} color={colors.accent} />} title="Không thấy kết quả" body={`Chưa có bài nào khớp với “${query}”. Thử từ khóa ngắn hơn nhé.`} />;
+    empty = <EmptyState title="Không thấy kết quả" body={`Chưa có bài nào khớp với “${query}”. Thử từ khóa ngắn hơn nhé.`} />;
   } else if (scope === 'FOLLOWING') {
     empty = (
       <EmptyState
-        icon={<Users size={30} color={colors.accent} />}
         title="Chưa có bài từ người bạn theo dõi"
         body="Theo dõi vài người học giỏi để bài của họ hiện ở đây."
         action={<Button variant="secondary" label="Khám phá bài viết" onPress={() => setScope('ALL')} />}
@@ -256,7 +257,6 @@ export default function CommunityScreen() {
   } else {
     empty = (
       <EmptyState
-        icon={<PenLine size={28} color={colors.accent} />}
         title="Chưa có bài viết nào"
         body="Hãy là người đầu tiên chia sẻ điều bạn đang học."
         action={<Button label="Viết bài đầu tiên" onPress={compose} />}
@@ -372,15 +372,8 @@ function Chip({ label, active, onPress, accent = colors.accentDeep, tint = color
   );
 }
 
-function EmptyState({ title, body, action }: { icon?: React.ReactNode; title: string; body: string; action?: React.ReactNode }) {
-  return (
-    <View className="items-center px-8 pt-10">
-      <CachedImage source={require('@/assets/images/owl/nav-owl-stand.webp')} contentFit="contain" style={{ width: 120, height: 120 }} accessibilityIgnoresInvertColors />
-      <Text weight="extrabold" className="mt-4 text-center text-lg">{title}</Text>
-      <Text className="mt-2 text-center text-sm leading-5 text-muted">{body}</Text>
-      {action ? <View className="mt-5 self-stretch">{action}</View> : null}
-    </View>
-  );
+function EmptyState({ title, body, action, mood = 'wave' }: { title: string; body: string; action?: React.ReactNode; mood?: OwlMood }) {
+  return <SharedEmptyState framed={false} mood={mood} title={title} message={body} action={action} />;
 }
 
 function FeedSkeleton() {

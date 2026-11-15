@@ -6,6 +6,7 @@ import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, View } f
 
 import { BackHeader } from '@/src/components/navigation/back-header';
 import { Button } from '@/src/components/ui/button';
+import { EmptyState } from '@/src/components/ui/empty-state';
 import { Text } from '@/src/components/ui/text';
 import { useCurrentUser } from '@/src/features/auth/auth-provider';
 import { communityApi, type CommunityPost, type CursorPage, type PublicProfile } from '@/src/features/community/api';
@@ -176,9 +177,9 @@ export default function PublicProfileScreen() {
 
   let empty: React.ReactElement;
   if (list.isPending) empty = <ActivityIndicator className="py-10" color={colors.accent} />;
-  else if (list.isError) empty = <View className="px-4 pt-6"><Text weight="bold">Không tải được danh sách.</Text><View className="mt-3"><Button label="Thử lại" onPress={() => void list.refetch()} /></View></View>;
-  else if (tab === 'posts' && own) empty = <View className="items-center px-8 pt-12"><Text className="text-center text-sm text-muted">Bạn chưa đăng bài nào. Chia sẻ điều bạn đang học nhé.</Text><View className="mt-4"><Button label="Viết bài đầu tiên" onPress={() => router.push('/community/composer' as never)} /></View></View>;
-  else empty = <Text className="px-8 pt-12 text-center text-sm text-muted">{tab === 'posts' ? 'Người này chưa đăng bài nào.' : 'Chưa có ai ở đây.'}</Text>;
+  else if (list.isError) empty = <EmptyState framed={false} mood="oops" title="Ối, chưa tải được danh sách" message="Hãy kiểm tra kết nối rồi thử lại." action={<Button label="Thử lại" onPress={() => void list.refetch()} />} />;
+  else if (tab === 'posts' && own) empty = <EmptyState framed={false} title="Bạn chưa đăng bài nào" message="Chia sẻ điều bạn đang học nhé." action={<Button label="Viết bài đầu tiên" onPress={() => router.push('/community/composer' as never)} />} />;
+  else empty = <EmptyState framed={false} title={tab === 'posts' ? 'Người này chưa đăng bài nào' : 'Chưa có ai ở đây'} />;
 
   return (
     <View className="flex-1 bg-canvas">
