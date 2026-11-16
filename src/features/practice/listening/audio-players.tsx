@@ -1,0 +1,191 @@
+import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { Headphones, Pause, Play, RotateCcw, RotateCw, Volume1, Volume2, VolumeX } from 'lucide-react-native';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { ActivityIndicator, PanResponder, Pressable, View, type LayoutChangeEvent } from 'react-native';
+
+import { Text } from '@/src/components/ui/text';
+import { colors } from '@/src/theme';
+
+import { formatClock } from '../model/clock';
+
+const RATES = [0.75, 1, 1.25, 1.5] as const;
+const VOLUMES = [1, 0.75, 0.5, 0.25] as const;
+
+/** Plays through the silent switch and keeps playing with the screen locked, like a media app. */
+export function usePlaybackAudioMode() {
+  useEffect(() => {
+    void setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true, interruptionMode: 'doNotMix', allowsRecording: false }).catch(() => undefined);
+  }, []);
+}
+
+/**
+ * The practice player of one section: play/pause, jump 5 s, a seek bar to drag or tap, speed and volume.
+ * Reports `onPlayingChange` so study time counts while audio plays.
+ */
+export function PracticePlayer({ src, durationHint, onPlayingChange, compact = false, label }: { src: string; durationHint: number | null; onPlayingChange?: (playing: boolean) => void; compact?: boolean; label?: string }) {
+  usePlaybackAudioMode();
+  const player = useAudioPlayer(src, { updateInterval: 250 });
+  const status = useAudioPlayerStatus(player);
+  const [rateIndex, setRateIndex] = useState(1);
+  const [volumeIndex, setVolumeIndex] = useState(0);
+  const duration = status.duration || durationHint || 0;
+
+  useEffect(() => { onPlayingChange?.(status.playing); }, [status.playing, onPlayingChange]);
+  useEffect(() => () => { onPlayingChange?.(false); }, [onPlayingChange]);
+  useEffect(() => { player.volume = VOLUMES[volumeIndex]; }, [player, volumeIndex]);
+  useEffect(() => { player.shouldCorrectPitch = true; player.setPlaybackRate(RATES[rateIndex]); }, [player, rateIndex]);
+  useEffect(() => { if (status.didJustFinish) void player.seekTo(0); }, [status.didJustFinish, player]);
+
+  const toggle = () => { if (status.playing) player.pause(); else player.play(); };
+  const seek = (seconds: number) => { void player.seekTo(Math.max(0, Math.min(duration || seconds, seconds))); };
+  const VolumeIcon = volumeIndex === 0 ? Volume2 : volumeIndex === VOLUMES.length - 1 ? VolumeX : Volume1;
+
+  if (status.error) return <PlayerCard><Text className="text-sm text-danger">Không phát được bài nghe. Kiểm tra mạng rồi mở lại.</Text></PlayerCard>;
+
+  return (
+    <PlayerCard compact={compact}>
+      <View className="flex-row items-center gap-3">
+        <View className="h-10 w-10 items-center justify-center rounded-2xl" style={{ backgroundColor: `${tint()}1f` }}>
+          <Headphones size={20} color={tint()} />
+        </View>
+        <View className="min-w-0 flex-1">
+          <Text weight="black" numberOfLines={1} className="text-sm text-ink">{label ?? 'Bài nghe'}</Text>
+          <Text weight="bold" className="text-xs text-muted" style={{ fontVariant: ['tabular-nums'] }}>{formatClock(status.currentTime)} / {formatClock(duration)}</Text>
+        </View>
+        <Pressable onPress={() => setVolumeIndex((index) => (index + 1) % VOLUMES.length)} accessibilityRole="button" accessibilityLabel={`Âm lượng ${Math.round(VOLUMES[volumeIndex] * 100)}%`} className="h-9 w-9 items-center justify-center rounded-full bg-canvas active:opacity-70">
+          <VolumeIcon size={18} color={colors.ink} />
+        </Pressable>
+        <Pressable onPress={() => setRateIndex((index) => (index + 1) % RATES.length)} accessibilityRole="button" accessibilityLabel={`Tốc độ ${RATES[rateIndex]}x, chạm để đổi`} className="h-9 min-w-[52px] items-center justify-center rounded-full px-2 active:opacity-70" style={{ backgroundColor: RATES[rateIndex] === 1 ? colors.canvas : tint() }}>
+          <Text weight="black" className="text-xs" style={{ color: RATES[rateIndex] === 1 ? colors.ink : '#ffffff' }}>{RATES[rateIndex]}x</Text>
+        </Pressable>
+      </View>
+      <View className="mt-2"><SeekBar current={status.currentTime} duration={duration} onSeek={seek} /></View>
+      <View className="mt-1 flex-row items-center justify-center gap-6">
+        <Pressable onPress={() => seek(status.currentTime - 5)} accessibilityRole="button" accessibilityLabel="Tua lại 5 giây" hitSlop={6} className="h-11 w-11 items-center justify-center rounded-full active:opacity-60">
+          <RotateCcw size={24} color={colors.ink} />
+          <Text weight="black" style={{ position: 'absolute', fontSize: 8, color: colors.ink }}>5</Text>
+        </Pressable>
+        <Pressable onPress={toggle} accessibilityRole="button" accessibilityLabel={status.playing ? 'Tạm dừng' : 'Phát'} className="h-14 w-14 items-center justify-center rounded-full active:opacity-80" style={{ backgroundColor: tint(), borderBottomWidth: 3, borderBottomColor: 'rgba(0,0,0,0.25)' }}>
+          {status.isBuffering && !status.isLoaded ? <ActivityIndicator color="#ffffff" /> : status.playing ? <Pause size={24} color="#ffffff" fill="#ffffff" /> : <Play size={24} color="#ffffff" fill="#ffffff" style={{ marginLeft: 3 }} />}
+        </Pressable>
+        <Pressable onPress={() => seek(status.currentTime + 5)} accessibilityRole="button" accessibilityLabel="Tua tới 5 giây" hitSlop={6} className="h-11 w-11 items-center justify-center rounded-full active:opacity-60">
+          <RotateCw size={24} color={colors.ink} />
+          <Text weight="black" style={{ position: 'absolute', fontSize: 8, color: colors.ink }}>5</Text>
+        </Pressable>
+      </View>
+    </PlayerCard>
+  );
+}
+
+const tint = () => colors.skill.listening;
+
+/** The floating card that holds a player, between the header and the questions. */
+function PlayerCard({ children, compact = false }: { children: ReactNode; compact?: boolean }) {
+  return (
+    <View className={compact ? 'px-2 pb-2 pt-1' : 'px-3 pb-2 pt-3'}>
+      <View className="rounded-3xl bg-surface px-4 py-3" style={{ borderWidth: 1.5, borderBottomWidth: 3.5, borderColor: colors.line, borderBottomColor: colors.edge }}>
+        {children}
+      </View>
+    </View>
+  );
+}
+
+/** A seek bar that seeks on tap and follows the finger while dragging. */
+function SeekBar({ current, duration, onSeek }: { current: number; duration: number; onSeek: (seconds: number) => void }) {
+  const width = useRef(1);
+  const [dragging, setDragging] = useState<number | null>(null);
+  const ratioAt = (x: number) => Math.max(0, Math.min(1, x / width.current));
+  const responder = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: (event) => setDragging(ratioAt(event.nativeEvent.locationX)),
+    onPanResponderMove: (event) => setDragging(ratioAt(event.nativeEvent.locationX)),
+    onPanResponderRelease: (event) => { const ratio = ratioAt(event.nativeEvent.locationX); setDragging(null); seekRef.current(ratio); },
+    onPanResponderTerminate: () => setDragging(null),
+  })).current;
+  const seekRef = useRef((ratio: number) => onSeek(ratio * duration));
+  seekRef.current = (ratio: number) => onSeek(ratio * duration);
+  const ratio = dragging ?? (duration > 0 ? Math.min(1, current / duration) : 0);
+  return (
+    <View
+      {...responder.panHandlers}
+      onLayout={(event: LayoutChangeEvent) => { width.current = Math.max(1, event.nativeEvent.layout.width); }}
+      accessibilityRole="adjustable"
+      accessibilityLabel="Tiến độ bài nghe"
+      accessibilityValue={{ min: 0, max: Math.round(duration), now: Math.round(current), text: `${formatClock(current)} trên ${formatClock(duration)}` }}
+      accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+      onAccessibilityAction={(event) => onSeek(current + (event.nativeEvent.actionName === 'increment' ? 10 : -10))}
+      style={{ height: 28, justifyContent: 'center' }}>
+      <View style={{ height: 6, borderRadius: 3, backgroundColor: colors.line, overflow: 'hidden' }}>
+        <View style={{ width: `${ratio * 100}%`, height: 6, backgroundColor: colors.skill.listening }} />
+      </View>
+      <View pointerEvents="none" style={{ position: 'absolute', left: `${ratio * 100}%`, marginLeft: -9, width: 18, height: 18, borderRadius: 9, backgroundColor: '#ffffff', borderWidth: 3, borderColor: colors.skill.listening }} />
+    </View>
+  );
+}
+
+type ExamPhase = 'starting' | 'playing' | 'blocked' | 'done' | 'failed';
+const PHASE_LABEL: Record<ExamPhase, string> = {
+  starting: 'Đang chuẩn bị bài nghe…',
+  playing: 'Đang phát · chỉ nghe một lần',
+  blocked: 'Chạm để bắt đầu bài nghe',
+  done: 'Đã nghe xong phần này',
+  failed: 'Không phát được bài nghe',
+};
+
+/**
+ * The exam recording of one part, as in the real test: it starts by itself, plays once and has no controls. A part
+ * heard before (even in an earlier session) does not play again. If the system refuses to start, one button starts it.
+ */
+export function ExamPlayer({ src, alreadyPlayed, onStarted, onEnded, onPlayingChange, label }: { src: string; alreadyPlayed: boolean; onStarted: () => void; onEnded: () => void; onPlayingChange?: (playing: boolean) => void; label?: string }) {
+  usePlaybackAudioMode();
+  const [wasPlayed] = useState(alreadyPlayed);
+  const player = useAudioPlayer(wasPlayed ? null : src, { updateInterval: 500 });
+  const status = useAudioPlayerStatus(player);
+  const [phase, setPhase] = useState<ExamPhase>(wasPlayed ? 'done' : 'starting');
+  const started = useRef(false);
+  const ended = useRef(false);
+
+  useEffect(() => {
+    if (wasPlayed) return;
+    player.play();
+    const timer = setTimeout(() => { if (!started.current) setPhase('blocked'); }, 4000);
+    return () => { clearTimeout(timer); try { player.pause(); } catch { /* released */ } };
+  }, [player, wasPlayed]);
+
+  useEffect(() => {
+    onPlayingChange?.(status.playing);
+    if (status.playing && !started.current) { started.current = true; setPhase('playing'); onStarted(); }
+  }, [status.playing, onStarted, onPlayingChange]);
+  useEffect(() => {
+    if (status.didJustFinish && !ended.current) { ended.current = true; setPhase('done'); onPlayingChange?.(false); onEnded(); }
+  }, [status.didJustFinish, onEnded, onPlayingChange]);
+  useEffect(() => { if (status.error) setPhase('failed'); }, [status.error]);
+
+  const progress = status.duration > 0 ? Math.min(1, status.currentTime / status.duration) : 0;
+  const live = phase === 'playing';
+  return (
+    <PlayerCard>
+      <View accessibilityRole="text" accessibilityLiveRegion="polite" className="flex-row items-center gap-3">
+        <View className="h-10 w-10 items-center justify-center rounded-2xl" style={{ backgroundColor: live ? colors.dangerSoft : `${tint()}1f` }}>
+          {live ? <View className="h-3 w-3 rounded-full" style={{ backgroundColor: colors.danger }} /> : <Headphones size={20} color={tint()} />}
+        </View>
+        <View className="min-w-0 flex-1">
+          <Text weight="black" className="text-sm text-ink" numberOfLines={1}>{PHASE_LABEL[phase]}</Text>
+          <Text className="text-xs text-muted" numberOfLines={1}>{live ? `${formatClock(status.currentTime)} / ${formatClock(status.duration)} · không tua, không dừng` : label ?? 'Bài nghe thi thật'}</Text>
+        </View>
+        {phase === 'blocked' ? (
+          <Pressable onPress={() => player.play()} accessibilityRole="button" className="min-h-10 flex-row items-center gap-1.5 rounded-full px-4" style={{ backgroundColor: tint() }}>
+            <Play size={14} color="#ffffff" fill="#ffffff" />
+            <Text weight="black" style={{ color: '#ffffff' }}>Bắt đầu</Text>
+          </Pressable>
+        ) : null}
+      </View>
+      {live ? (
+        <View className="mt-3" style={{ height: 6, borderRadius: 3, backgroundColor: colors.line, overflow: 'hidden' }}>
+          <View style={{ width: `${progress * 100}%`, height: 6, borderRadius: 3, backgroundColor: tint() }} />
+        </View>
+      ) : null}
+    </PlayerCard>
+  );
+}

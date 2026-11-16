@@ -60,7 +60,7 @@
       [
         "expo-audio",
         {
-          "microphonePermission": false
+          "microphonePermission": "Cho phép IELTSPath dùng micro để ghi âm câu trả lời Speaking."
         }
       ],
       "expo-image"

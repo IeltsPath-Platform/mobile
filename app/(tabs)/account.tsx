@@ -46,7 +46,7 @@ import {
 } from '@/src/features/settings/components/settings-rows';
 import { clearAppSettingsStorage, useAppSettings } from '@/src/features/settings/use-app-settings';
 import { vocabApi } from '@/src/features/vocab/api';
-import { studyKeys, vocabularyStudyApi } from '@/src/features/vocab/study-api';
+import { learningProgressKeys, useLearningProgress } from '@/src/features/progress/learning-progress-api';
 import { haptics } from '@/src/lib/haptics';
 import { colors } from '@/src/theme';
 import { useTabBarScrollHandler, useTabReselect } from '@/src/components/navigation/tab-reselect-context';
@@ -89,13 +89,8 @@ export default function AccountScreen() {
     staleTime: 60_000,
   });
 
-  const studySummary = useQuery({
-    queryKey: studyKeys.summary,
-    queryFn: ({ signal }) => vocabularyStudyApi.summary(signal),
-    enabled: signedIn,
-    staleTime: 30_000,
-    retry: 1,
-  });
+  // Streak and XP of the learning service, as on the web profile; practice tests feed them on the server.
+  const { streak: learningStreak, progress: learningXp } = useLearningProgress();
   const unread = useUnread();
   const { settings, setDailyXpGoal } = useAppSettings();
 
@@ -114,7 +109,7 @@ export default function AccountScreen() {
         profileQueryKeys.learner,
         ['community', 'relationship', user?.id],
         ['vocab', 'achievements'],
-        studyKeys.summary,
+        learningProgressKeys.all,
         ['community', 'unread'],
       ] as const,
     [user?.id],
@@ -157,7 +152,8 @@ export default function AccountScreen() {
         learnerQuery.refetch(),
         relationshipsQuery.refetch(),
         achievementsQuery.refetch(),
-        studySummary.refetch(),
+        learningStreak.refetch(),
+        learningXp.refetch(),
         unread.refetch(),
       ]);
     } finally {
@@ -222,18 +218,19 @@ export default function AccountScreen() {
   const displayName = learnerQuery.data?.displayName || user?.fullName || 'Học viên';
   const avatarReference = learnerQuery.data?.avatarReference;
   const band = learnerQuery.data?.selfReportedBand != null ? `Band ${learnerQuery.data.selfReportedBand}` : null;
-  const streakDays = studySummary.data?.streak.currentDays ?? (studySummary.isPending ? '…' : '—');
-  const totalXp = studySummary.data?.xp.totalXp ?? (studySummary.isPending ? '…' : '—');
+  const streakDays = learningStreak.data?.currentDays ?? (learningStreak.isPending ? '…' : '—');
+  const totalXp = learningXp.data?.totalXp ?? (learningXp.isPending ? '…' : '—');
   const followersCount = relationshipsQuery.data?.followerCount ?? (relationshipsQuery.isPending ? '…' : '—');
   const achievementItems = achievementsQuery.data?.items;
   const completedAchievements = achievementItems?.filter((item) => item.achieved).length ?? 0;
   const hasSummaryError =
-    learnerQuery.isError || relationshipsQuery.isError || achievementsQuery.isError || studySummary.isError;
+    learnerQuery.isError || relationshipsQuery.isError || achievementsQuery.isError || learningStreak.isError || learningXp.isError;
   const retrySummary = () => {
     if (learnerQuery.isError) void learnerQuery.refetch();
     if (relationshipsQuery.isError) void relationshipsQuery.refetch();
     if (achievementsQuery.isError) void achievementsQuery.refetch();
-    if (studySummary.isError) void studySummary.refetch();
+    if (learningStreak.isError) void learningStreak.refetch();
+    if (learningXp.isError) void learningXp.refetch();
   };
 
   return (

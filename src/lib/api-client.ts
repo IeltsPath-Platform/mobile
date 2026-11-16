@@ -16,12 +16,14 @@ export class ApiError extends Error {
   readonly code?: string;
   /** Seconds from the Retry-After header of a 429, when the server sent one. */
   readonly retryAfterSeconds?: number;
+  /** The parsed error body, for callers that read fields beyond message, code and details. */
+  readonly body?: unknown;
 
   constructor(
     status: number,
     message: string,
     details?: Record<string, string> | null,
-    extras?: { code?: string; retryAfterSeconds?: number },
+    extras?: { code?: string; retryAfterSeconds?: number; body?: unknown },
   ) {
     super(message);
     this.name = 'ApiError';
@@ -29,6 +31,7 @@ export class ApiError extends Error {
     this.details = details ?? {};
     this.code = extras?.code ?? details?.code;
     this.retryAfterSeconds = extras?.retryAfterSeconds;
+    this.body = extras?.body;
   }
 
   get isNetworkError() {
@@ -114,7 +117,7 @@ async function parse<T>(response: Response): Promise<T> {
     const message = response.status === 429
       ? rateLimitMessage(retryAfterSeconds)
       : body.message || body.detail || (response.status === 503 ? 'Dịch vụ tạm chưa sẵn sàng. Kiểm tra backend rồi thử lại.' : FALLBACK_ERROR_MESSAGE);
-    throw new ApiError(response.status, message, body.details, { code: body.code, retryAfterSeconds });
+    throw new ApiError(response.status, message, body.details, { code: body.code, retryAfterSeconds, body: data });
   }
   return data as T;
 }

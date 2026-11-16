@@ -21,7 +21,7 @@ export default function TabLayout() {
           tabBarHideOnKeyboard: true,
           tabBarStyle: { position: 'absolute', backgroundColor: 'transparent', borderTopWidth: 0, elevation: 0 },
         }}>
-        <Tabs.Screen name="index" options={{ title: 'Hôm nay' }} />
+        <Tabs.Screen name="index" options={{ title: 'Hôm nay', sceneStyle: { backgroundColor: colors.canvas, paddingTop: 0 } }} />
         <Tabs.Screen name="flashcards" options={{ title: 'Flashcards' }} />
         <Tabs.Screen name="practice" options={{ title: 'Trò chơi' }} />
         <Tabs.Screen name="community" options={{ title: 'Cộng đồng', sceneStyle: { backgroundColor: colors.canvas, paddingTop: 0 } }} />
