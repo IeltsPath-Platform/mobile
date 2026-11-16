@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Platform, View } from 'react-native';
+import { NativeModules, Platform, TurboModuleRegistry, View } from 'react-native';
 
 import { Button } from '@/src/components/ui/button';
 import { FormAlert } from '@/src/components/ui/form-alert';
@@ -19,16 +19,21 @@ const GOOGLE_ERRORS: Record<string, string> = {
 
 type GoogleSigninModule = typeof import('@react-native-google-signin/google-signin');
 
-const EXPO_GO_MESSAGE = 'Đăng nhập Google cần bản dev build của ứng dụng, không chạy trong Expo Go. Hãy dùng email và mật khẩu.';
+const EXPO_GO_MESSAGE = 'Bản ứng dụng này chưa hỗ trợ đăng nhập Google (Expo Go hoặc bản cài cũ). Hãy cài bản dev build mới nhất, hoặc dùng email và mật khẩu.';
 
 let googleModule: GoogleSigninModule | null | undefined;
 
 /**
- * The library has a native module that Expo Go does not ship, so importing it at the top of the
- * file would crash the whole app on launch. Load it on first use and treat a failure as "unavailable".
+ * The library has a native module that Expo Go (and builds made before it was added) do not ship,
+ * so importing it at the top of the file would crash the whole app on launch. Check the binary for
+ * the module first (requiring the JS would raise a red-box invariant) and treat absence as "unavailable".
  */
 function loadGoogleSignin(): GoogleSigninModule | null {
   if (googleModule !== undefined) return googleModule;
+  if (!TurboModuleRegistry.get('RNGoogleSignin') && !NativeModules.RNGoogleSignin) {
+    googleModule = null;
+    return googleModule;
+  }
   try {
     googleModule = require('@react-native-google-signin/google-signin') as GoogleSigninModule;
   } catch {

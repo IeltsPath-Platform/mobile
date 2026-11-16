@@ -8,6 +8,7 @@ import { haptics } from '@/src/lib/haptics';
 import { colors } from '@/src/theme';
 import { useTheme } from '@/src/theme/app-theme';
 import { useNotifyTabReselect, useTabBarControls } from './tab-reselect-context';
+import { UnreadTabBadge } from './unread-tab-badge';
 
 const tabs = {
   index: { label: 'Hôm nay', Icon: House },
@@ -103,22 +104,26 @@ export function ColorfulTabBar({ state, emitter, navigateToTab }: BottomTabBarPr
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}>
-                {/* Radius must be exactly half the size: Android draws a square when it is larger. */}
-                <View
-                  style={{
-                    width: 52,
-                    height: 52,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderRadius: 26,
-                    overflow: 'hidden',
-                    backgroundColor: focused ? (isDark ? '#41474c' : '#e9edf1') : 'transparent',
-                  }}>
-                  <Icon
-                    size={25}
-                    color={focused ? colors.ink : colors.muted}
-                    strokeWidth={focused ? 2.6 : 2.1}
-                  />
+                {/* The badge sits outside the clipped circle so it can overlap its edge. */}
+                <View style={{ width: 52, height: 52 }}>
+                  {/* Radius must be exactly half the size: Android draws a square when it is larger. */}
+                  <View
+                    style={{
+                      width: 52,
+                      height: 52,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: 26,
+                      overflow: 'hidden',
+                      backgroundColor: focused ? (isDark ? '#41474c' : '#e9edf1') : 'transparent',
+                    }}>
+                    <Icon
+                      size={25}
+                      color={focused ? colors.ink : colors.muted}
+                      strokeWidth={focused ? 2.6 : 2.1}
+                    />
+                  </View>
+                  {route.name === 'notifications' ? <UnreadTabBadge borderColor={isDark ? '#25292d' : '#ffffff'} /> : null}
                 </View>
               </Pressable>
             );

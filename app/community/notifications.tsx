@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { AtSign, CheckCheck, CornerDownRight, Heart, MessageCircle, Settings, Trash2, UserPlus, type LucideIcon } from 'lucide-react-native';
+import { AtSign, Bell, CheckCheck, CornerDownRight, Heart, MessageCircle, Settings, Trash2, UserPlus, type LucideIcon } from 'lucide-react-native';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, SectionList, View } from 'react-native';
 
@@ -36,6 +36,20 @@ const eventLabels: Record<string, string> = {
 function eventLabel(type: string) {
   return eventLabels[type] ?? 'đã tương tác với bạn trong cộng đồng';
 }
+
+/** Notifications sent by the system (grading, Premium, results) have no person behind them; same wording as the web app. */
+const systemTexts: Record<string, string> = {
+  'assessment.grading-completed.v1': 'Giáo viên đã chấm xong bài của bạn. Xem nhận xét trên trang web IELTSPath.',
+  'assessment.grading-overdue.v1': 'Giáo viên chưa chấm bài của bạn. Bạn có thể chờ tiếp hoặc đổi giáo viên trên trang web.',
+  'assessment.grading-requested.v1': 'Có bài mới chờ bạn chấm (hạn 48 giờ).',
+  'assessment.grading-due-soon.v1': 'Có bài sắp quá hạn chấm (còn khoảng 12 giờ). Hãy ưu tiên chấm.',
+  'assessment.result-ready.v1': 'Kết quả bài thi của bạn đã sẵn sàng.',
+  'access.subscription-granted.v1': 'Bạn đã được nâng cấp Premium.',
+  'access.subscription-expiry-notice.v1': 'Gói Premium của bạn sắp hết hạn hoặc đã hết hạn.',
+};
+
+const isSystemNotification = (type: string) => !type.startsWith('community.');
+const systemText = (type: string) => systemTexts[type] ?? 'Bạn có thông báo mới.';
 
 /** Icon + tint for the small badge on each avatar, so the event type reads before the text does. */
 function eventBadge(type: string): { Icon: LucideIcon; color: string } {
@@ -80,10 +94,11 @@ function groupByDay(items: Notification[]): Section[] {
 }
 
 const NotificationRow = memo(function NotificationRow({ item, onOpen, onDelete }: { item: Notification; onOpen: (item: Notification) => void; onDelete: (item: Notification) => void }) {
+  const system = isSystemNotification(item.eventType);
   const actorQuery = useQuery({
     queryKey: ['community', 'profile', item.actorId],
     queryFn: () => communityApi.profile(item.actorId),
-    enabled: !item.actor && Boolean(item.actorId),
+    enabled: !system && !item.actor && Boolean(item.actorId),
     staleTime: 5 * 60_000,
     retry: false,
   });
@@ -92,29 +107,40 @@ const NotificationRow = memo(function NotificationRow({ item, onOpen, onDelete }
   const { Icon, color } = eventBadge(item.eventType);
   const name = actor?.displayName ?? 'Thành viên';
   const label = eventLabel(item.eventType);
+  const spoken = system ? systemText(item.eventType) : `${name} ${label}`;
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${unread ? 'Chưa đọc. ' : ''}${name} ${label}`}
+      accessibilityLabel={`${unread ? 'Chưa đọc. ' : ''}${spoken}`}
       accessibilityHint="Nhấn giữ để xóa thông báo"
       onPress={() => onOpen(item)}
       onLongPress={() => onDelete(item)}
       className="mx-4 mb-2.5 min-h-[80px] flex-row items-center rounded-3xl px-4 py-3 active:opacity-80"
       style={frameStyle(unread)}>
-      <View>
-        <CommunityAvatar uri={actor?.avatarUrl} name={actor?.displayName} size={48} />
-        <View
-          className="absolute -bottom-1 -right-1 h-6 w-6 items-center justify-center rounded-full"
-          style={{ backgroundColor: colors.surface, borderWidth: 2, borderColor: unread ? colors.accentSoft : colors.surface }}>
-          <Icon size={12} color={color} fill={item.eventType === 'community.post-reacted.v1' ? color : 'transparent'} />
+      {system ? (
+        <View className="h-12 w-12 items-center justify-center rounded-full" style={{ backgroundColor: colors.accentSoft }}>
+          <Bell size={22} color={colors.accentDeep} />
         </View>
-      </View>
+      ) : (
+        <View>
+          <CommunityAvatar uri={actor?.avatarUrl} name={actor?.displayName} size={48} />
+          <View
+            className="absolute -bottom-1 -right-1 h-6 w-6 items-center justify-center rounded-full"
+            style={{ backgroundColor: colors.surface, borderWidth: 2, borderColor: unread ? colors.accentSoft : colors.surface }}>
+            <Icon size={12} color={color} fill={item.eventType === 'community.post-reacted.v1' ? color : 'transparent'} />
+          </View>
+        </View>
+      )}
       <View className="ml-3.5 flex-1">
-        <Text className="text-base leading-[22px]" numberOfLines={3}>
-          <Text weight="black">{name}</Text>
-          <Text className="text-ink"> {label}.</Text>
-        </Text>
+        {system ? (
+          <Text className="text-base leading-[22px] text-ink" numberOfLines={3}>{systemText(item.eventType)}</Text>
+        ) : (
+          <Text className="text-base leading-[22px]" numberOfLines={3}>
+            <Text weight="black">{name}</Text>
+            <Text className="text-ink"> {label}.</Text>
+          </Text>
+        )}
         <Text weight="bold" className="mt-1 text-xs" style={{ color: unread ? colors.accentDeep : colors.muted }}>{timeAgo(item.createdAt)}</Text>
       </View>
       {unread ? <View className="ml-3 h-3 w-3 rounded-full" style={{ backgroundColor: colors.accent }} /> : null}
@@ -270,6 +296,8 @@ export default function NotificationsScreen({ inTab = false }: { inTab?: boolean
         }
       })();
     }
+    // System notices have no screen in the app yet; opening one only marks it read.
+    if (isSystemNotification(item.eventType)) return;
     if (item.eventType === 'community.user-followed.v1') router.push(`/community/users/${item.actorId}` as never);
     else if (item.postId) router.push({ pathname: '/community/[postId]', params: { postId: item.postId, commentId: item.commentId ?? '' } } as never);
     else Alert.alert('Nội dung không còn khả dụng', 'Thông báo đã được đánh dấu là đã đọc.');

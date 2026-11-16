@@ -15,7 +15,7 @@ Lệnh chạy stack khi có mail: `docker compose --profile dev-mail up -d`.
 
 ## Còn lại
 
-- **Đăng nhập Google:** cần tạo OAuth Web Client và Android Client (SHA-1) trên Google Cloud, khai báo `GOOGLE_CLIENT_IDS` (backend) và `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` (mobile), rồi chạy bằng bản dev build. Hiện tại server trả 503 `GOOGLE_SIGNIN_UNAVAILABLE`, không còn trả 500.
+- **Đăng nhập Google:** OAuth Web Client và Android Client (SHA-1) đã tạo xong trên Firebase `ieltspathh`; mobile đã cấu hình. BE đặt `GOOGLE_CLIENT_IDS=109903045641-efeued50dg6tjrv8phdodbvtak1f5gqr.apps.googleusercontent.com,109903045641-vl7bptq8jln1iegbpqsja6cqfufjvris.apps.googleusercontent.com` trong `backend/.env` (Web Client ID và Android Client ID, không phải bí mật), rồi khởi động lại user-service. Phải có cả Android Client ID vì token Google lấy trên Android mang `azp` là Android Client ID, mà bộ xác minh yêu cầu `azp` nằm trong danh sách; thiếu thì `/auth/google` trả 401 "Google ID token is invalid".
 - **Mã lỗi `code` cố định** cho từng lỗi nghiệp vụ của community và game (`POST_NOT_FOUND`, `ROOM_FULL`…): chưa làm. Mobile hiện vẫn chạy được nhờ dựa vào HTTP status.
 - **Phòng SOLO tự sẵn sàng:** chưa làm. Mobile đã tự gọi đủ hai bước sẵn sàng và bắt đầu.
 - **Mục tiêu XP mỗi ngày:** cần nhóm sản phẩm quyết định.

@@ -3,11 +3,14 @@ import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Switch, View } from 'react-native';
 import { BackHeader } from '@/src/components/navigation/back-header';
 import { Text } from '@/src/components/ui/text';
+import { useCurrentUser } from '@/src/features/auth/auth-provider';
 import { communityApi } from '@/src/features/community/api';
 import { colors } from '@/src/theme';
 import { useTheme } from '@/src/theme/app-theme';
 
-const PREFERENCE_COPY: Record<string, { title: string; detail: string; group: 'activity' | 'connections' | 'other' }> = {
+type PreferenceGroup = 'activity' | 'connections' | 'learning' | 'premium' | 'examiner' | 'other';
+
+const PREFERENCE_COPY: Record<string, { title: string; detail: string; group: PreferenceGroup }> = {
   'community.post-commented.v1': {
     title: 'Bình luận bài viết',
     detail: 'Khi có người bình luận bài viết bạn đăng.',
@@ -33,28 +36,71 @@ const PREFERENCE_COPY: Record<string, { title: string; detail: string; group: 'a
     detail: 'Khi có người mới bắt đầu theo dõi bạn.',
     group: 'connections',
   },
+  'assessment.grading-completed.v1': {
+    title: 'Đã có kết quả chấm',
+    detail: 'Khi bài viết của bạn được chấm xong.',
+    group: 'learning',
+  },
+  'assessment.result-ready.v1': {
+    title: 'Đã có kết quả bài thi',
+    detail: 'Khi kết quả bài thi của bạn đã sẵn sàng.',
+    group: 'learning',
+  },
+  'access.subscription-granted.v1': {
+    title: 'Đã kích hoạt Premium',
+    detail: 'Khi quyền Premium được cấp cho tài khoản.',
+    group: 'premium',
+  },
+  'access.subscription-expiry-notice.v1': {
+    title: 'Premium sắp hết hạn',
+    detail: 'Nhắc khi quyền Premium sắp hết hạn hoặc đã hết hạn.',
+    group: 'premium',
+  },
+  'assessment.grading-requested.v1': {
+    title: 'Bài viết cần chấm',
+    detail: 'Khi học viên chọn bạn chấm bài.',
+    group: 'examiner',
+  },
+  'assessment.grading-due-soon.v1': {
+    title: 'Sắp đến hạn chấm',
+    detail: 'Nhắc khi bài được giao sắp đến hạn.',
+    group: 'examiner',
+  },
+  'assessment.grading-overdue.v1': {
+    title: 'Bài chấm quá hạn',
+    detail: 'Khi bài viết bạn nhận chấm bị quá hạn.',
+    group: 'examiner',
+  },
 };
 
+// Unknown types fall back to the raw event type so new ones stay distinguishable instead of repeating one label.
 const preferenceCopy = (type: string) =>
-  PREFERENCE_COPY[type] ?? {
-    title: 'Hoạt động cộng đồng khác',
-    detail: 'Thông báo về hoạt động khác trong cộng đồng.',
-    group: 'other' as const,
-  };
+  PREFERENCE_COPY[type] ?? { title: type, detail: 'Loại thông báo khác.', group: 'other' as const };
+
+const SECTIONS: { key: PreferenceGroup; title: string }[] = [
+  { key: 'activity', title: 'BÀI VIẾT & BÌNH LUẬN' },
+  { key: 'connections', title: 'NGƯỜI THEO DÕI' },
+  { key: 'learning', title: 'HỌC TẬP' },
+  { key: 'premium', title: 'TÀI KHOẢN PREMIUM' },
+  { key: 'examiner', title: 'GIÁM KHẢO' },
+  { key: 'other', title: 'KHÁC' },
+];
 
 export default function NotificationPreferencesScreen() {
   useTheme();
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: ['community', 'notification-preferences'], queryFn: communityApi.preferences });
+  const user = useCurrentUser();
+  // The server lists every type for every account; grading-queue reminders only concern examiners.
+  const isExaminer = user.data?.roles.some((role) => role.name === 'EXAMINER') ?? false;
   const [busy, setBusy] = useState<string>();
-  const sections = [
-    { key: 'activity', title: 'BÀI VIẾT & BÌNH LUẬN' },
-    { key: 'connections', title: 'NGƯỜI THEO DÕI' },
-    { key: 'other', title: 'HOẠT ĐỘNG KHÁC' },
-  ].map((section) => ({
-    ...section,
-    items: (query.data ?? []).filter((item) => preferenceCopy(item.eventType).group === section.key),
-  })).filter((section) => section.items.length > 0);
+  const sections = SECTIONS
+    .filter((section) => section.key !== 'examiner' || isExaminer)
+    .map((section) => ({
+      ...section,
+      items: (query.data ?? []).filter((item) => preferenceCopy(item.eventType).group === section.key),
+    }))
+    .filter((section) => section.items.length > 0);
 
   const update = async (eventType: string, enabled: boolean) => {
     setBusy(eventType);
