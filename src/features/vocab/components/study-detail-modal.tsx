@@ -23,6 +23,12 @@ export function StudyDetailModal({ visible, onClose }: { visible: boolean; onClo
     enabled: visible,
     staleTime: 20_000,
   });
+  const wallet = useQuery({
+    queryKey: studyKeys.wallet,
+    queryFn: ({ signal }) => vocabularyStudyApi.wallet(signal),
+    enabled: visible,
+    staleTime: 20_000,
+  });
 
   const [selection, setConfirmation] = useState<{ kind: PurchaseKind; cost: number } | null>(null);
   const pending = useQuery<StudyPurchase | null>({
@@ -50,6 +56,7 @@ export function StudyDetailModal({ visible, onClose }: { visible: boolean; onClo
     try {
       const result = await purchaseStudyBenefit(client, confirmation);
       if (result) {
+        client.setQueryData(studyKeys.wallet, { balance: result.balance });
         setNotice(`Đã hoàn tất. Còn ${result.balance} Points.`);
         setConfirmation(null);
       }
@@ -105,6 +112,28 @@ export function StudyDetailModal({ visible, onClose }: { visible: boolean; onClo
 
           {data ? (
             <>
+              {/* Points wallet that pays for refills and streak freezes */}
+              <View
+                className="flex-row items-center justify-between rounded-3xl border border-line bg-surface p-4"
+                accessible
+                accessibilityLabel={wallet.data ? `Ví điểm: ${wallet.data.balance} Points` : 'Ví điểm chưa tải được'}>
+                <View className="flex-row items-center gap-2">
+                  <View className="h-9 w-9 items-center justify-center rounded-xl" style={{ backgroundColor: colors.warmSoft }}>
+                    <Coins size={20} color={colors.coin} />
+                  </View>
+                  <Text weight="black" className="text-base text-ink">Ví điểm</Text>
+                </View>
+                {wallet.isPending ? (
+                  <ActivityIndicator color={colors.accent} />
+                ) : wallet.data ? (
+                  <Text weight="black" className="text-base text-ink">{wallet.data.balance.toLocaleString('vi-VN')} Points</Text>
+                ) : (
+                  <Pressable onPress={() => void wallet.refetch()} accessibilityRole="button" className="py-1">
+                    <Text weight="bold" className="text-sm text-accent">Tải lại</Text>
+                  </Pressable>
+                )}
+              </View>
+
               {/* Level and XP card */}
               <View className="gap-2.5 rounded-3xl border border-line bg-surface p-4">
                 <View className="flex-row items-center justify-between">

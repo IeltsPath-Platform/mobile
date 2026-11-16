@@ -8,6 +8,7 @@ export const studyKeys = {
   all: ['vocabulary-study'] as const,
   summary: ['vocabulary-study', 'summary'] as const,
   purchase: ['vocabulary-study', 'purchase'] as const,
+  wallet: ['access', 'points'] as const,
   unitLists: ['vocabulary-study', 'units'] as const,
   progress: ['vocabulary-study', 'progress'] as const,
   units: (topicId: string) => ['vocabulary-study', 'units', topicId] as const,
@@ -28,5 +29,7 @@ export const vocabularyStudyApi = {
   summary: (signal?: AbortSignal) => apiRequest<StudySummary>(`${base}/me/summary`, { auth: true, signal }),
   settings: (timezone: string) => apiRequest<{ timezone: string }>(`${base}/me/settings`, { method: 'PUT', body: { timezone }, auth: true }),
   refill: (requestId: string) => apiRequest<RefillResult>(`${base}/me/hearts/refill`, { method: 'POST', body: { requestId }, auth: true }),
+  /** Points wallet kept by access-service; hearts refills and streak freezes are paid from it. */
+  wallet: (signal?: AbortSignal) => apiRequest<{ balance: number }>('/api/access/me/points', { auth: true, signal }),
   freeze: (requestId: string) => apiRequest<FreezeResult>(`${base}/me/streak/freeze`, { method: 'POST', body: { requestId }, auth: true }),
 };
