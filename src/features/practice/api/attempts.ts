@@ -35,11 +35,6 @@ export interface ReadingTestPage {
   items: ReadingTestCard[]
 }
 
-export interface ReadingTestSource {
-  code: string
-  name: string
-}
-
 export interface ReadingProgress {
   /** `submissionId` is the graded answer to open; only Speaking and Writing name it. */
   completed: Array<{ packageId: string; partNo: number | null; submissionId?: string }>
@@ -152,10 +147,6 @@ export function searchReadingTests(input: ReadingSearchInput, signal?: AbortSign
   })
 }
 
-export function getReadingSources(signal?: AbortSignal) {
-  return apiRequest<ReadingTestSource[]>('/api/content/practice-tests/sources', { auth: true, signal })
-}
-
 export function getReadingProgress(scope: ReadingScope, signal?: AbortSignal, skill: PracticeSkill = 'READING') {
   return apiRequest<ReadingProgress>(`/api/assessments/practice/progress?skill=${skill}&scope=${scope}`, { auth: true, signal })
 }
@@ -199,10 +190,6 @@ export function startAttemptSection(attemptId: string, sectionId: string) {
   return apiRequest<void>(`/api/assessments/attempts/${attemptId}/sections/${sectionId}/start`, { method: 'POST', auth: true })
 }
 
-export function completeAttemptSection(attemptId: string, sectionId: string) {
-  return apiRequest<void>(`/api/assessments/attempts/${attemptId}/sections/${sectionId}/complete`, { method: 'POST', auth: true })
-}
-
 export function saveAttemptAnswer(attemptId: string, itemId: string, answer: string, expectedRevision: number) {
   return apiRequest<AttemptResponse>(`/api/assessments/attempts/${attemptId}/items/${itemId}/response`, {
     method: 'PUT', auth: true,
@@ -230,10 +217,6 @@ export function getPracticeHistory(skill: PracticeSkill, page: number, size: num
   return apiRequest<{ totalElements: number; page: number; size: number; items: ReadingHistoryItem[] }>(
     `/api/assessments/practice/history?skill=${skill}&page=${page}&size=${size}`, { auth: true, signal },
   )
-}
-
-export function getReadingHistory(page: number, signal?: AbortSignal) {
-  return getPracticeHistory('READING', page, 10, signal)
 }
 
 const HISTORY_PAGE_SIZE = 50

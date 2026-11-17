@@ -1,5 +1,5 @@
 // Ported from frontend/src/features/learning-path/components/essayCriteria.ts (the helpers the Writing result uses).
-import type { EssayJudgment, EssayStudyPoint } from './types';
+import type { EssayStudyPoint } from './types';
 
 export const CRITERION_NAME: Record<string, string> = {
   TA: 'Task Achievement',
@@ -7,12 +7,6 @@ export const CRITERION_NAME: Record<string, string> = {
   CC: 'Coherence & Cohesion',
   LR: 'Lexical Resource',
   GRA: 'Grammar Range & Accuracy',
-};
-
-export const JUDGMENT_LABEL: Record<EssayJudgment, string> = {
-  PASS: 'Đạt',
-  FAIL: 'Cần luyện',
-  NOT_ASSESSED: 'Chưa đủ bằng chứng',
 };
 
 /** Which rubric criteria an AI focus title is about, by the words the grader's model tends to use. */

@@ -7,6 +7,7 @@ import { Text } from '@/src/components/ui/text';
 import { colors } from '@/src/theme';
 
 import { formatClock } from '../model/clock';
+import { skillInk } from '../model/skill-meta';
 
 const RATES = [0.75, 1, 1.25, 1.5] as const;
 const VOLUMES = [1, 0.75, 0.5, 0.25] as const;
@@ -46,16 +47,16 @@ export function PracticePlayer({ src, durationHint, onPlayingChange, compact = f
     <PlayerCard compact={compact}>
       <View className="flex-row items-center gap-3">
         <View className="h-10 w-10 items-center justify-center rounded-2xl" style={{ backgroundColor: `${tint()}1f` }}>
-          <Headphones size={20} color={tint()} />
+          <Headphones size={20} color={skillInk('listening')} />
         </View>
         <View className="min-w-0 flex-1">
           <Text weight="black" numberOfLines={1} className="text-sm text-ink">{label ?? 'Bài nghe'}</Text>
           <Text weight="bold" className="text-xs text-muted" style={{ fontVariant: ['tabular-nums'] }}>{formatClock(status.currentTime)} / {formatClock(duration)}</Text>
         </View>
-        <Pressable onPress={() => setVolumeIndex((index) => (index + 1) % VOLUMES.length)} accessibilityRole="button" accessibilityLabel={`Âm lượng ${Math.round(VOLUMES[volumeIndex] * 100)}%`} className="h-9 w-9 items-center justify-center rounded-full bg-canvas active:opacity-70">
+        <Pressable onPress={() => setVolumeIndex((index) => (index + 1) % VOLUMES.length)} accessibilityRole="button" accessibilityLabel={`Âm lượng ${Math.round(VOLUMES[volumeIndex] * 100)}%`} hitSlop={6} className="h-9 w-9 items-center justify-center rounded-full bg-canvas active:opacity-70">
           <VolumeIcon size={18} color={colors.ink} />
         </Pressable>
-        <Pressable onPress={() => setRateIndex((index) => (index + 1) % RATES.length)} accessibilityRole="button" accessibilityLabel={`Tốc độ ${RATES[rateIndex]}x, chạm để đổi`} className="h-9 min-w-[52px] items-center justify-center rounded-full px-2 active:opacity-70" style={{ backgroundColor: RATES[rateIndex] === 1 ? colors.canvas : tint() }}>
+        <Pressable onPress={() => setRateIndex((index) => (index + 1) % RATES.length)} accessibilityRole="button" accessibilityLabel={`Tốc độ ${RATES[rateIndex]}x, chạm để đổi`} hitSlop={6} className="h-9 min-w-[52px] items-center justify-center rounded-full px-2 active:opacity-70" style={{ backgroundColor: RATES[rateIndex] === 1 ? colors.canvas : tint() }}>
           <Text weight="black" className="text-xs" style={{ color: RATES[rateIndex] === 1 ? colors.ink : '#ffffff' }}>{RATES[rateIndex]}x</Text>
         </Pressable>
       </View>
@@ -145,6 +146,7 @@ export function ExamPlayer({ src, alreadyPlayed, onStarted, onEnded, onPlayingCh
   const [phase, setPhase] = useState<ExamPhase>(wasPlayed ? 'done' : 'starting');
   const started = useRef(false);
   const ended = useRef(false);
+  useEffect(() => () => { onPlayingChange?.(false); }, [onPlayingChange]);
 
   useEffect(() => {
     if (wasPlayed) return;
@@ -168,14 +170,14 @@ export function ExamPlayer({ src, alreadyPlayed, onStarted, onEnded, onPlayingCh
     <PlayerCard>
       <View accessibilityRole="text" accessibilityLiveRegion="polite" className="flex-row items-center gap-3">
         <View className="h-10 w-10 items-center justify-center rounded-2xl" style={{ backgroundColor: live ? colors.dangerSoft : `${tint()}1f` }}>
-          {live ? <View className="h-3 w-3 rounded-full" style={{ backgroundColor: colors.danger }} /> : <Headphones size={20} color={tint()} />}
+          {live ? <View className="h-3 w-3 rounded-full" style={{ backgroundColor: colors.danger }} /> : <Headphones size={20} color={skillInk('listening')} />}
         </View>
         <View className="min-w-0 flex-1">
           <Text weight="black" className="text-sm text-ink" numberOfLines={1}>{PHASE_LABEL[phase]}</Text>
           <Text className="text-xs text-muted" numberOfLines={1}>{live ? `${formatClock(status.currentTime)} / ${formatClock(status.duration)} · không tua, không dừng` : label ?? 'Bài nghe thi thật'}</Text>
         </View>
         {phase === 'blocked' ? (
-          <Pressable onPress={() => player.play()} accessibilityRole="button" className="min-h-10 flex-row items-center gap-1.5 rounded-full px-4" style={{ backgroundColor: tint() }}>
+          <Pressable onPress={() => player.play()} accessibilityRole="button" accessibilityLabel="Bắt đầu bài nghe" className="min-h-11 flex-row items-center gap-1.5 rounded-full px-4" style={{ backgroundColor: tint() }}>
             <Play size={14} color="#ffffff" fill="#ffffff" />
             <Text weight="black" style={{ color: '#ffffff' }}>Bắt đầu</Text>
           </Pressable>

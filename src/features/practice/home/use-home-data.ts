@@ -1,19 +1,22 @@
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { learningProgressKeys, useLearningProgress } from '@/src/features/progress/learning-progress-api';
 import { profileApi, profileQueryKeys } from '@/src/features/profile/api';
+import { ApiError } from '@/src/lib/api-client';
 
 import { getReadingAttempt } from '../api/attempts';
 import { loadBankHistory, loadFreeHistory } from '../model/history-loaders';
 import type { HistoryRow } from '../model/history-view';
-import { readResume, type ResumeEntry } from '../model/resume-store';
+import { forgetAttempt, readResume, type ResumeEntry } from '../model/resume-store';
 import type { SkillType } from '../model/types';
 
 const LOADERS: Record<SkillType, () => Promise<{ rows: HistoryRow[] }>> = {
-  listening: () => loadBankHistory('LISTENING', 0),
-  reading: () => loadBankHistory('READING', 0),
+  // Only the latest result shows, so one attempt (and one title lookup) is enough; Writing and Speaking keep a page
+  // because their rows also feed the pending-grading list.
+  listening: () => loadBankHistory('LISTENING', 0, 1),
+  reading: () => loadBankHistory('READING', 0, 1),
   writing: () => loadFreeHistory('WRITING', 0),
   speaking: () => loadFreeHistory('SPEAKING', 0),
 };
@@ -46,15 +49,25 @@ export function useHomeData(signedIn: boolean) {
   const latestBySkill = Object.fromEntries(HOME_SKILLS.map((skill, index) => [skill, latest[index]])) as Record<SkillType, (typeof latest)[number]>;
   const pending = [...(latest[2]?.data ?? []), ...(latest[3]?.data ?? [])].filter((row) => row.tone === 'wait').slice(0, 3);
 
+  // A test left in progress that was submitted elsewhere (or expired) is no longer offered on this device.
+  useEffect(() => {
+    const gone = resumeAttempt.error instanceof ApiError && resumeAttempt.error.status === 404;
+    if (resume && (gone || (resumeAttempt.data && resumeAttempt.data.status !== 'IN_PROGRESS'))) void forgetAttempt(resume.attemptId);
+  }, [resume, resumeAttempt.data, resumeAttempt.error]);
+
   const learning = useLearningProgress();
-  // The streak grows on the server shortly after a submission, so coming back to the home reads it again when stale.
+  // The home tab stays mounted, so coming back to it reads again what went stale meanwhile: the streak (it grows on the
+  // server shortly after a submission), the latest results and pending grading, and the test left in progress.
   const client = useQueryClient();
   useFocusEffect(useCallback(() => {
-    if (signedIn) void client.refetchQueries({ queryKey: learningProgressKeys.all, type: 'active', stale: true });
+    if (!signedIn) return;
+    for (const queryKey of [learningProgressKeys.all, ['practice', 'home-latest'], ['practice', 'attempt']]) {
+      void client.refetchQueries({ queryKey, type: 'active', stale: true });
+    }
   }, [signedIn, client]));
 
-  const refresh = () => Promise.all([profile.refetch(), resumeAttempt.refetch(), learning.streak.refetch(), learning.progress.refetch(), ...latest.map((query) => query.refetch())]);
-  const refreshing = profile.isRefetching || learning.streak.isRefetching || latest.some((query) => query.isRefetching);
+  const refresh = () => Promise.all([profile.refetch(), ...(resume ? [resumeAttempt.refetch()] : []), learning.streak.refetch(), learning.progress.refetch(), ...latest.map((query) => query.refetch())]);
+  const refreshing = profile.isRefetching || resumeAttempt.isRefetching || learning.streak.isRefetching || learning.progress.isRefetching || latest.some((query) => query.isRefetching);
 
   return {
     name: profile.data?.displayName?.trim() || null,

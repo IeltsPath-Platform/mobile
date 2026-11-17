@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { averageBand, bandComment, groupErrors, learnerIpa, parseSpeakingResult, summaryLine, weakestCriteria, weakestCriterion } from '@/src/features/practice/model/speaking-result-view'
+import { averageBand, bandComment, groupErrors, learnerIpa, parseSpeakingResult, summaryLine, weakestCriteria } from '@/src/features/practice/model/speaking-result-view'
 
 describe('parseSpeakingResult', () => {
   it('reads a partly filled or wrongly typed result without throwing', () => {
@@ -21,11 +21,11 @@ describe('parseSpeakingResult', () => {
   })
 })
 
-describe('weakestCriterion and averageBand', () => {
+describe('weakestCriteria and averageBand', () => {
   const criteria = parseSpeakingResult({ criteria: [{ code: 'FC', band: 6 }, { code: 'LR', band: 4.5 }, { code: 'GRA', band: 5 }] }).criteria
 
-  it('finds the lowest band', () => expect(weakestCriterion(criteria)?.code).toBe('LR'))
-  it('has no weakest one with a single graded criterion', () => expect(weakestCriterion(criteria.slice(0, 1))).toBeNull())
+  it('finds the lowest band', () => expect(weakestCriteria(criteria).map((item) => item.code)).toEqual(['LR']))
+  it('has no weakest one with a single graded criterion', () => expect(weakestCriteria(criteria.slice(0, 1))).toEqual([]))
   const of = (...bands: number[]) => parseSpeakingResult({
     criteria: bands.map((band, index) => ({ code: ['FC', 'LR', 'GRA', 'PR'][index], band })),
   }).criteria
@@ -36,9 +36,8 @@ describe('weakestCriterion and averageBand', () => {
   })
   it('marks none when every criterion has the same band, so nothing is picked by position', () => {
     expect(weakestCriteria(of(6, 6, 6, 6))).toEqual([])
-    expect(weakestCriterion(of(6, 6, 6, 6))).toBeNull()
   })
-  it('still opens on the first of the weakest ones', () => expect(weakestCriterion(of(6, 5, 5, 7))?.code).toBe('LR'))
+  it('still opens on the first of the weakest ones', () => expect(weakestCriteria(of(6, 5, 5, 7))[0]?.code).toBe('LR'))
 
   it('rounds the mean to the nearest half band, so 5.17 is 5', () => expect(averageBand(criteria)).toBe(5))
   it('rounds below a quarter down: 5.125 is 5, never 5.1', () => expect(averageBand(of(5, 5, 5, 5.5))).toBe(5))

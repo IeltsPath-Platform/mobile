@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Info, Mic, Quote, TrendingUp } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
@@ -8,6 +8,7 @@ import { Button } from '@/src/components/ui/button';
 import { Text } from '@/src/components/ui/text';
 import { ApiError } from '@/src/lib/api-client';
 import { colors } from '@/src/theme';
+import { refreshLearningProgressSoon } from '@/src/features/progress/learning-progress-api';
 
 import { getSpeakingSubmission, settleSpeakingSubmission, type SpeakingSubmission } from '../../api/speaking';
 import { ActivateKeySheet, PremiumPlansSheet } from '../../grading/grading-sheets';
@@ -34,14 +35,16 @@ function useSpeakingResult(submissionId: string) {
   const polls = useRef(0);
   const [short, setShort] = useState(false);
   const [settleError, setSettleError] = useState('');
+  const [retryCount, setRetryCount] = useState(0);
   const settling = useRef(false);
   const query = useQuery({
     queryKey: ['practice', 'speaking-submission', submissionId],
-    queryFn: ({ signal }) => getSpeakingSubmission(submissionId, signal),
+    // Counted per request: refetchInterval is also read on every render, so it must not move the back-off itself.
+    queryFn: ({ signal }) => { polls.current += 1; return getSpeakingSubmission(submissionId, signal); },
     refetchInterval: (state) => {
       const status = state.state.data?.status;
       if (!status || TERMINAL.has(status) || short) return false;
-      return POLL_STEPS_MS[Math.min(polls.current++, POLL_STEPS_MS.length - 1)]!;
+      return POLL_STEPS_MS[Math.min(Math.max(0, polls.current - 1), POLL_STEPS_MS.length - 1)]!;
     },
   });
   const status = query.data?.status;
@@ -56,21 +59,28 @@ function useSpeakingResult(submissionId: string) {
         else setSettleError(cause instanceof Error ? cause.message : 'Chưa hoàn tất được kết quả. Hãy thử lại.');
       })
       .finally(() => { settling.current = false; });
-  }, [status, short, submissionId, refetch]);
-  return { query, short, settleError, retry: () => { setShort(false); setSettleError(''); polls.current = 0; void refetch(); } };
+  }, [status, short, submissionId, refetch, retryCount]);
+  return { query, short, settleError, retry: () => { setShort(false); setSettleError(''); setRetryCount((count) => count + 1); polls.current = 0; void refetch(); } };
 }
 
 export function SpeakingResultScreen({ submissionId }: { submissionId: string }) {
+  const client = useQueryClient();
   const { query, short, settleError, retry } = useSpeakingResult(submissionId);
   const submission: SpeakingSubmission | undefined = query.data;
   const status = submission?.status;
+  useEffect(() => {
+    if (status !== 'GRADED') return;
+    refreshLearningProgressSoon(client);
+    void client.invalidateQueries({ queryKey: ['practice', 'progress'] });
+    void client.invalidateQueries({ queryKey: ['practice', 'catalog'] });
+  }, [client, status]);
   const view = status === 'GRADED' && submission?.result ? parseSpeakingResult(submission.result) : null;
   const working = status !== undefined && WORKING.has(status);
   const error = (query.error?.message ?? '') || settleError;
 
   return (
     <View className="flex-1 bg-canvas">
-      <SkillBand color={colors.skill.speaking} title="Kết quả Speaking" subtitle={view ? 'Đã chấm xong' : 'AI đang chấm bài nói'} onBack={() => router.replace(CATALOG as never)} right={<BandIcon><Mic size={22} color={colors.skill.speaking} /></BandIcon>} />
+      <SkillBand color={colors.skill.speaking} title="Kết quả Speaking" subtitle={view ? 'Đã chấm xong' : query.isPending || working ? 'AI đang chấm bài nói' : 'Bài luyện Speaking'} onBack={() => router.replace(CATALOG as never)} right={<BandIcon><Mic size={22} color={colors.skill.speaking} /></BandIcon>} />
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 14 }}>
         {query.isPending ? <Waiting status={undefined} /> : null}
         {working && !short ? <Waiting status={status} /> : null}
@@ -286,7 +296,7 @@ function Pronunciation({ view }: { view: SpeakingResultView }) {
       {answers.length > 1 ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-3" contentContainerStyle={{ gap: 6 }}>
           {answers.map((entry, position) => (
-            <Pressable key={`${entry.partNo}-${entry.questionNo}`} onPress={() => { setQuestion(position); setPicked(null); }} accessibilityRole="tab" accessibilityState={{ selected: position === question }} className="min-h-9 justify-center rounded-full px-3" style={{ backgroundColor: position === question ? colors.accentSoft : colors.canvas }}>
+            <Pressable key={`${entry.partNo}-${entry.questionNo}`} onPress={() => { setQuestion(position); setPicked(null); }} accessibilityRole="tab" accessibilityState={{ selected: position === question }} className="min-h-11 justify-center rounded-full px-3" style={{ backgroundColor: position === question ? colors.accentSoft : colors.canvas }}>
               <Text weight="bold" className="text-xs" style={{ color: position === question ? colors.accentDeep : colors.muted }}>Part {entry.partNo} · câu {entry.questionNo}</Text>
             </Pressable>
           ))}

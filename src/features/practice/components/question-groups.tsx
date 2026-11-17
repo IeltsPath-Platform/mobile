@@ -1,4 +1,5 @@
 import { Lightbulb } from 'lucide-react-native';
+import { useMemo, useRef } from 'react';
 import { View } from 'react-native';
 
 import { Text } from '@/src/components/ui/text';
@@ -35,13 +36,26 @@ type QuestionGroupsProps = {
 /** The questions of one section grouped like the paper: range title, instructions, then each question. */
 export function QuestionGroups({ section, numberByItem, answers, disabled, flagged, activeId, onChange, onBlur, onFocusItem, onToggleFlag, reviewOf, onItemLayout, showTips, markable, tint = colors.accent }: QuestionGroupsProps) {
   const { paper, text } = useReaderPrefs();
+  const groups = useMemo(() => groupItems(section), [section]);
+  const instructionStyle = useMemo(() => ({ fontSize: text.fontSize - 2, lineHeight: text.lineHeight - 3, color: paper.text }), [text, paper.text]);
+  // onLayout coordinates are relative to the immediate parent, not the ScrollView.
+  const rootY = useRef(0);
+  const groupY = useRef(new Map<string, number>());
+  const matchingY = useRef(new Map<string, number>());
+  const itemY = useRef(new Map<string, { group: string; y: number; matching?: boolean }>());
+  const publishLayout = () => {
+    itemY.current.forEach((item, id) => {
+      const offset = groupY.current.get(item.group);
+      if (offset !== undefined) onItemLayout?.(id, rootY.current + offset + (item.matching ? matchingY.current.get(item.group) ?? 0 : 0) + item.y);
+    });
+  };
   return (
-    <View className="gap-6">
-      {groupItems(section).map((group) => {
+    <View className="gap-6" onLayout={(event) => { rootY.current = event.nativeEvent.layout.y; publishLayout(); }}>
+      {groups.map((group) => {
         const numbers = group.items.map((item) => numberByItem.get(item.id) ?? 0);
         const options = group.formatCode.startsWith('MATCHING') ? sharedOptions(group.items) : null;
         return (
-          <View key={group.key} className="gap-3">
+          <View key={group.key} className="gap-3" onLayout={(event) => { groupY.current.set(group.key, event.nativeEvent.layout.y); publishLayout(); }}>
             <View>
               <View className="flex-row items-center gap-2">
                 <View className="rounded-full px-3 py-1" style={{ backgroundColor: tint }}>
@@ -50,7 +64,7 @@ export function QuestionGroups({ section, numberByItem, answers, disabled, flagg
                 {group.formatCode !== 'OTHER' ? <Text weight="bold" numberOfLines={1} className="flex-1 text-xs text-muted">{practiceFormatLabel(group.formatCode)}</Text> : null}
               </View>
               {group.instructions ? (markable
-                ? <View className="mt-2"><MarkableText block={`g:${group.key}`} text={group.instructions} style={{ fontSize: text.fontSize - 2, lineHeight: text.lineHeight - 3, color: paper.text }} {...markable} /></View>
+                ? <View className="mt-2"><MarkableText block={`g:${group.key}`} text={group.instructions} style={instructionStyle} {...markable} /></View>
                 : <Text className="mt-2" style={{ fontSize: text.fontSize - 2, lineHeight: text.lineHeight - 3, color: paper.text, opacity: 0.85 }}>{group.instructions}</Text>) : null}
               {showTips && group.formatCode !== 'OTHER' ? (
                 <View className="mt-2 flex-row gap-2 rounded-2xl px-3 py-2" style={{ backgroundColor: colors.warmSoft }}>
@@ -60,7 +74,7 @@ export function QuestionGroups({ section, numberByItem, answers, disabled, flagg
               ) : null}
             </View>
             {options ? (
-              <View onLayout={(event) => group.items.forEach((item) => onItemLayout?.(item.id, event.nativeEvent.layout.y))}>
+              <View onLayout={(event) => { matchingY.current.set(group.key, event.nativeEvent.layout.y); publishLayout(); }}>
                 <MatchingGroup
                   rows={group.items.map((item) => ({
                     id: item.id,
@@ -77,10 +91,11 @@ export function QuestionGroups({ section, numberByItem, answers, disabled, flagg
                   onFocusRow={onFocusItem}
                   onToggleFlag={onToggleFlag}
                   tint={tint}
+                  onRowLayout={(itemId, y) => { itemY.current.set(itemId, { group: group.key, y, matching: true }); publishLayout(); }}
                 />
               </View>
             ) : group.items.map((item) => item.question ? (
-              <View key={item.id} onLayout={(event) => onItemLayout?.(item.id, event.nativeEvent.layout.y)}>
+              <View key={item.id} onLayout={(event) => { itemY.current.set(item.id, { group: group.key, y: event.nativeEvent.layout.y }); publishLayout(); }}>
                 <QuestionField
                   question={item.question}
                   number={numberByItem.get(item.id) ?? 0}

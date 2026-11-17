@@ -17,8 +17,8 @@ type StripProps = {
   tint?: string;
 };
 
-const CHIP = 36;
-const GAP = 6;
+const CHIP = 44;
+const GAP = 8;
 
 /** Footer strip: the grid button and the numbers of the current section, scrolled to keep the current one in view. */
 export function QuestionStrip({ questions, currentId, onSelect, onOpenGrid, tint = colors.accent }: StripProps) {

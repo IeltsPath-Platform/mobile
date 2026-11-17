@@ -8,7 +8,8 @@ import { colors } from '@/src/theme';
 
 import type { ReadingAttempt } from '../api/attempts';
 import { ExamHeader, headerIconColor } from '../components/exam-header';
-import { MarkingSheets, SelectionToolbar } from '../components/marking-overlays';
+import { MarkingSheets } from '../components/marking-overlays';
+import { SelectionCallout } from '../components/selection-callout';
 import { QuestionGridSheet, QuestionStrip } from '../components/question-nav';
 import { QuestionGroups } from '../components/question-groups';
 import { ReaderSettingsSheet, useReaderPrefs } from '../components/reader-prefs';
@@ -16,9 +17,11 @@ import { SnapPanel, type SnapPanelHandle } from '../components/snap-panel';
 import { SubmitSheet } from '../components/submit-sheet';
 import { KeyboardShell, SectionTabs, TestFooter, closeTest, useLeaveTestGuard } from '../components/test-shell';
 import { useAnnotations } from '../hooks/use-annotations';
+import { useScrollToItem } from '../hooks/use-scroll-to-item';
 import { useStudySession } from '../hooks/use-study-session';
 import { useTestRunner } from '../hooks/use-test-runner';
 import { useTextMarking } from '../hooks/use-text-marking';
+import { blockOrderOf } from '../model/mark-blocks';
 import { groupItems, type SavedResponse, type TestSection } from '../model/sections';
 import { PassageView } from './passage-view';
 
@@ -49,7 +52,8 @@ export function ReadingScreen({ attemptId, attempt, sections, saved }: { attempt
     if (block.startsWith('g:') && section) return groupItems(section).find((group) => group.key === block.slice(2))?.instructions ?? '';
     return '';
   }, [sections, runner.items, section]);
-  const marking = useTextMarking({ annotations, sectionId: section?.id ?? '', textOf, lookupEnabled });
+  const blockOrder = useMemo(() => blockOrderOf(section), [section]);
+  const marking = useTextMarking({ annotations, sectionId: section?.id ?? '', textOf, blockOrder, lookupEnabled });
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [gridOpen, setGridOpen] = useState(false);
@@ -57,16 +61,11 @@ export function ReadingScreen({ attemptId, attempt, sections, saved }: { attempt
   const [coach, setCoach] = useState(!COACH_KEY_SEEN.current);
   const panel = useRef<SnapPanelHandle>(null);
   const passageScroll = useRef<ScrollViewInstance>(null);
-  const questionScroll = useRef<ScrollViewInstance>(null);
-  const positions = useRef<Record<string, number>>({});
+  const questions = useScrollToItem(8);
   const guardOff = useLeaveTestGuard(!runner.submitting);
 
   const label = (index: number) => `Passage ${sections[index]?.partNo ?? index + 1}`;
   const sectionLabels = sections.map((_, index) => label(index));
-  const progress = useMemo(() => sections.map((_, index) => {
-    const own = runner.navQuestions.filter((question) => question.sectionIndex === index);
-    return { answered: own.filter((question) => question.answered).length, total: own.length };
-  }), [sections, runner.navQuestions]);
   const current = runner.navQuestions.find((question) => question.id === runner.currentId);
 
   const select = (itemId: string) => {
@@ -74,11 +73,12 @@ export function ReadingScreen({ attemptId, attempt, sections, saved }: { attempt
     runner.goTo(itemId);
     if (!sameSection) passageScroll.current?.scrollTo({ y: 0, animated: false });
     panel.current?.snapTo(1);
-    requestAnimationFrame(() => {
-      const y = positions.current[itemId];
-      if (y !== undefined) questionScroll.current?.scrollTo({ y: Math.max(0, y - 8), animated: true });
-    });
+    questions.scrollToItem(itemId, !sameSection);
   };
+
+  // One object for every question, so the memoised question text is not redrawn on each keystroke.
+  const markable = useMemo(() => ({ highlights: annotations.highlights, selection: marking.selection, onWordPress: marking.onWordPress, onWordLongPress: marking.onWordLongPress }),
+    [annotations.highlights, marking.selection, marking.onWordPress, marking.onWordLongPress]);
 
   const focusItem = (itemId: string) => {
     runner.setCurrentId(itemId);
@@ -101,7 +101,7 @@ export function ReadingScreen({ attemptId, attempt, sections, saved }: { attempt
       <ExamHeader
         title={`Reading · ${label(runner.activeIndex)}`}
         subtitle={runner.timed ? 'Thi thật' : 'Luyện tập'}
-        seconds={runner.seconds}
+        readClock={runner.readClock}
         countdown={runner.timed}
         tint={TINT}
         progress={runner.navQuestions.length ? (runner.navQuestions.length - runner.unanswered) / runner.navQuestions.length : 0}
@@ -113,17 +113,17 @@ export function ReadingScreen({ attemptId, attempt, sections, saved }: { attempt
           </Pressable>
         }
       />
-      <SectionTabs labels={sectionLabels} progress={progress} activeIndex={runner.activeIndex} onSelect={(index) => { runner.selectSection(index); passageScroll.current?.scrollTo({ y: 0, animated: false }); }} tint={TINT} />
+      <SectionTabs labels={sectionLabels} progress={runner.sectionProgress} activeIndex={runner.activeIndex} onSelect={(index) => { runner.selectSection(index); passageScroll.current?.scrollTo({ y: 0, animated: false }); }} tint={TINT} />
 
       <KeyboardShell>
         <View className="flex-1">
-          <ScrollView ref={passageScroll} contentContainerStyle={{ padding: 18, paddingBottom: 420 }} onScrollBeginDrag={() => Keyboard.dismiss()}>
+          <ScrollView ref={passageScroll} contentContainerStyle={{ padding: 18, paddingBottom: 420 }} onScrollBeginDrag={() => { Keyboard.dismiss(); marking.hideMenu(); }}>
             {coach ? (
               <View className="mb-5 flex-row gap-3 rounded-3xl p-3.5" style={{ backgroundColor: colors.warmSoft }}>
                 <View className="h-9 w-9 items-center justify-center rounded-xl" style={{ backgroundColor: colors.surface }}><Lightbulb size={18} color={colors.accentWarm} /></View>
                 <View className="flex-1">
                   <Text className="text-[13px] leading-5 text-ink">
-                    <Text weight="bold">Nhấn giữ</Text> một từ rồi chạm từ khác để chọn đoạn, sau đó Highlight hoặc Ghi chú.{lookupEnabled ? ' Chạm một từ để tra nghĩa.' : ''} Kéo bảng câu hỏi lên xuống để đọc song song.
+                    <Text weight="bold">Nhấn giữ</Text> một từ để chọn, rồi chạm từ cuối để chọn cả đoạn và mở menu Highlight, Ghi chú, Dịch.{lookupEnabled ? ' Chạm một từ để tra nghĩa nhanh.' : ''} Chạm vào chữ đã highlight để bỏ cả cụm. Kéo bảng câu hỏi lên xuống để đọc song song.
                   </Text>
                   <Pressable onPress={() => { COACH_KEY_SEEN.current = true; setCoach(false); }} accessibilityRole="button" hitSlop={8} className="mt-1.5 self-start">
                     <Text weight="black" className="text-xs" style={{ color: colors.accentWarm }}>ĐÃ HIỂU</Text>
@@ -144,8 +144,8 @@ export function ReadingScreen({ attemptId, attempt, sections, saved }: { attempt
             />
           </ScrollView>
 
-          <SnapPanel ref={panel} tint={TINT} title={current ? `Câu ${current.number} / ${runner.navQuestions.length} · đã làm ${runner.navQuestions.length - runner.unanswered}` : 'Câu hỏi'}>
-            <ScrollView ref={questionScroll} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 24 + insets.bottom }}>
+          <SnapPanel ref={panel} tint={TINT} onSnap={marking.hideMenu} title={current ? `Câu ${current.number} / ${runner.navQuestions.length} · đã làm ${runner.navQuestions.length - runner.unanswered}` : 'Câu hỏi'}>
+            <ScrollView ref={questions.scrollRef} keyboardShouldPersistTaps="handled" onScrollBeginDrag={marking.hideMenu} contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 24 + insets.bottom }}>
               <QuestionGroups
                 section={section}
                 numberByItem={runner.numberByItem}
@@ -157,14 +157,14 @@ export function ReadingScreen({ attemptId, attempt, sections, saved }: { attempt
                 onBlur={(itemId) => { void runner.answers.saveAnswer(itemId); }}
                 onFocusItem={focusItem}
                 onToggleFlag={runner.toggleFlag}
-                onItemLayout={(itemId, y) => { positions.current[itemId] = y; }} tint={TINT}
+                onItemLayout={questions.onItemLayout}
+                tint={TINT}
                 showTips={!runner.timed}
-                markable={{ highlights: annotations.highlights, selection: marking.selection, onWordPress: marking.onWordPress, onWordLongPress: marking.onWordLongPress }}
+                markable={markable}
               />
               {runner.answers.failed > 0 ? <Text className="mt-4 text-sm text-danger">{runner.answers.failed} câu chưa lưu được. Ứng dụng sẽ thử lại khi bạn nộp bài.</Text> : null}
             </ScrollView>
           </SnapPanel>
-          <SelectionToolbar marking={marking} lookupEnabled={lookupEnabled} />
         </View>
       </KeyboardShell>
 
@@ -175,7 +175,7 @@ export function ReadingScreen({ attemptId, attempt, sections, saved }: { attempt
       <ReaderSettingsSheet visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <QuestionGridSheet tint={TINT} visible={gridOpen} onClose={() => setGridOpen(false)} questions={runner.navQuestions} sectionLabels={sectionLabels} currentId={runner.currentId} onSelect={select} />
       <SubmitSheet
-        visible={submitOpen || (runner.submitting && runner.timed)}
+        visible={submitOpen || runner.expired}
         onClose={() => setSubmitOpen(false)}
         onSubmit={() => void submit()}
         total={runner.navQuestions.length}
@@ -185,8 +185,10 @@ export function ReadingScreen({ attemptId, attempt, sections, saved }: { attempt
         submitting={runner.submitting}
         error={runner.submitError}
         timed={runner.timed}
+        expired={runner.expired}
       />
       <MarkingSheets marking={marking} annotations={annotations} sectionId={section.id} sectionLabel={label(runner.activeIndex)} />
+      <SelectionCallout marking={marking} lookupEnabled={lookupEnabled} />
     </View>
   );
 }

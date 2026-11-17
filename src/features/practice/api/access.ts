@@ -85,8 +85,3 @@ export const accessApi = {
     }));
   },
 };
-
-export function isActivePremium(subscription: Subscription | null, now = Date.now()): boolean {
-  return subscription?.planCode === 'PREMIUM' && subscription.status === 'ACTIVE'
-    && (subscription.endsAt === null || Date.parse(subscription.endsAt) > now);
-}

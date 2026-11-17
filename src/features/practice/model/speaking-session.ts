@@ -20,6 +20,7 @@ const EMPTY: Recordings = new Map();
 const KEY_PREFIX = 'speaking-session:';
 const sessions = new Map<string, Recordings>();
 const loaded = new Set<string>();
+const loadVersions = new Map<string, number>();
 const listeners = new Set<() => void>();
 
 function publish(sessionId: string, next: Recordings) {
@@ -37,9 +38,10 @@ function deleteFile(uri: string) {
 export async function loadSession(sessionId: string) {
   if (loaded.has(sessionId)) return;
   loaded.add(sessionId);
+  const version = loadVersions.get(sessionId) ?? 0;
   try {
     const raw = await AsyncStorage.getItem(KEY_PREFIX + sessionId);
-    if (!raw) return;
+    if (!raw || version !== (loadVersions.get(sessionId) ?? 0)) return;
     const entries = (JSON.parse(raw) as Array<[string, SavedRecording]>).filter(([, recording]) => {
       try { return new File(recording.uri).exists; } catch { return false; }
     });
@@ -57,8 +59,41 @@ export function saveRecording(sessionId: string, questionId: string, recording: 
 
 /** Drops the recordings of a test and their files (after sending, or when the learner leaves the test). */
 export function clearSession(sessionId: string) {
+  // A storage read already in flight must not bring sent or discarded answers back.
+  loaded.add(sessionId);
+  loadVersions.set(sessionId, (loadVersions.get(sessionId) ?? 0) + 1);
   (sessions.get(sessionId) ?? EMPTY).forEach((recording) => deleteFile(recording.uri));
   publish(sessionId, EMPTY);
+  writePendingSend(sessionId, null);
+}
+
+const SEND_PREFIX = 'speaking-send:';
+
+/**
+ * A send that has not finished: its request id and the file uploaded for each question under it. Kept on the device so
+ * that sending again after the app was closed continues the same submission; a new id would be refused while the
+ * unfinished one is still open on the server.
+ */
+export type PendingSend = { requestId: string; sent: Map<string, string> };
+
+export async function readPendingSend(sessionId: string): Promise<PendingSend | null> {
+  try {
+    const raw = await AsyncStorage.getItem(SEND_PREFIX + sessionId);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { requestId?: unknown; sent?: unknown };
+    if (typeof parsed.requestId !== 'string' || !Array.isArray(parsed.sent)) return null;
+    const pairs = parsed.sent.filter((pair): pair is [string, string] => Array.isArray(pair) && typeof pair[0] === 'string' && typeof pair[1] === 'string');
+    return { requestId: parsed.requestId, sent: new Map(pairs) };
+  } catch {
+    return null;
+  }
+}
+
+export function writePendingSend(sessionId: string, pending: PendingSend | null) {
+  const write = pending
+    ? AsyncStorage.setItem(SEND_PREFIX + sessionId, JSON.stringify({ requestId: pending.requestId, sent: [...pending.sent] }))
+    : AsyncStorage.removeItem(SEND_PREFIX + sessionId);
+  void write.catch(() => undefined);
 }
 
 function subscribe(listener: () => void) {

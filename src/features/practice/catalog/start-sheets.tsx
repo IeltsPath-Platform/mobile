@@ -125,6 +125,8 @@ export function CompletedSheet({ card, busy, error, onViewResult, onRedo, onClos
     <Sheet
       visible={card !== null}
       onClose={onClose}
+      // The lookup navigates when it ends, so the sheet stays until then rather than opening a result out of nowhere.
+      dismissable={!busy}
       title="Bạn đã làm bài này rồi"
       subtitle="Xem lại kết quả để biết mình sai ở đâu, hoặc làm lại để luyện thêm."
       footer={<>

@@ -31,11 +31,13 @@ export function AttemptGate({ attemptId, skill, children }: {
       </View>
     );
   }
-  if (data.isError) {
+  // The attempt is refetched when the app returns to the foreground. A failed refetch keeps the test on screen;
+  // only a first load without data shows the error.
+  if (!data.data) {
     return (
       <View className="flex-1 bg-canvas">
         <BackHeader title="Không mở được bài làm" fallbackHref={catalog} />
-        <EmptyState title="Chưa tải được bài làm" message={data.error.message} mood="oops" action={<Button label="Thử lại" variant="secondary" onPress={() => void data.refetch()} />} />
+        <EmptyState title="Chưa tải được bài làm" message={data.error?.message} mood="oops" action={<Button label="Thử lại" variant="secondary" onPress={() => void data.refetch()} />} />
       </View>
     );
   }

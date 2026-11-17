@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Search, SlidersHorizontal, X } from 'lucide-react-native';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -23,6 +23,7 @@ import type { SkillType } from '../model/types';
 import { BandIcon, SkillBand } from '../components/skill-band';
 import { CompletedSheet, FormatFilterSheet, ModeSheet, SpeakingReadySheet, type StartMode } from './start-sheets';
 import { TestCard } from './test-card';
+import { catalogQueryState, isCompletedUnknown } from './catalog-query-state';
 
 const PAGE_SIZE = 9;
 
@@ -57,21 +58,30 @@ export function CatalogScreen({ skill, initialPart, initialFormat }: { skill: Sk
   const [findingResult, setFindingResult] = useState(false);
   const [doneError, setDoneError] = useState('');
   const { scope, partNo } = toScopeAndPart(part);
+  // One start or result per tap: state lands a frame late, so a quick double tap could create two attempts or push two
+  // screens. Released on failure, and when the learner comes back to this screen.
+  const busyRef = useRef(false);
+  useFocusEffect(useCallback(() => { busyRef.current = false; }, []));
 
   const formats = useQuery({ queryKey: ['practice', 'formats', config.apiSkill], queryFn: ({ signal }) => getPracticeFormats(config.apiSkill, signal), staleTime: 300_000, retry: 1 });
-  const progress = useQuery({ queryKey: ['practice', 'progress', config.apiSkill, scope], queryFn: ({ signal }) => getCatalogProgress(scope, signal, config.apiSkill), staleTime: 30_000 });
+  const progress = useQuery({ queryKey: ['practice', 'progress', config.apiSkill, scope], queryFn: ({ signal }) => getCatalogProgress(scope, signal, config.apiSkill), staleTime: 30_000, retry: 1 });
   const completed = useMemo(() => progress.data?.completed ?? [], [progress.data]);
+  // Same reference while the progress data is unchanged (structural sharing), so the catalog key is stable on refetch.
+  const doneList = useMemo(() => completed.map(({ packageId, partNo: donePart }) => ({ packageId, partNo: donePart })), [completed]);
+  const completedUnknown = isCompletedUnknown(progress);
+  const activeTab: ProgressTab = completedUnknown ? 'uncompleted' : tab;
   const doneSubmissions = useMemo(() => submissionsByKey(completed), [completed]);
   const doneKeys = useMemo(() => new Set(completed.map((item) => progressKey(item.packageId, item.partNo))), [completed]);
   // Without the formats endpoint the backend cannot filter, so the chosen formats are applied to the loaded cards.
   const formatsUnavailable = formats.isError;
 
   const tests = useInfiniteQuery({
-    queryKey: ['practice', 'catalog', config.apiSkill, scope, partNo ?? null, tab, debouncedQuery, formatsUnavailable ? [] : selectedFormats, completed.length],
-    enabled: progress.isSuccess,
+    queryKey: ['practice', 'catalog', config.apiSkill, scope, partNo ?? null, activeTab, debouncedQuery, formatsUnavailable ? [] : selectedFormats, doneList],
+    // Waits for the finished-test list; a failed one still lists every test.
+    enabled: !progress.isPending,
     initialPageParam: 0,
     queryFn: ({ pageParam, signal }) => {
-      const keyFilter = toCatalogKeyFilter(tab, completed.map(({ packageId, partNo: donePart }) => ({ packageId, partNo: donePart })));
+      const keyFilter = toCatalogKeyFilter(activeTab, doneList);
       if (keyFilter === 'EMPTY') return Promise.resolve({ totalElements: 0, page: 0, size: PAGE_SIZE, items: [] as ReadingTestCard[] });
       return searchReadingTests({
         skill: config.apiSkill,
@@ -97,41 +107,49 @@ export function CatalogScreen({ skill, initialPart, initialFormat }: { skill: Sk
     return [...seen].map((code) => ({ code, sectionCount: 0 }));
   }, [formats.data, formatsUnavailable, tests.data]);
   const total = tests.data?.pages[0]?.totalElements ?? 0;
+  // The server total does not know a filter applied on the device, so it is hidden then.
+  const localFilter = formatsUnavailable && selectedFormats.length > 0;
 
   const openCard = useCallback((card: ReadingTestCard) => {
     setStartError('');
-    if (tab === 'completed') { setDoneError(''); setDoneCard(card); return; }
+    if (activeTab === 'completed') { setDoneError(''); setDoneCard(card); return; }
     if (skill === 'speaking') setReadyCard(card);
     else setModeCard(card);
-  }, [tab, skill]);
+  }, [activeTab, skill]);
 
   function sectionOf(card: ReadingTestCard) {
     return card.parts.find((item) => item.partNo === partNo) ?? card.parts[0];
   }
 
   function start(card: ReadingTestCard, mode: StartMode) {
+    if (busyRef.current) return;
     if (skill === 'writing') {
       const target = sectionOf(card);
       setModeCard(null);
-      if (target) router.push({ pathname: '/practice/writing/[packageVersionId]/[sectionId]', params: { packageVersionId: card.packageVersionId, sectionId: target.sectionId, mode } } as never);
+      if (!target) return;
+      busyRef.current = true;
+      router.push({ pathname: '/practice/writing/[packageVersionId]/[sectionId]', params: { packageVersionId: card.packageVersionId, sectionId: target.sectionId, mode } } as never);
       return;
     }
-    if (starting) return;
+    busyRef.current = true;
     setStarting(true);
     setStartError('');
     startReadingAttempt(card, mode, card.scope === 'PART' ? partNo : undefined).then((attempt) => {
       setModeCard(null);
       void rememberAttempt({ attemptId: attempt.id, skill: skill as 'reading' | 'listening', title: card.title });
       router.push(`/practice/${skill}/${attempt.id}` as never);
-    }).catch((cause: unknown) => setStartError(errorMessage(cause, 'Chưa bắt đầu được bài làm. Vui lòng thử lại.')))
-      .finally(() => setStarting(false));
+    }).catch((cause: unknown) => {
+      busyRef.current = false;
+      setStartError(errorMessage(cause, 'Chưa bắt đầu được bài làm. Vui lòng thử lại.'));
+    }).finally(() => setStarting(false));
   }
 
   function startSpeaking(card: ReadingTestCard) {
     const ordered = [...card.parts].sort((a, b) => (a.partNo ?? 0) - (b.partNo ?? 0));
     const target = card.scope === 'PART' ? ordered.find((item) => item.partNo === partNo) ?? ordered[0] : ordered[0];
     setReadyCard(null);
-    if (!target) return;
+    if (!target || busyRef.current) return;
+    busyRef.current = true;
     router.push({
       pathname: '/practice/speaking/[packageVersionId]/[sectionId]',
       params: { packageVersionId: card.packageVersionId, sectionId: target.sectionId, ...(card.scope === 'PART' ? {} : { parts: ordered.map((item) => item.sectionId).join(',') }) },
@@ -139,32 +157,44 @@ export function CatalogScreen({ skill, initialPart, initialFormat }: { skill: Sk
   }
 
   function viewResult(card: ReadingTestCard) {
-    if (findingResult) return;
+    if (busyRef.current) return;
     setDoneError('');
     if (skill === 'speaking' || skill === 'writing') {
       const submissionId = doneSubmissions.get(doneKey(card));
       if (!submissionId) { setDoneError('Không tìm thấy bài làm đã chấm của đề này.'); return; }
+      busyRef.current = true;
       setDoneCard(null);
       router.push(`/practice/${skill}-result/${submissionId}` as never);
       return;
     }
+    busyRef.current = true;
     setFindingResult(true);
     findSubmittedAttemptId(config.apiSkill, card, card.scope === 'PART' ? partNo : undefined).then((attemptId) => {
-      if (!attemptId) { setDoneError('Không tìm thấy bài làm đã nộp của đề này.'); return; }
+      if (!attemptId) { busyRef.current = false; setDoneError('Không tìm thấy bài làm đã nộp của đề này.'); return; }
       setDoneCard(null);
       router.push({ pathname: '/practice/result/[attemptId]', params: { attemptId, skill } } as never);
-    }).catch((cause: unknown) => setDoneError(errorMessage(cause))).finally(() => setFindingResult(false));
+    }).catch((cause: unknown) => {
+      busyRef.current = false;
+      setDoneError(errorMessage(cause));
+    }).finally(() => setFindingResult(false));
   }
 
   function redo(card: ReadingTestCard) {
     setDoneCard(null);
+    setStartError('');
     if (skill === 'speaking') setReadyCard(card);
     else setModeCard(card);
   }
 
   const partOptions: PracticePart[] = [...config.parts, ...(config.hasFull ? ['full' as const] : [])];
-  const loading = progress.isPending || tests.isPending;
-  const loadError = progress.error ?? tests.error;
+  const { loading, error: loadError } = catalogQueryState(progress, tests);
+
+  async function refreshCatalog() {
+    const before = progress.data;
+    const refreshed = await progress.refetch();
+    // A changed finished-test list moves the catalog to a new key, which loads by itself.
+    if (refreshed.data === before) await tests.refetch();
+  }
 
   const meta = SKILL_META[skill];
   const band = (
@@ -174,7 +204,7 @@ export function CatalogScreen({ skill, initialPart, initialFormat }: { skill: Sk
           const active = option === part;
           const label = option === 'full' ? 'Full đề' : `${config.partLabel} ${option}`;
           return (
-            <Pressable key={String(option)} onPress={() => { haptics.tap(); setPart(option); }} accessibilityRole="tab" accessibilityState={{ selected: active }} className="min-h-10 justify-center rounded-full px-4" style={{ backgroundColor: active ? '#ffffff' : 'rgba(255,255,255,0.18)' }}>
+              <Pressable key={String(option)} onPress={() => { haptics.tap(); setPart(option); }} accessibilityRole="tab" accessibilityState={{ selected: active }} className="min-h-11 justify-center rounded-full px-4" style={{ backgroundColor: active ? '#ffffff' : 'rgba(255,255,255,0.18)' }}>
               <Text weight="extrabold" className="text-sm" style={{ color: active ? tint : '#ffffff' }}>{label}</Text>
             </Pressable>
           );
@@ -203,9 +233,10 @@ export function CatalogScreen({ skill, initialPart, initialFormat }: { skill: Sk
       <View className="flex-row items-center justify-between">
         <View className="flex-row gap-5">
           {(['uncompleted', 'completed'] as const).map((value) => {
-            const active = tab === value;
+            const active = activeTab === value;
+            const disabled = value === 'completed' && completedUnknown;
             return (
-              <Pressable key={value} onPress={() => setTab(value)} accessibilityRole="tab" accessibilityState={{ selected: active }} className="min-h-10 justify-center" hitSlop={6}>
+              <Pressable key={value} disabled={disabled} onPress={() => setTab(value)} accessibilityRole="tab" accessibilityState={{ selected: active, disabled }} className="min-h-11 justify-center" style={{ opacity: disabled ? 0.45 : 1 }} hitSlop={6}>
                 <Text weight={active ? 'black' : 'bold'} className="text-[15px]" style={{ color: active ? colors.ink : colors.muted }}>
                   {value === 'uncompleted' ? 'Chưa làm' : `Đã làm${completed.length ? ` · ${completed.length}` : ''}`}
                 </Text>
@@ -214,8 +245,16 @@ export function CatalogScreen({ skill, initialPart, initialFormat }: { skill: Sk
             );
           })}
         </View>
-        {!loading && !loadError ? <Text className="text-xs text-muted">{total} đề</Text> : null}
+        {!loading && !loadError && !localFilter ? <Text className="text-xs text-muted">{total} đề</Text> : null}
       </View>
+      {completedUnknown ? (
+        <View className="flex-row items-center gap-2 rounded-2xl px-3 py-1" style={{ backgroundColor: colors.warmSoft }}>
+          <Text className="flex-1 text-xs leading-4 text-ink">Chưa tải được danh sách đề đã làm, nên mọi đề đều hiện ở đây.</Text>
+          <Pressable onPress={() => void refreshCatalog()} accessibilityRole="button" accessibilityLabel="Tải lại danh sách đề đã làm" className="min-h-11 justify-center px-2">
+            <Text weight="extrabold" className="text-xs" style={{ color: colors.accentWarm }}>Thử lại</Text>
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 
@@ -230,16 +269,17 @@ export function CatalogScreen({ skill, initialPart, initialFormat }: { skill: Sk
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: insets.bottom + 32 }}
         keyboardShouldPersistTaps="handled"
         onEndReachedThreshold={0.4}
-        onEndReached={() => { if (tests.hasNextPage && !tests.isFetchingNextPage) void tests.fetchNextPage(); }}
-        refreshControl={<RefreshControl refreshing={tests.isRefetching && !tests.isFetchingNextPage} onRefresh={() => { void progress.refetch(); void tests.refetch(); }} tintColor={colors.accent} />}
+        // Not during a refresh: a page fetched then is overwritten when the refetch of the loaded pages lands.
+        onEndReached={() => { if (tests.hasNextPage && !tests.isFetching) void tests.fetchNextPage(); }}
+        refreshControl={<RefreshControl refreshing={progress.isRefetching || (tests.isRefetching && !tests.isFetchingNextPage)} onRefresh={() => void refreshCatalog()} tintColor={colors.accent} />}
         ListEmptyComponent={loading ? (
           <View className="gap-3">{[0, 1, 2, 3].map((index) => <Skeleton key={index} height={112} radius={22} />)}</View>
         ) : loadError ? (
-          <EmptyState title="Chưa tải được danh sách đề" message={errorMessage(loadError)} mood="oops" action={<Button label="Thử lại" variant="secondary" onPress={() => { void progress.refetch(); void tests.refetch(); }} />} />
+          <EmptyState title="Chưa tải được danh sách đề" message={errorMessage(loadError)} mood="oops" action={<Button label="Thử lại" variant="secondary" onPress={() => void refreshCatalog()} />} />
         ) : (
           <EmptyState
-            title={tab === 'completed' ? 'Bạn chưa hoàn thành đề nào ở mục này' : query || selectedFormats.length ? 'Không có đề phù hợp' : 'Bạn đã làm hết đề ở mục này'}
-            message={tab === 'completed' ? 'Làm một đề ở tab Chưa làm, bài đã nộp sẽ hiện ở đây.' : 'Thử bỏ bớt bộ lọc hoặc chọn phần khác.'}
+            title={activeTab === 'completed' ? 'Bạn chưa hoàn thành đề nào ở mục này' : query || selectedFormats.length ? 'Không có đề phù hợp' : 'Bạn đã làm hết đề ở mục này'}
+            message={activeTab === 'completed' ? 'Làm một đề ở tab Chưa làm, bài đã nộp sẽ hiện ở đây.' : 'Thử bỏ bớt bộ lọc hoặc chọn phần khác.'}
           />
         )}
         ListFooterComponent={tests.isFetchingNextPage ? <ActivityIndicator className="py-4" color={colors.accent} /> : undefined}

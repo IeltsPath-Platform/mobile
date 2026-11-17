@@ -37,8 +37,8 @@ export async function loadKnowledgeHistory(page: number): Promise<HistoryPage> {
 }
 
 /** Submitted Listening/Reading attempts of the practice bank, named by their tests. */
-export async function loadBankHistory(skill: 'LISTENING' | 'READING', page: number): Promise<HistoryPage> {
-  const result = await getPracticeHistory(skill, page, HISTORY_PAGE_SIZE);
+export async function loadBankHistory(skill: 'LISTENING' | 'READING', page: number, size = HISTORY_PAGE_SIZE): Promise<HistoryPage> {
+  const result = await getPracticeHistory(skill, page, size);
   const submitted = result.items.filter((item) => item.status === 'SUBMITTED');
   const responses = await Promise.all(historyTitleRequests(submitted).map(async (request) => ({
     scope: request.scope,

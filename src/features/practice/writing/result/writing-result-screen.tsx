@@ -1,7 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { BookOpenCheck, Clock, PenLine } from 'lucide-react-native';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, View, type ScrollViewInstance } from 'react-native';
 
 import { BackHeader } from '@/src/components/navigation/back-header';
@@ -9,12 +9,14 @@ import { Button } from '@/src/components/ui/button';
 import { EmptyState } from '@/src/components/ui/empty-state';
 import { Text } from '@/src/components/ui/text';
 import { colors } from '@/src/theme';
+import { refreshLearningProgressSoon } from '@/src/features/progress/learning-progress-api';
 
 import { getWritingSubmission, type WritingCorrection, type WritingCriterion, type WritingSubmission } from '../../api/writing';
 import { Sheet } from '../../components/sheet';
 import { mapKnowledgeJudgments, mapStudyPoints } from '../../model/essay-mappers';
 import { correctedEssay, errorNames, markEssay, segmentAt } from '../../model/writing-result-model';
-import { formatClock, loadResultContext, lowestIndex, measureEssay, roundBand } from '../../model/writing-text';
+import { formatClock } from '../../model/clock';
+import { loadResultContext, lowestIndex, measureEssay, roundBand } from '../../model/writing-text';
 import { BandScore, SkillBand } from '../../components/skill-band';
 import { ExaminerResultView } from './examiner-result';
 import { Card, Collapsible, CorrectionCard, DataChecksView, NextSteps, Priorities, RevisionSummary, TaskChecksView, categoryOf } from './writing-blocks';
@@ -37,12 +39,23 @@ function comment(band: number) {
 
 /** The result of a Writing submission: AI grade, teacher review, or the state while it is still being graded. */
 export function WritingResultScreen({ submissionId }: { submissionId: string }) {
+  const client = useQueryClient();
   const submission = useQuery({
     queryKey: ['practice', 'writing-submission', submissionId],
     queryFn: ({ signal }) => getWritingSubmission(submissionId, signal),
-    refetchInterval: (query) => (query.state.data?.status === 'GRADING' || query.state.data?.status === 'PAYMENT_PENDING' ? 3000 : false),
+    // Only GRADING moves on by itself; PAYMENT_PENDING waits for the learner to resend, so polling it would never end.
+    // Polling stops after about 3 minutes: a grade stuck that long is taken over by the server on the next send.
+    refetchInterval: (query) => (query.state.data?.status === 'GRADING' && query.state.dataUpdateCount < 60 ? 3000 : false),
   });
   const context = useQuery({ queryKey: ['practice', 'writing-context', submissionId], queryFn: () => loadResultContext(submissionId), staleTime: Infinity });
+  const status = submission.data?.status;
+  useEffect(() => {
+    if (status !== 'GRADED') return;
+    refreshLearningProgressSoon(client);
+    void client.invalidateQueries({ queryKey: ['practice', 'progress'] });
+    void client.invalidateQueries({ queryKey: ['practice', 'catalog'] });
+    void client.invalidateQueries({ queryKey: ['practice', 'history'] });
+  }, [client, status]);
 
   if (submission.isPending) return <View className="flex-1 items-center justify-center bg-canvas"><ActivityIndicator color={colors.accent} /><Text className="mt-2 text-sm text-muted">Đang tải kết quả chấm bài…</Text></View>;
   if (submission.isError) {
@@ -56,7 +69,7 @@ export function WritingResultScreen({ submissionId }: { submissionId: string }) 
   const data = submission.data;
   const title = context.data?.title ?? 'Bài Writing';
   if (data.status === 'AWAITING_EXAMINER') return <ExaminerResultView submission={data} submissionId={submissionId} title={title} />;
-  if (data.status === 'GRADING' || data.status === 'PAYMENT_PENDING') {
+  if (data.status === 'GRADING') {
     return (
       <View className="flex-1 bg-canvas">
         <BackHeader title="Kết quả Writing" fallbackHref={CATALOG} />
@@ -72,7 +85,9 @@ export function WritingResultScreen({ submissionId }: { submissionId: string }) 
     return (
       <View className="flex-1 bg-canvas">
         <BackHeader title="Kết quả Writing" fallbackHref={CATALOG} />
-        <EmptyState title="Bài viết chưa có điểm" message={`Bài này chưa được chấm xong${data.failureCode ? ` (${data.failureCode})` : ''}. Point chỉ bị trừ khi chấm thành công.`} mood="oops" action={<Button label="Về danh mục Writing" variant="secondary" onPress={() => router.replace(CATALOG as never)} />} />
+        <EmptyState title="Bài viết chưa có điểm" message={data.status === 'PAYMENT_PENDING'
+          ? 'Bài đã được chấm nhưng chưa trừ được point nên kết quả chưa mở. Hãy kiểm tra số dư rồi gửi chấm lại bài này; point chỉ bị trừ khi bạn nhận được kết quả.'
+          : `Bài này chưa được chấm xong${data.failureCode ? ` (${data.failureCode})` : ''}. Point chỉ bị trừ khi chấm thành công.`} mood="oops" action={<Button label="Về danh mục Writing" variant="secondary" onPress={() => router.replace(CATALOG as never)} />} />
       </View>
     );
   }
@@ -234,7 +249,7 @@ function CriterionDetail({ item, worst, limits }: { item: WritingCriterion; wors
   return (
     <View className="rounded-2xl p-3" style={{ backgroundColor: colors.canvas, borderWidth: worst ? 2 : 0, borderColor: colors.danger }}>
       <View className="flex-row items-center gap-3">
-        <View className="h-12 w-12 items-center justify-center rounded-2xl" style={{ backgroundColor: worst ? colors.danger : colors.accent }}><Text weight="black" style={{ color: '#ffffff' }}>{item.band.toFixed(1)}</Text></View>
+        <View className="h-12 w-12 items-center justify-center rounded-2xl" style={{ backgroundColor: worst ? colors.danger : colors.accent }}><Text weight="black" style={{ color: colors.onAccent }}>{item.band.toFixed(1)}</Text></View>
         <View className="flex-1">
           <Text weight="extrabold" className="text-sm text-ink">{info.name}</Text>
           <Text className="text-xs text-muted">{info.meaning} · band ước tính</Text>

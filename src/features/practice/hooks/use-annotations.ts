@@ -3,8 +3,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { createRequestId } from '@/src/lib/request-id';
 
+import { eraseMarks, paintMarks, pruneLinks, type Mark, type Segment } from '../model/highlight-marks';
+
 /** A highlighted run of words: `block` names the text (a passage paragraph or a question), `start`/`end` are word indexes. */
-export type Highlight = { id: string; sectionId: string; block: string; start: number; end: number };
+export type Highlight = Mark;
 /** A note, optionally tied to a highlight; `quote` keeps the words it was written about. */
 export type Note = { id: string; sectionId: string; highlightId: string | null; quote: string; text: string; createdAt: number };
 
@@ -39,18 +41,22 @@ export function useAnnotations(attemptId: string) {
     });
   }, [attemptId]);
 
-  const addHighlight = useCallback((sectionId: string, block: string, start: number, end: number) => {
-    const highlight: Highlight = { id: createRequestId(), sectionId, block, start: Math.min(start, end), end: Math.max(start, end) };
-    update((current) => ({
-      ...current,
-      // A new mark replaces the marks it overlaps, so marks never stack.
-      highlights: [...current.highlights.filter((item) => item.block !== block || item.end < highlight.start || item.start > highlight.end), highlight],
-    }));
-    return highlight;
+  /** Highlights the words of a selection (one segment per block) and returns the id of its first mark. */
+  const paintHighlight = useCallback((sectionId: string, segments: Segment[]) => {
+    const firstId = createRequestId();
+    update((current) => {
+      const highlights = paintMarks(current.highlights, sectionId, segments, createRequestId, firstId);
+      return { highlights, notes: pruneLinks(current.notes, highlights) };
+    });
+    return firstId;
   }, [update]);
 
-  const removeHighlight = useCallback((id: string) => {
-    update((current) => ({ highlights: current.highlights.filter((item) => item.id !== id), notes: current.notes.map((note) => note.highlightId === id ? { ...note, highlightId: null } : note) }));
+  /** Takes exactly the selected words out of the highlights; a mark that is only partly covered is cut back. */
+  const eraseHighlight = useCallback((segments: Segment[]) => {
+    update((current) => {
+      const highlights = eraseMarks(current.highlights, segments, createRequestId);
+      return { highlights, notes: pruneLinks(current.notes, highlights) };
+    });
   }, [update]);
 
   const addNote = useCallback((sectionId: string, quote: string, highlightId: string | null, text = '') => {
@@ -73,7 +79,7 @@ export function useAnnotations(attemptId: string) {
 
   const clearAll = useCallback(() => { void AsyncStorage.removeItem(KEY_PREFIX + attemptId).catch(() => undefined); }, [attemptId]);
 
-  return { ...state, addHighlight, removeHighlight, addNote, setNoteText, removeNote, removeSectionNotes, clearAll };
+  return { ...state, paintHighlight, eraseHighlight, addNote, setNoteText, removeNote, removeSectionNotes, clearAll };
 }
 
 export type Annotations = ReturnType<typeof useAnnotations>;

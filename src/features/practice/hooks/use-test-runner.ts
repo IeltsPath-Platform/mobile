@@ -6,12 +6,11 @@ import { AppState } from 'react-native';
 import { refreshLearningProgressSoon } from '@/src/features/progress/learning-progress-api';
 import { haptics } from '@/src/lib/haptics';
 
-import { completeAttemptSection, startAttemptSection, submitReadingAttempt, type ReadingAttempt } from '../api/attempts';
+import { startAttemptSection, submitReadingAttempt, type ReadingAttempt } from '../api/attempts';
 import type { NavQuestion } from '../components/question-nav';
 import { forgetAttempt } from '../model/resume-store';
 import { clockSeconds, numberItems, type SavedResponse, type TestSection } from '../model/sections';
 import { useAttemptAnswers } from './use-attempt-answers';
-import { useTicker } from './use-ticker';
 
 /**
  * Everything a Reading or Listening test screen shares: answers with autosave, one numbering across sections, flags,
@@ -83,18 +82,40 @@ export function useTestRunner({ attemptId, attempt, sections, saved, skill }: {
     }
   }, [answers, attemptId, client, skill, timed]);
 
-  const seconds = useTicker(() => clockSeconds(attempt, timed), { onZero: timed ? () => { void submit(); } : undefined });
+  const submitRef = useRef(submit);
+  submitRef.current = submit;
+
+  /** Read by the header clock, which ticks on its own so the passage and questions do not re-render every second. */
+  const readClock = useCallback(() => clockSeconds(attempt, timed), [attempt, timed]);
+
+  // The exam submits itself at the server deadline, as the web app does. Without a deadline nothing is submitted:
+  // a missing `expiresAt` reads as 0 seconds left and must not end the test the moment it opens.
+  const [expired, setExpired] = useState(false);
+  const deadline = timed && attempt.expiresAt ? Date.parse(attempt.expiresAt) : NaN;
+  useEffect(() => {
+    if (!Number.isFinite(deadline)) return;
+    let done = false;
+    const check = () => {
+      if (done || Date.now() < deadline) return;
+      done = true;
+      setExpired(true);
+      void submitRef.current();
+    };
+    check();
+    const timer = setInterval(check, 1000);
+    const subscription = AppState.addEventListener('change', (state) => { if (state === 'active') check(); });
+    return () => { clearInterval(timer); subscription.remove(); };
+  }, [deadline]);
 
   const selectSection = useCallback((index: number) => {
     const target = sections[index];
     if (!target || index === activeIndex) return;
-    const previous = sections[activeIndex];
-    if (previous && !timed) void completeAttemptSection(attemptId, previous.id).catch(() => undefined);
+    // Switching tabs is navigation: completing a section would lock its answers on the server.
     void startAttemptSection(attemptId, target.id).catch(() => undefined);
     setActiveIndex(index);
     const first = items.find((entry) => entry.sectionIndex === index);
     if (first) setCurrentId(first.item.id);
-  }, [sections, activeIndex, attemptId, items, timed]);
+  }, [sections, activeIndex, attemptId, items]);
 
   /** Moves to a question, opening its section first when needed. */
   const goTo = useCallback((itemId: string) => {
@@ -117,11 +138,15 @@ export function useTestRunner({ attemptId, attempt, sections, saved, skill }: {
     id: item.id, number, sectionIndex, answered: Boolean(answers.answers[item.id]?.trim()), flagged: flagged.has(item.id),
   })), [items, answers.answers, flagged]);
   const unanswered = navQuestions.filter((question) => !question.answered).length;
+  const sectionProgress = useMemo(() => sections.map((_, index) => {
+    const own = navQuestions.filter((question) => question.sectionIndex === index);
+    return { answered: own.filter((question) => question.answered).length, total: own.length };
+  }), [sections, navQuestions]);
 
   return {
-    timed, answers, numberByItem, items, navQuestions, unanswered,
+    timed, answers, numberByItem, items, navQuestions, unanswered, sectionProgress,
     activeIndex, section: sections[activeIndex], selectSection,
     currentId, setCurrentId, goTo, flagged, toggleFlag,
-    seconds, submit, submitting, submitError,
+    readClock, expired, submit, submitting, submitError,
   };
 }

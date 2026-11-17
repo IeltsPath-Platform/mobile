@@ -1,12 +1,12 @@
 import { Check, CheckCircle2, Flag, X, XCircle } from 'lucide-react-native';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 
 import { Text } from '@/src/components/ui/text';
 import { colors } from '@/src/theme';
 
 import type { Question } from '../model/types';
-import { MarkableText, type TextSelection } from './markable-text';
+import { MarkableText, type TextSelection, type WordHandler } from './markable-text';
 import { useReaderPrefs } from './reader-prefs';
 
 import type { Highlight } from '../hooks/use-annotations';
@@ -15,8 +15,8 @@ import type { Highlight } from '../hooks/use-annotations';
 export type MarkableProps = {
   highlights: Highlight[];
   selection: TextSelection;
-  onWordPress: (block: string, index: number, word: string) => void;
-  onWordLongPress: (block: string, index: number, word: string) => void;
+  onWordPress: WordHandler;
+  onWordLongPress: WordHandler;
 };
 
 export type QuestionReview = { correct: boolean | null; correctAnswer: string | null; explanation?: string | null };
@@ -44,11 +44,13 @@ type QuestionFieldProps = {
  */
 export const QuestionField = memo(function QuestionField({ question, number, value, disabled, flagged, active, onChange, onBlur, onFocus, onToggleFlag, review, markable, tint = colors.accent }: QuestionFieldProps) {
   const { text, paper } = useReaderPrefs();
+  // Stable so the memoised prompt text skips the re-render a keystroke in another question causes.
+  const promptStyle = useMemo(() => ({ flex: 1, ...text, color: paper.text }), [text, paper.text]);
   const verdictOf = (optionValue: string): 'correct' | 'wrong' | undefined => {
     if (!review) return undefined;
     if (review.correctAnswer && optionValue === review.correctAnswer) return 'correct';
     if (optionValue !== value) return undefined;
-    return review.correct ? 'correct' : 'wrong';
+    return review.correct === null ? undefined : review.correct ? 'correct' : 'wrong';
   };
 
   return (
@@ -60,7 +62,7 @@ export const QuestionField = memo(function QuestionField({ question, number, val
           <Text weight="black" className="text-xs" style={{ color: value ? '#ffffff' : colors.ink }} accessibilityLabel={`Câu ${number}`}>{number}</Text>
         </View>
         {markable ? (
-          <MarkableText block={`q:${question.id}`} text={question.prompt} style={{ flex: 1, ...text, color: paper.text }} {...markable} />
+          <MarkableText block={`q:${question.id}`} text={question.prompt} style={promptStyle} {...markable} />
         ) : <Text className="flex-1" style={{ ...text, color: paper.text }}>{question.prompt}</Text>}
         {onToggleFlag ? (
           <Pressable onPress={onToggleFlag} hitSlop={10} accessibilityRole="button" accessibilityState={{ selected: flagged }} accessibilityLabel={flagged ? `Bỏ đánh dấu câu ${number}` : `Đánh dấu câu ${number} để xem lại`} className="h-8 w-8 items-center justify-center">
@@ -120,8 +122,8 @@ export const QuestionField = memo(function QuestionField({ question, number, val
           style={{
             fontSize: text.fontSize, color: paper.text,
             borderWidth: 2,
-            borderColor: review ? (review.correct ? colors.success : colors.danger) : value ? tint : paper.line,
-            backgroundColor: review ? (review.correct ? colors.successSoft : colors.dangerSoft) : 'transparent',
+            borderColor: review && review.correct !== null ? (review.correct ? colors.success : colors.danger) : value ? tint : paper.line,
+            backgroundColor: review && review.correct !== null ? (review.correct ? colors.successSoft : colors.dangerSoft) : 'transparent',
           }}
         />
       )}
@@ -132,6 +134,7 @@ export const QuestionField = memo(function QuestionField({ question, number, val
 });
 
 function ReviewNote({ review, answered }: { review: QuestionReview; answered: boolean }) {
+  if (review.correct === null) return <Text className="mt-3 text-sm text-muted">Câu này chưa có kết quả chấm.</Text>;
   const correct = review.correct === true;
   return (
     <View className="mt-3 gap-2">

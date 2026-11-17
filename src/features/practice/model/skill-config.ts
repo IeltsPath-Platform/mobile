@@ -18,17 +18,11 @@ export interface PracticeSkillConfig {
   unit: string
 }
 
-export const PRACTICE_SKILLS: readonly SkillType[] = ['reading', 'listening', 'writing', 'speaking']
-
 export const PRACTICE_SKILL_CONFIG: Record<SkillType, PracticeSkillConfig> = {
   reading: { skill: 'reading', apiSkill: 'READING', label: 'Reading', partLabel: 'Passage', parts: [1, 2, 3], hasFull: true, unit: 'câu' },
   listening: { skill: 'listening', apiSkill: 'LISTENING', label: 'Listening', partLabel: 'Section', parts: [1, 2, 3, 4], hasFull: true, unit: 'câu' },
   writing: { skill: 'writing', apiSkill: 'WRITING', label: 'Writing', partLabel: 'Task', parts: [1, 2], hasFull: false, unit: 'bài viết' },
   speaking: { skill: 'speaking', apiSkill: 'SPEAKING', label: 'Speaking', partLabel: 'Part', parts: [1, 2, 3], hasFull: true, unit: 'câu' },
-}
-
-export function parsePracticeSkill(value: string | null): SkillType {
-  return PRACTICE_SKILLS.find((item) => item === value) ?? 'reading'
 }
 
 export function defaultPracticePart(config: PracticeSkillConfig): PracticePart {

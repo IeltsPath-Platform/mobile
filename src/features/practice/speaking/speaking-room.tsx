@@ -1,7 +1,7 @@
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { router } from 'expo-router';
-import { Check, ChevronLeft, ChevronRight, Info, Mic, Pause, Play, Settings, Square, Volume2 } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { Check, ChevronLeft, ChevronRight, Info, Mic, Pause, Play, Settings, Square, Volume2, VolumeX } from 'lucide-react-native';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,15 +13,14 @@ import { colors } from '@/src/theme';
 
 import { usePracticeSession } from '../api/practice-session';
 import type { SpeakingTask } from '../api/speaking-task';
-import { ExamHeader } from '../components/exam-header';
+import { ExamHeader, headerIconColor } from '../components/exam-header';
 import { closeTest, useLeaveTestGuard } from '../components/test-shell';
 import { useStudySession } from '../hooks/use-study-session';
-import { useTicker } from '../hooks/use-ticker';
 import { formatClock } from '../model/clock';
 import { parseCueCard, spokenPrompt } from '../model/speaking-cue';
 import { saveRecording, useSessionRecordings, type SavedRecording } from '../model/speaking-session';
 import { useExaminerVoice } from './use-examiner-voice';
-import { useRecorder } from './use-recorder';
+import { playFromStart, useRecorder } from './use-recorder';
 
 const CATALOG = '/practice/catalog/speaking';
 /** An answer can be stopped only after this long, so a stray tap does not leave an empty answer. */
@@ -47,27 +46,41 @@ export function SpeakingRoom({ task, parts, initialIndex, timed }: Props) {
   const [index, setIndex] = useState(() => Math.min(Math.max(initialIndex, 0), Math.max(total - 1, 0)));
   const question = task.questions[index];
   const cue = parseCueCard(question?.prompt ?? '');
-  const voice = useExaminerVoice(question ? spokenPrompt(question.prompt) : '');
+  const [micLive, setMicLive] = useState(false);
+  const voice = useExaminerVoice(question ? spokenPrompt(question.prompt) : '', micLive);
   const sessionId = task.packageVersionId;
   const recordings = useSessionRecordings(sessionId);
   const practiceSessionId = usePracticeSession('SPEAKING');
   const study = useStudySession('SPEAKING', practiceSessionId ?? '');
+  const { setMediaActive } = study;
+  const onActive = useCallback((active: boolean) => { setMediaActive(active); setMicLive(active); }, [setMediaActive]);
   const [opened] = useState(Date.now);
   const limit = timed && task.timeLimitSeconds ? task.timeLimitSeconds : null;
-  const remaining = useTicker(() => (limit ? Math.max(0, limit - Math.floor((Date.now() - opened) / 1000)) : 0), { running: limit !== null });
-  const expired = limit !== null && remaining <= 0;
+  // The clock ticks inside the header only; the room re-renders once, when the time is up.
+  const readRemaining = useCallback(() => (limit ? Math.max(0, limit - Math.floor((Date.now() - opened) / 1000)) : 0), [limit, opened]);
+  const [expired, setExpired] = useState(() => limit !== null && readRemaining() <= 0);
+  useEffect(() => {
+    if (limit === null || expired) return;
+    const timer = setTimeout(() => setExpired(true), readRemaining() * 1000);
+    return () => clearTimeout(timer);
+  }, [limit, expired, readRemaining]);
   const position = parts.indexOf(task.sectionId);
   const nextPart = position >= 0 ? parts[position + 1] : undefined;
   const isLast = index >= total - 1;
   const partLabel = task.partNo ? `Part ${task.partNo}` : 'Speaking';
-  const guardOff = useLeaveTestGuard(recordings.size > 0, 'Các bản ghi được giữ trên thiết bị này. Bạn có thể quay lại để nộp bài sau.', 'Tạm rời bài Speaking?');
+  // Opened from the review to record again, going back only returns to that review, which keeps its own guard.
+  const guardOff = useLeaveTestGuard(timed && recordings.size > 0, 'Các bản ghi được giữ trên thiết bị này. Bạn có thể quay lại để nộp bài sau.', 'Tạm rời bài Speaking?');
+  const answered = task.questions.filter((item) => recordings.has(item.questionVersionId)).length;
+  const tint = colors.skill.speaking;
 
   const reviewParams = { packageVersionId: task.packageVersionId, parts: (parts.includes(task.sectionId) ? parts : [task.sectionId]).join(',') };
   const finish = () => {
     voice.stop();
-    // Opened from the review to record one question again: go back to that review instead of stacking another.
+    guardOff();
+    // Opened from the review to record one question again: go back to that review instead of stacking another. At the
+    // end of the test the review takes the room's place, so its back button leaves the test rather than reopening a part.
     if (!timed && router.canGoBack()) router.back();
-    else router.push({ pathname: '/practice/speaking-review/[packageVersionId]', params: reviewParams } as never);
+    else router.replace({ pathname: '/practice/speaking-review/[packageVersionId]', params: reviewParams } as never);
   };
   const goNextPart = () => {
     if (!nextPart) return;
@@ -82,12 +95,14 @@ export function SpeakingRoom({ task, parts, initialIndex, timed }: Props) {
       <ExamHeader
         title={`Speaking · ${partLabel}`}
         subtitle={task.title}
-        seconds={limit !== null ? remaining : null}
+        readClock={limit !== null ? readRemaining : undefined}
         countdown
         onClose={exit}
+        tint={tint}
+        progress={total ? answered / total : undefined}
         right={
           <Pressable onPress={() => voice.setAutoRead(!voice.autoRead)} accessibilityRole="switch" accessibilityState={{ checked: voice.autoRead }} accessibilityLabel="Tự đọc câu hỏi" className="h-11 w-11 items-center justify-center">
-            <Volume2 size={20} color={voice.autoRead ? colors.accent : colors.muted} />
+            {voice.autoRead ? <Volume2 size={20} color={headerIconColor(tint)} /> : <VolumeX size={20} color={headerIconColor(tint)} />}
           </Pressable>
         }
       />
@@ -114,7 +129,7 @@ export function SpeakingRoom({ task, parts, initialIndex, timed }: Props) {
               </View>
             ) : null}
             <View className="mt-4 flex-row justify-center">
-              <Pressable onPress={voice.speaking ? voice.stop : voice.replay} accessibilityRole="button" className="min-h-10 flex-row items-center gap-2 rounded-full px-4" style={{ backgroundColor: colors.accentSoft }}>
+              <Pressable onPress={voice.speaking ? voice.stop : voice.replay} disabled={micLive} accessibilityRole="button" accessibilityState={{ disabled: micLive }} className="min-h-11 flex-row items-center gap-2 rounded-full px-4" style={{ backgroundColor: colors.accentSoft, opacity: micLive ? 0.5 : 1 }}>
                 {voice.speaking ? <Square size={14} color={colors.accentDeep} fill={colors.accentDeep} /> : <Volume2 size={17} color={colors.accentDeep} />}
                 <Text weight="bold" style={{ color: colors.accentDeep }}>{voice.speaking ? 'Dừng đọc' : 'Nghe câu hỏi'}</Text>
               </Pressable>
@@ -128,7 +143,7 @@ export function SpeakingRoom({ task, parts, initialIndex, timed }: Props) {
             saved={recordings.get(question.questionVersionId) ?? null}
             onSaved={(recording) => saveRecording(sessionId, question.questionVersionId, recording)}
             onStart={voice.stop}
-            onActive={study.setMediaActive}
+            onActive={onActive}
             maxSeconds={question.durationSeconds}
           />
         </ScrollView>
@@ -158,6 +173,7 @@ function RecorderCard({ saved, onSaved, onStart, onActive, locked, maxSeconds }:
   const { stop } = recorder;
 
   useEffect(() => { onActive(recording); }, [recording, onActive]);
+  useEffect(() => () => { onActive(false); }, [onActive]);
   useEffect(() => { if (locked && recording) void stop(); }, [locked, recording, stop]);
   useEffect(() => { if (recording && maxSeconds && recorder.elapsed >= maxSeconds) void stop(); }, [recording, maxSeconds, recorder.elapsed, stop]);
 
@@ -186,7 +202,8 @@ function RecorderCard({ saved, onSaved, onStart, onActive, locked, maxSeconds }:
         }}
       />
       <Text className="mt-1 text-center text-sm text-muted">{hint}</Text>
-      {recorder.recording ? <Playback uri={recorder.recording.uri} disabled={recording} /> : null}
+      {/* Busy too: playback must be silent before the microphone opens, or it is recorded into the answer. */}
+      {recorder.recording ? <Playback uri={recorder.recording.uri} disabled={recording || busy} /> : null}
       {recorder.recording?.silent && recorder.status === 'recorded' ? <Text className="mt-3 text-center text-sm" style={{ color: colors.danger }}>Không thu được tiếng nói trong bản ghi này. Hãy kiểm tra micro (và bỏ tắt tiếng) rồi ghi lại.</Text> : null}
       {recorder.status === 'denied' ? (
         <View className="mt-3 items-center gap-2">
@@ -236,7 +253,7 @@ function Playback({ uri, disabled }: { uri: string; disabled: boolean }) {
   return (
     <Pressable
       disabled={disabled}
-      onPress={() => { if (status.playing) player.pause(); else { void player.seekTo(0); player.play(); } }}
+      onPress={() => { if (status.playing) player.pause(); else void playFromStart(player); }}
       accessibilityRole="button"
       className="mt-3 min-h-11 flex-row items-center gap-2 rounded-full px-5"
       style={{ borderWidth: 2, borderColor: colors.line, opacity: disabled ? 0.5 : 1 }}>

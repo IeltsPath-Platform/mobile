@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/src/components/ui/text';
 import { colors } from '@/src/theme';
 
+import { useTicker } from '../hooks/use-ticker';
 import { formatClock } from '../model/clock';
 
 type ExamHeaderProps = {
@@ -14,6 +15,8 @@ type ExamHeaderProps = {
   onClose: () => void;
   /** Seconds shown in the clock; null hides the clock. */
   seconds?: number | null;
+  /** A live clock instead of `seconds`: re-read every second inside the header only, so the screen does not re-render. */
+  readClock?: () => number;
   /** Counting down: the clock turns red in the last five minutes. */
   countdown?: boolean;
   onSettings?: () => void;
@@ -30,9 +33,8 @@ export function headerIconColor(tint?: string) {
 }
 
 /** Top bar of every test screen: close, title, clock, display settings and the answered progress. */
-export function ExamHeader({ title, subtitle, onClose, seconds = null, countdown = false, onSettings, right, tint, progress }: ExamHeaderProps) {
+export function ExamHeader({ title, subtitle, onClose, seconds = null, readClock, countdown = false, onSettings, right, tint, progress }: ExamHeaderProps) {
   const insets = useSafeAreaInsets();
-  const urgent = countdown && seconds !== null && seconds <= 300;
   const onTint = Boolean(tint);
   const fg = onTint ? '#ffffff' : colors.ink;
   const icon = headerIconColor(tint);
@@ -46,16 +48,8 @@ export function ExamHeader({ title, subtitle, onClose, seconds = null, countdown
           <Text accessibilityRole="header" numberOfLines={1} weight="black" className="text-base" style={{ color: fg }}>{title}</Text>
           {subtitle ? <Text numberOfLines={1} weight="bold" className="text-[11px] uppercase tracking-wider" style={{ color: onTint ? 'rgba(255,255,255,0.8)' : colors.muted }}>{subtitle}</Text> : null}
         </View>
-        {seconds !== null ? (
-          <View
-            accessibilityRole="timer"
-            accessibilityLabel={countdown ? `Còn ${formatClock(seconds)}` : `Đã làm ${formatClock(seconds)}`}
-            className="mx-1 flex-row items-center gap-1.5 rounded-full px-3 py-1.5"
-            style={{ backgroundColor: urgent ? colors.danger : onTint ? '#ffffff' : colors.canvas }}>
-            <Timer size={15} color={urgent ? '#ffffff' : tint ?? colors.muted} strokeWidth={2.4} />
-            <Text weight="black" className="text-sm" style={{ color: urgent ? '#ffffff' : tint ?? colors.ink, fontVariant: ['tabular-nums'] }}>{formatClock(seconds)}</Text>
-          </View>
-        ) : null}
+        {readClock ? <LiveClock read={readClock} countdown={countdown} tint={tint} />
+          : seconds !== null ? <ClockPill seconds={seconds} countdown={countdown} tint={tint} /> : null}
         {right}
         {onSettings ? (
           <Pressable onPress={onSettings} accessibilityRole="button" accessibilityLabel="Cài đặt hiển thị" hitSlop={8} className="h-11 w-10 items-center justify-center rounded-full active:opacity-70">
@@ -68,6 +62,26 @@ export function ExamHeader({ title, subtitle, onClose, seconds = null, countdown
           <View style={{ height: 4, width: `${Math.round(Math.max(0, Math.min(1, progress)) * 100)}%`, backgroundColor: onTint ? '#ffffff' : colors.accent, borderTopRightRadius: 2, borderBottomRightRadius: 2 }} />
         </View>
       ) : null}
+    </View>
+  );
+}
+
+function LiveClock({ read, countdown, tint }: { read: () => number; countdown: boolean; tint?: string }) {
+  const seconds = useTicker(read);
+  return <ClockPill seconds={seconds} countdown={countdown} tint={tint} />;
+}
+
+function ClockPill({ seconds, countdown, tint }: { seconds: number; countdown: boolean; tint?: string }) {
+  const urgent = countdown && seconds <= 300;
+  const onTint = Boolean(tint);
+  return (
+    <View
+      accessibilityRole="timer"
+      accessibilityLabel={countdown ? `Còn ${formatClock(seconds)}` : `Đã làm ${formatClock(seconds)}`}
+      className="mx-1 flex-row items-center gap-1.5 rounded-full px-3 py-1.5"
+      style={{ backgroundColor: urgent ? colors.danger : onTint ? '#ffffff' : colors.canvas }}>
+      <Timer size={15} color={urgent ? '#ffffff' : tint ?? colors.muted} strokeWidth={2.4} />
+      <Text weight="black" className="text-sm" style={{ color: urgent ? '#ffffff' : tint ?? colors.ink, fontVariant: ['tabular-nums'] }}>{formatClock(seconds)}</Text>
     </View>
   );
 }

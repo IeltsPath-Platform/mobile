@@ -25,23 +25,29 @@ async function pickVoice() {
 
 /**
  * Reads a question aloud like an examiner. It starts by itself when the text changes (unless the learner turned that
- * off) and stops when the text changes again or the screen goes away.
+ * off) and stops when the text changes again or the screen goes away. While `muted` (the microphone is live) it never
+ * speaks, so the examiner's voice is not recorded into the answer.
  */
-export function useExaminerVoice(text: string) {
+export function useExaminerVoice(text: string, muted = false) {
   const [speaking, setSpeaking] = useState(false);
   const [autoRead, setAutoReadState] = useState(true);
-  const loaded = useRef(false);
+  /** Bumped by every stop, so a reading still choosing its voice does not start after it was cancelled. */
+  const generation = useRef(0);
+  const mutedRef = useRef(muted);
+  mutedRef.current = muted;
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then((value) => { setAutoReadState(value !== 'off'); loaded.current = true; }).catch(() => { loaded.current = true; });
+    AsyncStorage.getItem(STORAGE_KEY).then((value) => setAutoReadState(value !== 'off')).catch(() => undefined);
   }, []);
 
-  const stop = useCallback(() => { void Speech.stop(); setSpeaking(false); }, []);
+  const stop = useCallback(() => { generation.current += 1; void Speech.stop(); setSpeaking(false); }, []);
 
   const replay = useCallback(() => {
-    if (!text) return;
+    if (!text || mutedRef.current) return;
     void Speech.stop();
+    const turn = ++generation.current;
     void pickVoice().then((voice) => {
+      if (turn !== generation.current || mutedRef.current) return;
       Speech.speak(text, {
         language: 'en-GB', rate: RATE, voice,
         onStart: () => setSpeaking(true),
@@ -55,16 +61,17 @@ export function useExaminerVoice(text: string) {
   useEffect(() => {
     if (!text || !autoRead) return;
     const timer = setTimeout(replay, START_DELAY_MS);
-    return () => { clearTimeout(timer); void Speech.stop(); };
-  }, [text, autoRead, replay]);
+    return () => { clearTimeout(timer); stop(); };
+  }, [text, autoRead, replay, stop]);
 
-  useEffect(() => () => { void Speech.stop(); }, []);
+  useEffect(() => { if (muted) stop(); }, [muted, stop]);
+  useEffect(() => stop, [stop]);
 
   const setAutoRead = useCallback((on: boolean) => {
     setAutoReadState(on);
     void AsyncStorage.setItem(STORAGE_KEY, on ? 'on' : 'off').catch(() => undefined);
-    if (!on) void Speech.stop();
-  }, []);
+    if (!on) stop();
+  }, [stop]);
 
   return { speaking, autoRead, setAutoRead, replay, stop };
 }

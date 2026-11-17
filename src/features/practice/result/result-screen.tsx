@@ -172,7 +172,7 @@ function PriorityCard({ rated, answered, total, onPractise }: { rated: RatedForm
             <Text weight="black" className="text-xs uppercase tracking-wider" style={{ color: TONE[level[0]!.rating] }}>Ưu tiên số {index + 1}</Text>
             <View className="mt-1 flex-row flex-wrap gap-2">
               {level.map((format) => (
-                <Pressable key={format.formatCode} onPress={() => onPractise(format.formatCode)} accessibilityRole="button" className="rounded-full px-3 py-1.5" style={{ backgroundColor: colors.surface, borderWidth: 2, borderColor: TONE[format.rating] }}>
+                <Pressable key={format.formatCode} onPress={() => onPractise(format.formatCode)} accessibilityRole="button" className="min-h-11 justify-center rounded-full px-3 py-1.5" style={{ backgroundColor: colors.surface, borderWidth: 2, borderColor: TONE[format.rating] }}>
                   <Text weight="bold" className="text-sm text-ink">{practiceFormatLabel(format.formatCode)} · {format.percent}%</Text>
                 </Pressable>
               ))}
@@ -216,7 +216,7 @@ function FormatCards({ rated, scopeLabel, onPractise }: { rated: RatedFormat[]; 
           <View className="mt-1.5 flex-row items-center justify-between">
             <Text className="text-xs text-muted">{row.total} câu · đúng {row.correct} · sai {row.incorrect} · bỏ {row.blank}</Text>
             {row.percent < WEAK_BELOW_PERCENT ? (
-              <Pressable onPress={() => onPractise(row.formatCode)} accessibilityRole="button" hitSlop={6} className="flex-row items-center">
+              <Pressable onPress={() => onPractise(row.formatCode)} accessibilityRole="button" hitSlop={12} className="min-h-8 flex-row items-center">
                 <Text weight="bold" className="text-xs" style={{ color: colors.accentDeep }}>Luyện dạng này</Text><ChevronRight size={14} color={colors.accentDeep} />
               </Pressable>
             ) : <Text className="text-xs" style={{ color: colors.success }}>✓ Giữ phong độ</Text>}
@@ -244,7 +244,7 @@ function LossAnalysis({ rated, onPractise }: { rated: RatedFormat[]; onPractise:
                 <Text weight="bold" className="text-xs" style={{ color: TONE[format.rating] }}>{format.percent}% · {format.correct}/{format.total}</Text>
               </View>
               <Text className="mt-1 text-sm leading-5 text-ink"><Text weight="bold">Cách làm: </Text>{formatTip(format.formatCode)}</Text>
-              <Pressable onPress={() => onPractise(format.formatCode)} accessibilityRole="button" className="mt-1 self-start py-1"><Text weight="bold" className="text-sm" style={{ color: colors.accentDeep }}>Luyện dạng này ›</Text></Pressable>
+              <Pressable onPress={() => onPractise(format.formatCode)} accessibilityRole="button" className="mt-1 min-h-11 justify-center self-start"><Text weight="bold" className="text-sm" style={{ color: colors.accentDeep }}>Luyện dạng này ›</Text></Pressable>
             </View>
           ))}
         </View>

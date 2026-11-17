@@ -133,10 +133,6 @@ export function weakestCriteria(criteria: ResultCriterion[]): ResultCriterion[] 
   return criteria.filter((item) => item.band === lowest)
 }
 
-/** The first of the weakest criteria, or null when none stands out: where the result page opens. */
-export function weakestCriterion(criteria: ResultCriterion[]): ResultCriterion | null {
-  return weakestCriteria(criteria)[0] ?? null
-}
 
 /** Puts the places of one kind of mistake together, so a learner sees where it happens and every fix under one name. */
 export function groupErrors(errors: ResultError[]): ResultErrorGroup[] {

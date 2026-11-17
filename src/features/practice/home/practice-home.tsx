@@ -56,7 +56,8 @@ export const PracticeHome = forwardRef<ScrollViewInstance, Props>(function Pract
       onScroll={onScroll}
       scrollEventThrottle={16}
       className="flex-1 bg-canvas"
-      contentContainerStyle={{ paddingBottom: 120 }}
+      // Clears the floating tab bar (66 high above the bottom inset), like the other tabs.
+      contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 10) + 100 }}
       showsVerticalScrollIndicator={false}
       refreshControl={signedIn ? <RefreshControl refreshing={data.refreshing} onRefresh={() => void data.refresh()} tintColor="#ffffff" progressViewOffset={insets.top} /> : undefined}>
       {/* Greeting band: runs under the status bar and holds the one thing to do next. */}
@@ -76,13 +77,13 @@ export const PracticeHome = forwardRef<ScrollViewInstance, Props>(function Pract
         {signedIn && (data.streak || data.xp || data.targetBand) ? (
           <View className="mt-3 flex-row flex-wrap gap-2">
             {data.streak ? (
-              <Pressable onPress={() => open('/progress')} accessibilityRole="button" accessibilityLabel={`Chuỗi ${data.streak.currentDays} ngày${data.streak.activeToday ? ', hôm nay đã học' : ', hôm nay chưa học'}`} className="flex-row items-center gap-1.5 rounded-full px-3 py-1" style={{ backgroundColor: data.streak.activeToday ? colors.accentWarm : 'rgba(255,255,255,0.16)' }}>
+              <Pressable onPress={() => open('/progress')} accessibilityRole="button" accessibilityLabel={`Chuỗi ${data.streak.currentDays} ngày${data.streak.activeToday ? ', hôm nay đã học' : ', hôm nay chưa học'}`} className="min-h-11 flex-row items-center gap-1.5 rounded-full px-3 py-1" style={{ backgroundColor: data.streak.activeToday ? colors.accentWarm : 'rgba(255,255,255,0.16)' }}>
                 <Flame size={14} color="#ffffff" fill={data.streak.activeToday ? '#ffffff' : 'transparent'} />
                 <Text weight="black" className="text-xs" style={{ color: '#ffffff' }}>{data.streak.currentDays} ngày</Text>
               </Pressable>
             ) : null}
             {data.xp ? (
-              <Pressable onPress={() => open('/progress')} accessibilityRole="button" accessibilityLabel={`Cấp ${data.xp.level}, ${data.xp.totalXp} XP`} className="flex-row items-center gap-1.5 rounded-full px-3 py-1" style={{ backgroundColor: 'rgba(255,255,255,0.16)' }}>
+              <Pressable onPress={() => open('/progress')} accessibilityRole="button" accessibilityLabel={`Cấp ${data.xp.level}, ${data.xp.totalXp} XP`} className="min-h-11 flex-row items-center gap-1.5 rounded-full px-3 py-1" style={{ backgroundColor: 'rgba(255,255,255,0.16)' }}>
                 <Sparkles size={14} color="#ffffff" />
                 <Text weight="black" className="text-xs" style={{ color: '#ffffff' }}>Cấp {data.xp.level} · {data.xp.totalXp} XP</Text>
               </Pressable>
@@ -103,7 +104,7 @@ export const PracticeHome = forwardRef<ScrollViewInstance, Props>(function Pract
         <View className="flex-row flex-wrap" style={{ gap: 12 }}>
           {HOME_SKILLS.map((skill) => {
             const query = data.latestBySkill[skill];
-            return <SkillTile key={skill} skill={skill} signedIn={signedIn} loading={signedIn && query.isPending} latest={query.data?.[0] ?? null} onPress={() => open(`/practice/catalog/${skill}`)} />;
+            return <SkillTile key={skill} skill={skill} signedIn={signedIn} loading={signedIn && query.isPending} error={query.isError} latest={query.data?.[0] ?? null} onPress={() => open(`/practice/catalog/${skill}`)} />;
           })}
         </View>
 
@@ -135,7 +136,7 @@ export const PracticeHome = forwardRef<ScrollViewInstance, Props>(function Pract
         ) : null}
 
         <View className="mt-6 flex-row gap-3 rounded-3xl p-4" style={{ backgroundColor: colors.warmSoft }}>
-          <View className="h-10 w-10 items-center justify-center rounded-2xl" style={{ backgroundColor: '#ffffff' }}><Lightbulb size={20} color={colors.accentWarm} /></View>
+          <View className="h-10 w-10 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.surface }}><Lightbulb size={20} color={colors.accentWarm} /></View>
           <View className="flex-1">
             <Text weight="black" className="text-xs uppercase tracking-wider" style={{ color: colors.accentWarm }}>Mẹo {SKILL_META[tip.skill].label} hôm nay</Text>
             <Text className="mt-1 text-sm leading-5 text-ink">{tip.text}</Text>
@@ -148,7 +149,7 @@ export const PracticeHome = forwardRef<ScrollViewInstance, Props>(function Pract
 
 function SectionTitle({ title, note }: { title: string; note?: string }) {
   return (
-    <View className="mb-3 mt-6 flex-row items-end justify-between px-0">
+    <View className="mb-3 mt-6 flex-row flex-wrap items-end justify-between gap-x-3 gap-y-1 px-0">
       <Text accessibilityRole="header" weight="black" className="text-lg text-ink">{title}</Text>
       {note ? <Text className="text-xs text-muted">{note}</Text> : null}
     </View>
@@ -157,19 +158,20 @@ function SectionTitle({ title, note }: { title: string; note?: string }) {
 
 /** The white card inside the greeting band: continue the test in progress, start a first test, or sign in. */
 function NextCard({ signedIn, resume, onOpen }: { signedIn: boolean; resume: ReturnType<typeof useHomeData>['resume']; onOpen: (path: string) => void }) {
+  // `color` fills the button; `ink` is the same hue made readable as text on the (possibly dark) card surface.
   const content = !signedIn
-    ? { eyebrow: 'Bắt đầu', title: 'Đăng nhập để lưu bài làm và kết quả', action: 'Đăng nhập', path: '/(auth)/login', color: colors.accent }
+    ? { eyebrow: 'Bắt đầu', title: 'Đăng nhập để lưu bài làm và kết quả', action: 'Đăng nhập', path: '/(auth)/login', color: colors.accent, ink: colors.accentDeep }
     : resume
-      ? { eyebrow: 'Đang làm dở', title: resume.title || SKILL_META[resume.skill].label, action: 'Làm tiếp', path: `/practice/${resume.skill}/${resume.attemptId}`, color: skillColor(resume.skill) }
-      : { eyebrow: 'Gợi ý cho bạn', title: 'Bắt đầu với Listening Section 1, chỉ khoảng 10 phút', action: 'Bắt đầu', path: '/practice/catalog/listening?part=1', color: skillColor('listening') };
+      ? { eyebrow: 'Đang làm dở', title: resume.title || SKILL_META[resume.skill].label, action: 'Làm tiếp', path: `/practice/${resume.skill}/${resume.attemptId}`, color: skillColor(resume.skill), ink: skillInk(resume.skill) }
+      : { eyebrow: 'Gợi ý cho bạn', title: 'Bắt đầu với Listening Section 1, chỉ khoảng 10 phút', action: 'Bắt đầu', path: '/practice/catalog/listening?part=1', color: skillColor('listening'), ink: skillInk('listening') };
   return (
-    <Pressable onPress={() => (signedIn ? onOpen(content.path) : router.push('/(auth)/login' as never))} accessibilityRole="button" accessibilityLabel={`${content.eyebrow}: ${content.title}. ${content.action}`} className="mt-4">
+    <Pressable onPress={() => onOpen(content.path)} accessibilityRole="button" accessibilityLabel={`${content.eyebrow}: ${content.title}. ${content.action}`} className="mt-4">
       <View className="flex-row items-center gap-3 rounded-3xl p-4" style={{ backgroundColor: colors.surface }}>
         <View className="h-12 w-12 items-center justify-center rounded-2xl" style={{ backgroundColor: `${content.color}22` }}>
-          <PlayCircle size={26} color={content.color} />
+          <PlayCircle size={26} color={content.ink} />
         </View>
         <View className="flex-1">
-          <Text weight="black" className="text-[11px] uppercase tracking-wider" style={{ color: content.color }}>{content.eyebrow}</Text>
+          <Text weight="black" className="text-[11px] uppercase tracking-wider" style={{ color: content.ink }}>{content.eyebrow}</Text>
           <Text weight="extrabold" numberOfLines={2} className="text-base text-ink">{content.title}</Text>
         </View>
         <View className="flex-row items-center gap-1 rounded-full px-3 py-2" style={{ backgroundColor: content.color }}>
@@ -182,7 +184,7 @@ function NextCard({ signedIn, resume, onOpen }: { signedIn: boolean; resume: Ret
 }
 
 /** A skill as a tile: coloured head with the icon, the parts, and the latest result (or a nudge to take the first test). */
-function SkillTile({ skill, signedIn, loading, latest, onPress }: { skill: SkillType; signedIn: boolean; loading: boolean; latest: HistoryRow | null; onPress: () => void }) {
+function SkillTile({ skill, signedIn, loading, error, latest, onPress }: { skill: SkillType; signedIn: boolean; loading: boolean; error: boolean; latest: HistoryRow | null; onPress: () => void }) {
   const meta = SKILL_META[skill];
   const tint = skillColor(skill);
   const result = latest?.mark ? `${latest.mark.label} ${latest.mark.value}` : latest ? latest.status : null;
@@ -199,7 +201,8 @@ function SkillTile({ skill, signedIn, loading, latest, onPress }: { skill: Skill
           {loading ? <Skeleton height={16} width="70%" radius={6} style={{ marginTop: 4 }} />
             : !signedIn ? <Text weight="bold" className="text-sm" style={{ color: skillInk(skill) }}>Bắt đầu luyện ›</Text>
               : result ? <Text weight="extrabold" className="text-sm text-ink" numberOfLines={1}>Gần nhất: <Text weight="black" style={{ color: skillInk(skill) }}>{result}</Text></Text>
-                : <Text weight="bold" className="text-sm" style={{ color: skillInk(skill) }}>Làm đề đầu tiên ›</Text>}
+                : error ? <Text className="text-sm text-muted">Chưa tải được kết quả</Text>
+                  : <Text weight="bold" className="text-sm" style={{ color: skillInk(skill) }}>Làm đề đầu tiên ›</Text>}
         </View>
       </View>
     </Pressable>
@@ -209,14 +212,14 @@ function SkillTile({ skill, signedIn, loading, latest, onPress }: { skill: Skill
 function PendingRow({ row }: { row: HistoryRow }) {
   const route = row.href ? routeOf(row.href) : null;
   return (
-    <Pressable disabled={!route} onPress={() => route && router.push(route as never)} accessibilityRole="button" className="flex-row items-center gap-3 rounded-2xl bg-surface p-3" style={{ borderWidth: 2, borderColor: colors.line }}>
+    <Pressable disabled={!route} onPress={() => route && router.push(route as never)} accessibilityRole="button" accessibilityLabel={`${row.meta}. ${row.title}. ${row.status}`} className="flex-row items-center gap-3 rounded-3xl bg-surface p-3 active:opacity-80" style={{ borderWidth: 1.5, borderBottomWidth: 3.5, borderColor: colors.line, borderBottomColor: colors.edge }}>
       <View className="h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.warmSoft }}><Hourglass size={20} color={colors.accentWarm} /></View>
       <View className="flex-1">
         <Text className="text-xs text-muted" numberOfLines={1}>{row.meta}</Text>
         <Text weight="bold" className="text-sm text-ink" numberOfLines={1}>{row.title}</Text>
         <Text weight="bold" className="text-xs" style={{ color: colors.accentWarm }}>{row.status}</Text>
       </View>
-      <ChevronRight size={18} color={colors.muted} />
+      {route ? <ChevronRight size={18} color={colors.muted} /> : null}
     </Pressable>
   );
 }

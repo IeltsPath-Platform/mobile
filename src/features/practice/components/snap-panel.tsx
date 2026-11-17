@@ -43,8 +43,9 @@ export const SnapPanel = forwardRef<SnapPanelHandle, SnapPanelProps>(function Sn
   useImperativeHandle(ref, () => ({ snapTo: animateTo }));
 
   const responder = useRef(PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 4,
+    // Let a tap reach the accessible height button; only vertical drags take over.
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
     onPanResponderGrant: () => { start.current = height.value; },
     onPanResponderMove: (_, gesture) => {
       const max = SNAPS[2] * containerRef.current;

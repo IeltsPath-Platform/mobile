@@ -78,7 +78,7 @@ export function Priorities({ priorities, onShow }: { priorities: WritingPriority
       <View className="gap-4">
         {priorities.map((priority, index) => (
           <View key={`${priority.title}-${index}`} className="flex-row gap-3">
-            <View className="h-7 w-7 items-center justify-center rounded-full" style={{ backgroundColor: colors.accent }}><Text weight="black" className="text-xs" style={{ color: '#ffffff' }}>{index + 1}</Text></View>
+            <View className="h-7 w-7 items-center justify-center rounded-full" style={{ backgroundColor: colors.accent }}><Text weight="black" className="text-xs" style={{ color: colors.onAccent }}>{index + 1}</Text></View>
             <View className="flex-1">
               <Text weight="bold" className="text-sm text-ink">{priority.title}</Text>
               {priority.explanation ? <Text className="mt-0.5 text-sm leading-5 text-ink">{priority.explanation}</Text> : null}
@@ -136,7 +136,12 @@ export function DataChecksView({ checks, onShow }: { checks: WritingDataChecks; 
   );
 }
 
-const COVERAGE = { FULL: { label: 'Đã trả lời đủ', color: '#2f9e44' }, PARTIAL: { label: 'Mới trả lời một phần', color: '#e67700' }, NONE: { label: 'Chưa trả lời', color: '#e03131' } } as const;
+// Read at render: the theme colours change with dark mode.
+const coverageOf = (addressed: string) => (
+  addressed === 'FULL' ? { label: 'Đã trả lời đủ', color: colors.success }
+    : addressed === 'PARTIAL' ? { label: 'Mới trả lời một phần', color: colors.accentWarm }
+      : { label: 'Chưa trả lời', color: colors.danger }
+);
 const ROLE = { INTRODUCTION: 'Mở bài', BODY: 'Thân bài', CONCLUSION: 'Kết bài' } as const;
 
 export function TaskChecksView({ checks, onShow }: { checks: WritingTaskChecks; onShow: (excerpt: string) => void }) {
@@ -148,7 +153,7 @@ export function TaskChecksView({ checks, onShow }: { checks: WritingTaskChecks; 
   return (
     <Card title="Đề yêu cầu và bài bạn đã làm">
       {parts.map((part, index) => {
-        const coverage = COVERAGE[part.addressed] ?? COVERAGE.NONE;
+        const coverage = coverageOf(part.addressed);
         return (
           <View key={`${part.part}-${index}`} className="mt-2 rounded-2xl p-3" style={{ backgroundColor: colors.canvas }}>
             <Text className="text-sm text-ink">{part.part}</Text>

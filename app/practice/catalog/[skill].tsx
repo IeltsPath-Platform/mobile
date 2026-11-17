@@ -6,5 +6,6 @@ import { parseSkill } from '@/src/features/practice/model/skill-meta';
 export default function PracticeCatalogRoute() {
   const params = useLocalSearchParams<{ skill: string; part?: string; format?: string }>();
   const skill = parseSkill(params.skill);
-  return <CatalogScreen key={skill} skill={skill} initialPart={params.part} initialFormat={params.format} />;
+  // ?part= and ?format= only seed the screen's state, so a link that changes them starts the screen afresh.
+  return <CatalogScreen key={`${skill}|${params.part ?? ''}|${params.format ?? ''}`} skill={skill} initialPart={params.part} initialFormat={params.format} />;
 }

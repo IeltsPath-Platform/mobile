@@ -19,20 +19,22 @@ type SubmitSheetProps = {
   error?: string;
   /** Timed tests say the answers can no longer change; practice says the same in softer words. */
   timed: boolean;
+  /** The exam time is up: the sheet stays open, offering only to (re)submit. */
+  expired?: boolean;
 };
 
 /** The finish screen before submitting: what is still empty or flagged, and the irreversible submit. */
-export function SubmitSheet({ visible, onClose, onSubmit, total, unanswered, flagged, unsaved, submitting, error, timed }: SubmitSheetProps) {
+export function SubmitSheet({ visible, onClose, onSubmit, total, unanswered, flagged, unsaved, submitting, error, timed, expired = false }: SubmitSheetProps) {
   return (
     <Sheet
       visible={visible}
       onClose={onClose}
-      dismissable={!submitting}
-      title="Nộp bài?"
-      subtitle={timed ? 'Sau khi nộp bạn không sửa được đáp án.' : 'Bài sẽ được chấm ngay và bạn xem được giải thích từng câu.'}
+      dismissable={!submitting && !expired}
+      title={expired ? 'Hết giờ làm bài' : 'Nộp bài?'}
+      subtitle={expired ? 'Bài đang được nộp tự động. Nếu chưa nộp được, hãy kiểm tra mạng rồi nộp lại.' : timed ? 'Sau khi nộp bạn không sửa được đáp án.' : 'Bài sẽ được chấm ngay và bạn xem được giải thích từng câu.'}
       footer={<>
         <Button label="Nộp bài" loading={submitting} loadingLabel="Đang nộp…" onPress={onSubmit} />
-        <Button label="Làm tiếp" variant="secondary" disabled={submitting} onPress={onClose} />
+        {expired ? null : <Button label="Làm tiếp" variant="secondary" disabled={submitting} onPress={onClose} />}
       </>}>
       <View className="flex-row gap-2">
         <Stat label="Đã làm" value={`${total - unanswered}/${total}`} color={colors.success} />

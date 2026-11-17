@@ -168,7 +168,8 @@ export function getGradingTerms(signal?: AbortSignal) {
 }
 
 export function submitFreeWriting(input: { requestId: string; packageVersionId: string; questionVersionId: string; essayText: string }) {
-  return apiRequest<WritingSubmission>('/api/learning/free-writing/submissions', { method: 'POST', auth: true, body: input })
+  // AI grading answers inside the gateway's 60 s limit, well past the default request timeout.
+  return apiRequest<WritingSubmission>('/api/learning/free-writing/submissions', { method: 'POST', auth: true, body: input, timeoutMs: 60_000 })
 }
 
 export function getWritingSubmission(submissionId: string, signal?: AbortSignal) {

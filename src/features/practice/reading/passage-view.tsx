@@ -3,9 +3,11 @@ import { View } from 'react-native';
 
 import { Text } from '@/src/components/ui/text';
 
-import { MarkableText, type TextSelection } from '../components/markable-text';
+import { MarkableText, type TextSelection, type WordHandler } from '../components/markable-text';
 import { useReaderPrefs } from '../components/reader-prefs';
 import type { Highlight } from '../hooks/use-annotations';
+import { skillInk } from '../model/skill-meta';
+import { paragraphBlock } from '../model/mark-blocks';
 import type { Passage } from '../model/types';
 
 type PassageViewProps = {
@@ -16,11 +18,11 @@ type PassageViewProps = {
   passage: Passage;
   highlights: Highlight[];
   selection: TextSelection;
-  onWordPress: (block: string, index: number, word: string) => void;
-  onWordLongPress: (block: string, index: number, word: string) => void;
+  onWordPress: WordHandler;
+  onWordLongPress: WordHandler;
 };
 
-export const paragraphBlock = (sectionId: string, index: number) => `p:${sectionId}:${index}`;
+export { paragraphBlock };
 
 /** The passage as lettered paragraphs; every word answers tap (look up / mark menu) and long-press (select). */
 export const PassageView = memo(function PassageView({ sectionId, tint, title, instructions, passage, highlights, selection, onWordPress, onWordLongPress }: PassageViewProps) {
@@ -35,7 +37,7 @@ export const PassageView = memo(function PassageView({ sectionId, tint, title, i
           <View key={index} className="flex-row gap-2.5">
             {paragraph.label ? (
               <View className="items-center justify-center rounded-lg" style={{ width: 26, height: 26, marginTop: Math.max(0, (text.lineHeight - 26) / 2), backgroundColor: `${tint}22` }}>
-                <Text weight="black" className="text-[13px]" style={{ color: tint }}>{paragraph.label}</Text>
+                <Text weight="black" className="text-[13px]" style={{ color: skillInk('reading') }}>{paragraph.label}</Text>
               </View>
             ) : null}
             <View className="flex-1">

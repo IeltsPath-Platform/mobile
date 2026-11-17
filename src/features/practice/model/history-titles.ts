@@ -32,8 +32,3 @@ export function historyTitleMap(requests: Array<{ scope: ReadingScope; items: Re
   }
   return titles
 }
-
-export function historyTitle(item: ReadingHistoryItem, titles: Map<string, string>) {
-  const partNo = item.scope === 'PART' ? item.partNos[0] : null
-  return titles.get(`${item.scope}:${item.packageId}:${partNo ?? ''}`) ?? `Bài Reading${partNo ? ` · Passage ${partNo}` : ''}`
-}

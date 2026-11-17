@@ -3,10 +3,12 @@ import { router } from 'expo-router';
 import { Ban, CheckCircle2, ChevronRight, ExternalLink, History, Hourglass, TriangleAlert } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/src/components/ui/button';
 import { EmptyState } from '@/src/components/ui/empty-state';
 import { Text } from '@/src/components/ui/text';
+import { Skeleton } from '@/src/components/ui/skeleton';
 import { colors } from '@/src/theme';
 
 import { listExaminerReviews } from '../api/examiner-reviews';
@@ -43,7 +45,7 @@ export function HistoryScreen({ initialTab = 'practice', initialSkill = 'listeni
           {TABS.map((item) => {
             const active = tab === item.key;
             return (
-              <Pressable key={item.key} onPress={() => setTab(item.key)} accessibilityRole="tab" accessibilityState={{ selected: active }} className="min-h-10 justify-center rounded-full px-4" style={{ backgroundColor: active ? '#ffffff' : 'rgba(255,255,255,0.18)' }}>
+              <Pressable key={item.key} onPress={() => setTab(item.key)} accessibilityRole="tab" accessibilityState={{ selected: active }} className="min-h-11 justify-center rounded-full px-4" style={{ backgroundColor: active ? '#ffffff' : 'rgba(255,255,255,0.18)' }}>
                 <Text weight="extrabold" className="text-sm" style={{ color: active ? colors.heroStart : '#ffffff' }}>{item.label}</Text>
               </Pressable>
             );
@@ -76,6 +78,7 @@ export function HistoryScreen({ initialTab = 'practice', initialSkill = 'listeni
 }
 
 function RowList({ queryKey, load, empty, catalog }: { queryKey: unknown[]; load: (page: number) => Promise<HistoryPage>; empty: string; catalog?: string }) {
+  const insets = useSafeAreaInsets();
   const query = useInfiniteQuery({
     queryKey,
     initialPageParam: 0,
@@ -88,11 +91,11 @@ function RowList({ queryKey, load, empty, catalog }: { queryKey: unknown[]; load
       data={rows}
       keyExtractor={(row) => row.key}
       renderItem={({ item }) => <HistoryRowCard row={item} />}
-      contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 40 }}
+      contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: insets.bottom + 32 }}
       onEndReachedThreshold={0.4}
-      onEndReached={() => { if (query.hasNextPage && !query.isFetchingNextPage) void query.fetchNextPage(); }}
+      onEndReached={() => { if (query.hasNextPage && !query.isFetching) void query.fetchNextPage(); }}
       refreshControl={<RefreshControl refreshing={query.isRefetching && !query.isFetchingNextPage} onRefresh={() => void query.refetch()} tintColor={colors.accent} />}
-      ListEmptyComponent={query.isPending ? <ActivityIndicator className="py-8" color={colors.accent} /> : query.isError ? (
+      ListEmptyComponent={query.isPending ? <RowSkeletons /> : query.isError ? (
         <EmptyState title="Chưa tải được lịch sử" message={query.error.message} mood="oops" action={<Button label="Thử lại" variant="secondary" onPress={() => void query.refetch()} />} />
       ) : <EmptyState title={empty} message="Bài bạn nộp sẽ hiện ở đây." action={catalog ? <Button label="Chọn đề" onPress={() => router.push(catalog as never)} /> : undefined} />}
       ListFooterComponent={query.isFetchingNextPage ? <ActivityIndicator className="py-4" color={colors.accent} /> : undefined}
@@ -128,6 +131,7 @@ const FILTERS: Array<{ key: ReviewFilter; label: string }> = [{ key: 'ALL', labe
 
 /** Essays sent to a teacher, joined with how each grading job stands (waiting, late, done, cancelled). */
 function TeacherReviews() {
+  const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<ReviewFilter>('ALL');
   const reviews = useInfiniteQuery({
     queryKey: ['practice', 'examiner-reviews'],
@@ -144,15 +148,15 @@ function TeacherReviews() {
       data={shown}
       keyExtractor={(row) => row.reviewSubmissionId}
       renderItem={({ item }) => <ReviewCard row={item} />}
-      contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 40 }}
+      contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: insets.bottom + 32 }}
       onEndReachedThreshold={0.4}
-      onEndReached={() => { if (reviews.hasNextPage && !reviews.isFetchingNextPage) void reviews.fetchNextPage(); }}
+      onEndReached={() => { if (reviews.hasNextPage && !reviews.isFetching) void reviews.fetchNextPage(); }}
       refreshControl={<RefreshControl refreshing={reviews.isRefetching} onRefresh={() => { void reviews.refetch(); void jobs.refetch(); }} tintColor={colors.accent} />}
       ListHeaderComponent={rows.length ? (
         <View className="mb-1 gap-2">
           <View className="flex-row gap-2">
             {FILTERS.map((item) => (
-              <Pressable key={item.key} onPress={() => setFilter(item.key)} accessibilityRole="tab" accessibilityState={{ selected: filter === item.key }} className="min-h-9 flex-row items-center gap-1 rounded-full px-3" style={{ backgroundColor: filter === item.key ? colors.accentSoft : colors.surface, borderWidth: 2, borderColor: filter === item.key ? colors.accent : colors.line }}>
+              <Pressable key={item.key} onPress={() => setFilter(item.key)} accessibilityRole="tab" accessibilityState={{ selected: filter === item.key }} className="min-h-11 flex-row items-center gap-1 rounded-full px-3" style={{ backgroundColor: filter === item.key ? colors.accentSoft : colors.surface, borderWidth: 2, borderColor: filter === item.key ? colors.accent : colors.line }}>
                 <Text weight="bold" className="text-xs" style={{ color: filter === item.key ? colors.accentDeep : colors.ink }}>{item.label}</Text>
                 <Text className="text-xs text-muted">{counts[item.key]}</Text>
               </Pressable>
@@ -161,7 +165,7 @@ function TeacherReviews() {
           {jobs.isError ? <Text className="text-xs text-muted">Chưa lấy được trạng thái chấm bài; các bài đang hiện là đang chờ.</Text> : null}
         </View>
       ) : undefined}
-      ListEmptyComponent={reviews.isPending ? <ActivityIndicator className="py-8" color={colors.accent} /> : reviews.isError ? (
+      ListEmptyComponent={reviews.isPending ? <RowSkeletons /> : reviews.isError ? (
         <EmptyState title="Chưa tải được danh sách" message={reviews.error.message} mood="oops" action={<Button label="Thử lại" variant="secondary" onPress={() => void reviews.refetch()} />} />
       ) : rows.length ? <Text className="py-6 text-center text-sm text-muted">Không có bài nào ở mục này.</Text> : (
         <EmptyState title="Bạn chưa gửi bài nào cho giáo viên" message="Khi bạn chọn giáo viên chấm một bài Writing, bài đó sẽ hiện ở đây." action={<Button label="Đến danh mục Writing" onPress={() => router.push('/practice/catalog/writing' as never)} />} />
@@ -190,4 +194,9 @@ function ReviewCard({ row }: { row: ReviewRow }) {
       <ChevronRight size={18} color={colors.muted} />
     </Pressable>
   );
+}
+
+/** Placeholder rows shaped like the history cards while the first page loads. */
+function RowSkeletons() {
+  return <View className="gap-2.5">{[0, 1, 2, 3].map((index) => <Skeleton key={index} height={84} radius={24} />)}</View>;
 }

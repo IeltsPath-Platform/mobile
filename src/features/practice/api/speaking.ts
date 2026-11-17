@@ -1,4 +1,6 @@
 // Ported from frontend/src/features/practice/speaking/speakingPracticeApi.ts. Keep behaviour in step with the web version.
+import { File as ExpoFile } from 'expo-file-system'
+
 import { apiRequest } from '@/src/lib/api-client'
 
 /** What AI grading of a Speaking submission costs and the largest file the server accepts for one question. */
@@ -48,19 +50,14 @@ export function createSpeakingSubmission(input: { requestId: string; packageVers
 }
 
 /**
- * Opens the recorded answer of a lesson's practice attempt. Same checks as above, and the submission keeps the lesson and
- * the attempt: its grade reaches mastery when the attempt is submitted. 409 when the attempt already has a graded answer.
+ * Sends one answer: a WAV file on the device. Expo SDK 58's fetch reads a multipart part through bytes(); React Native's
+ * `{ uri }` part is refused there before any request is made (it surfaced as a lost connection), so the part reads the
+ * file itself.
  */
-export function createLessonSpeakingSubmission(attemptId: string, input: { requestId: string; consent: boolean }) {
-  return apiRequest<SpeakingSubmission>(`/api/learning/practice-attempts/${attemptId}/speaking-submissions`, {
-    method: 'POST', auth: true, body: input,
-  })
-}
-
-/** Sends one answer: a WAV file on the device (React Native FormData takes the file by its URI). */
 export function uploadSpeakingRecording(submissionId: string, questionVersionId: string, wavUri: string, durationMs: number) {
+  const wav = new ExpoFile(wavUri)
   const form = new FormData()
-  form.append('file', { uri: wavUri, name: 'answer.wav', type: 'audio/wav' } as unknown as Blob)
+  form.append('file', { name: 'answer.wav', type: 'audio/wav', bytes: () => wav.bytes() } as unknown as Blob)
   form.append('durationMs', String(Math.max(0, Math.round(durationMs))))
   return apiRequest<SpeakingSubmission>(`${BASE}/submissions/${submissionId}/recordings/${questionVersionId}`, {
     method: 'PUT', auth: true, body: form, timeoutMs: UPLOAD_TIMEOUT_MS,

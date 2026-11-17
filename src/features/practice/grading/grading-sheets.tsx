@@ -74,7 +74,7 @@ export function GradeMethodSheet({ visible, options, context, copy, onTeacher, o
 
 function MethodCard({ icon, title, text, status, ok, statusIcon, action }: { icon: React.ReactNode; title: string; text: string; status: string; ok: boolean; statusIcon: React.ReactNode; action: React.ReactNode }) {
   return (
-    <View className="gap-2 rounded-3xl p-4" style={{ borderWidth: 2, borderColor: ok ? colors.line : colors.line, backgroundColor: ok ? colors.surface : colors.canvas, opacity: ok ? 1 : 0.85 }}>
+    <View className="gap-2 rounded-3xl p-4" style={{ borderWidth: 2, borderColor: colors.line, backgroundColor: ok ? colors.surface : colors.canvas, opacity: ok ? 1 : 0.85 }}>
       <View className="flex-row items-center gap-3">
         <View className="h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.accentSoft }}>{icon}</View>
         <Text weight="black" className="text-base text-ink">{title}</Text>
@@ -186,10 +186,15 @@ export function NotEnoughPointsSheet({ visible, cost, balance, onActivate, onClo
 /** Enter an activation key: points or Premium days are added to the account at once. */
 export function ActivateKeySheet({ visible, product, onActivated, onClose }: { visible: boolean; product: ActivationProduct | null; onActivated: (result: ActivationResult) => void; onClose: () => void }) {
   const [key, setKey] = useState('');
-  const requestId = useRef(createRequestId());
+  // One idempotency key per typed key: a retry after a lost answer replays the same activation, while a corrected key is
+  // a new request (the server refuses an idempotency key that already redeemed a different key).
+  const request = useRef<{ key: string; id: string } | null>(null);
   const activate = useMutation({
-    mutationFn: () => accessApi.activateKey(key, requestId.current),
-    onSuccess: (result) => { requestId.current = createRequestId(); setKey(''); onActivated(result); },
+    mutationFn: () => {
+      if (request.current?.key !== key) request.current = { key, id: createRequestId() };
+      return accessApi.activateKey(key, request.current.id);
+    },
+    onSuccess: (result) => { request.current = null; setKey(''); onActivated(result); },
   });
   const result = activate.data;
   return (

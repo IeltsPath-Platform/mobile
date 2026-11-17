@@ -93,7 +93,7 @@ export function pickEntry(items: LookupItem[], forms: string[]): WordEntry | nul
   return pronunciationOnly
 }
 
-// Words already looked up in this browser tab; a word that is not in the library is remembered too (null).
+// Words already looked up while the app runs; a word that is not in the library is remembered too (null).
 const cache = new Map<string, WordEntry | null>()
 
 export async function lookupWord(word: string, signal?: AbortSignal): Promise<WordEntry | null> {

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ban, Check, ExternalLink, Hourglass } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, View } from 'react-native';
@@ -7,7 +7,7 @@ import { BackHeader } from '@/src/components/navigation/back-header';
 import { Button } from '@/src/components/ui/button';
 import { EmptyState } from '@/src/components/ui/empty-state';
 import { Text } from '@/src/components/ui/text';
-import { colors } from '@/src/theme';
+import { colors, lightColors } from '@/src/theme';
 
 import { getApprovedErrorTypes, errorTypesByCode, type LearnerErrorType } from '../../api/examiner-reviews';
 import { getExaminer, getHumanReview, readStudyPoints, type ExaminerStudyPoint, type HumanReview } from '../../api/examiners';
@@ -15,6 +15,7 @@ import { findJobOfReview, type MyGradingJob } from '../../api/grading-jobs';
 import { WEB_APP_URL, openOnWeb, practiseKnowledgePointOnWeb } from '../../api/learning-links';
 import type { WritingSubmission } from '../../api/writing';
 import { Sheet } from '../../components/sheet';
+import { BandScore, SkillBand } from '../../components/skill-band';
 import { ExaminerAvatar } from '../../grading/grading-sheets';
 import { LateExaminerNotice } from '../../grading/late-examiner-notice';
 import { CRITERION_NAME } from '../../model/essay-criteria';
@@ -24,11 +25,13 @@ import { criterionName, markByOffsets, shownMarks } from '../../model/review-mar
 import { Card } from './writing-blocks';
 
 const POLL_MS = 60_000;
+const CATALOG = '/practice/catalog/writing';
 const SHORT_NAME: Record<string, string> = { taskResponse: 'TR', coherence: 'CC', lexical: 'LR', grammar: 'GRA' };
 const tidy = (text: string) => text.trim().replace(/\n\s*\n+/g, '\n');
 
 /** An essay sent to a teacher: who grades it, the way to the review, and the review itself once it is done. */
 export function ExaminerResultView({ submission, submissionId, title }: { submission: WritingSubmission; submissionId: string; title: string }) {
+  const client = useQueryClient();
   const review = useQuery({
     queryKey: ['practice', 'human-review', submissionId],
     queryFn: ({ signal }) => getHumanReview(submissionId, signal),
@@ -44,21 +47,29 @@ export function ExaminerResultView({ submission, submissionId, title }: { submis
   const types = useMemo(() => errorTypesByCode(catalogue.data), [catalogue.data]);
   const essay = submission.essayText ?? '';
 
-  const refresh = () => { void review.refetch(); void job.refetch(); };
+  const refresh = () => {
+    void review.refetch();
+    void job.refetch();
+    // A change or cancel decides whether the prompt still shows "đang chờ giáo viên chấm" on the writing screen.
+    void client.invalidateQueries({ queryKey: ['practice', 'writing-pending'] });
+    void client.invalidateQueries({ queryKey: ['practice', 'grading-jobs'] });
+  };
 
   if (review.isError) {
     return (
       <View className="flex-1 bg-canvas">
-        <BackHeader title="Kết quả Writing" fallbackHref="/practice/catalog/writing" />
+        <BackHeader title="Kết quả Writing" fallbackHref={CATALOG} />
         <EmptyState title="Chưa tải được bài chấm" message={review.error.message} mood="oops" action={<Button label="Thử lại" variant="secondary" onPress={refresh} />} />
       </View>
     );
   }
 
   return (
-    <View className="flex-1 bg-canvas">
-      <BackHeader title="Giáo viên chấm" subtitle={title} fallbackHref="/practice/catalog/writing" />
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 14 }}>
+    <ScrollView className="flex-1 bg-canvas" contentContainerStyle={{ paddingBottom: 40 }}>
+      <SkillBand color={colors.skill.writing} title="Giáo viên chấm" subtitle={title} fallbackHref={CATALOG}>
+        {done && review.data ? <TeacherBand review={review.data} /> : null}
+      </SkillBand>
+      <View style={{ padding: 16, gap: 14 }}>
         {profile.data ? (
           <View className="flex-row items-center gap-3 rounded-3xl bg-surface p-4" style={{ borderWidth: 2, borderColor: colors.line }}>
             <ExaminerAvatar examiner={profile.data} size={52} />
@@ -80,8 +91,29 @@ export function ExaminerResultView({ submission, submissionId, title }: { submis
             </Card>
           </>
         )}
-      </ScrollView>
-    </View>
+      </View>
+    </ScrollView>
+  );
+}
+
+/** The teacher's overall band and the four criteria, in the skill band at the top. */
+function TeacherBand({ review }: { review: HumanReview }) {
+  const criteria = review.criteria ?? [];
+  return (
+    <BandScore
+      label="Band tổng · Giáo viên chấm"
+      value={(review.band ?? 0).toFixed(1)}
+      extra={criteria.length ? (
+        <View className="mt-2 flex-row flex-wrap gap-2">
+          {criteria.map((item) => (
+            <View key={item.criterion} accessibilityLabel={`${criterionName(item.criterion)} ${item.band.toFixed(1)}`} className="rounded-2xl px-3 py-1.5" style={{ backgroundColor: 'rgba(255,255,255,0.18)' }}>
+              <Text className="text-[11px]" style={{ color: 'rgba(255,255,255,0.85)' }}>{SHORT_NAME[item.criterion] ?? criterionName(item.criterion)}</Text>
+              <Text weight="extrabold" className="text-base" style={{ color: '#ffffff' }}>{item.band.toFixed(1)}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+    />
   );
 }
 
@@ -99,7 +131,7 @@ function Waiting({ job }: { job: MyGradingJob | null }) {
         <View key={step.title} className="flex-row gap-3">
           <View className="items-center">
             <View className="h-7 w-7 items-center justify-center rounded-full" style={{ backgroundColor: step.state === 'done' ? colors.success : step.state === 'current' ? colors.accentWarm : colors.line }}>
-              {step.state === 'done' ? <Check size={14} color="#ffffff" /> : step.state === 'current' ? <Hourglass size={13} color="#ffffff" /> : null}
+              {step.state === 'done' ? <Check size={14} color={colors.onAccent} /> : step.state === 'current' ? <Hourglass size={13} color={colors.onAccent} /> : null}
             </View>
             {index < steps.length - 1 ? <View style={{ width: 2, flex: 1, minHeight: 18, backgroundColor: colors.line }} /> : null}
           </View>
@@ -134,24 +166,11 @@ function Done({ review, essay, types }: { review: HumanReview; essay: string; ty
 
   return (
     <>
-      <View className="rounded-3xl p-4" style={{ backgroundColor: colors.accentSoft }}>
-        <Text weight="bold" className="text-xs uppercase tracking-wider" style={{ color: colors.accentDeep }}>Band tổng</Text>
-        <Text weight="black" style={{ fontSize: 52, lineHeight: 58, color: colors.accentDeep }}>{(review.band ?? 0).toFixed(1)}</Text>
-        <View className="mt-2 flex-row flex-wrap gap-2">
-          {criteria.map((item) => (
-            <View key={item.criterion} className="rounded-2xl bg-surface px-3 py-1.5">
-              <Text className="text-[11px] text-muted">{SHORT_NAME[item.criterion] ?? criterionName(item.criterion)}</Text>
-              <Text weight="extrabold" className="text-base text-ink">{item.band.toFixed(1)}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
-
       <Card title={`Bài viết của bạn${marks.length ? ' đã được giáo viên đánh dấu' : ''}`}>
-        {marks.length ? <Text className="mb-2 text-xs text-muted">Chạm vào chỗ được tô vàng để xem lỗi và cách sửa.</Text> : null}
+        {marks.length ? <Text className="mb-2 text-xs text-muted">Chạm vào chỗ được tô màu để xem lỗi và cách sửa.</Text> : null}
         <Text className="text-base leading-7 text-ink">
           {segments.map((segment, index) => segment.annotation ? (
-            <Text key={index} suppressHighlighting onPress={() => setActive(segment.number ?? null)} style={{ backgroundColor: segment.number === active ? '#ffd43b' : '#fff3bf', textDecorationLine: 'underline' }}>
+            <Text key={index} suppressHighlighting onPress={() => setActive(segment.number ?? null)} style={segment.number === active ? { backgroundColor: colors.xp, color: lightColors.ink, textDecorationLine: 'underline' } : { backgroundColor: colors.warmSoft, textDecorationLine: 'underline' }}>
               {segment.text}<Text weight="bold" className="text-[10px]" style={{ color: colors.accentWarm }}> {segment.number}</Text>
             </Text>
           ) : <Text key={index}>{segment.text}</Text>)}
@@ -161,7 +180,7 @@ function Done({ review, essay, types }: { review: HumanReview; essay: string; ty
       {marks.length ? (
         <Card title={`Các lỗi cần sửa (${marks.length})`}>
           {marks.map(({ annotation, number }) => (
-            <Pressable key={number} onPress={() => setActive(number)} accessibilityRole="button" className="mt-2 rounded-2xl p-3" style={{ backgroundColor: number === active ? '#fff3bf' : colors.canvas }}>
+            <Pressable key={number} onPress={() => setActive(number)} accessibilityRole="button" className="mt-2 rounded-2xl p-3" style={{ backgroundColor: number === active ? colors.warmSoft : colors.canvas }}>
               <Text className="text-sm text-ink">
                 <Text weight="black" style={{ color: colors.accentWarm }}>{number}. </Text>
                 {annotation.errorCode ? <Text weight="bold">[{nameOf(annotation.errorCode)}] </Text> : null}

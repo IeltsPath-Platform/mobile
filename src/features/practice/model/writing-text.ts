@@ -7,11 +7,6 @@ export function countWords(text: string) {
   return text.match(WORD)?.length ?? 0
 }
 
-export function formatClock(totalSeconds: number) {
-  const safe = Math.max(0, Math.floor(totalSeconds))
-  return `${String(Math.floor(safe / 60)).padStart(2, '0')}:${String(safe % 60).padStart(2, '0')}`
-}
-
 /** The parts a free essay is written in, in order. Task 1 has an overview; Task 2 ends with a conclusion. */
 export function essaySections(task: 'TASK_1' | 'TASK_2' | null) {
   return task === 'TASK_2' ? ['Introduction', 'Body 1', 'Body 2', 'Conclusion'] : ['Introduction', 'Overview', 'Body 1', 'Body 2']
@@ -104,7 +99,13 @@ export interface WritingDraft {
 export async function loadDraft(key: string): Promise<WritingDraft | null> {
   try {
     const raw = await AsyncStorage.getItem(DRAFT_PREFIX + key)
-    return raw ? (JSON.parse(raw) as WritingDraft) : null
+    if (!raw) return null
+    const draft: unknown = JSON.parse(raw)
+    if (typeof draft !== 'object' || draft === null) return null
+    const value = draft as Partial<WritingDraft>
+    if (!Array.isArray(value.texts) || !value.texts.every((text) => typeof text === 'string')
+      || typeof value.seconds !== 'number' || !Number.isFinite(value.seconds) || value.seconds < 0) return null
+    return value as WritingDraft
   } catch { return null }
 }
 

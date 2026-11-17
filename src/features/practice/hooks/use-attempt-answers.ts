@@ -1,5 +1,6 @@
 // Ported from frontend/src/features/learning-path/lib/useAttemptAnswers.ts.
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 
 import { saveAttemptAnswer } from '../api/attempts';
 import { answerOf, type SavedResponse } from '../model/sections';
@@ -45,7 +46,7 @@ export function useAttemptAnswers(attemptId: string, saved: SavedResponse[]) {
     clearTimeout(timers.current[itemId]);
     const value = (rawValue ?? latest.current[itemId] ?? '').trim();
     const run = async () => {
-      if (!value || savedValues.current[itemId] === value) return true;
+      if ((savedValues.current[itemId] ?? '') === value) return true;
       if (mounted.current) setSaveStates((current) => ({ ...current, [itemId]: 'saving' }));
       try {
         const response = await saveAttemptAnswer(attemptId, itemId, value, revisions.current[itemId] ?? 0);
@@ -78,6 +79,14 @@ export function useAttemptAnswers(attemptId: string, saved: SavedResponse[]) {
     const results = await Promise.all(ids.map((id) => saveAnswer(id)));
     return results.every(Boolean);
   }, [saveAnswer]);
+
+  // Flush typed answers before the phone suspends the screen or navigation unmounts it.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') void flushAll();
+    });
+    return () => { subscription.remove(); void flushAll(); };
+  }, [flushAll]);
 
   const failed = Object.values(saveStates).filter((state) => state === 'error').length;
   const saving = Object.values(saveStates).some((state) => state === 'saving');

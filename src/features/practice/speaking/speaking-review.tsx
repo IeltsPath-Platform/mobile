@@ -24,8 +24,9 @@ import { useWallet, type GradingAccess } from '../grading/use-wallet';
 import { formatClock } from '../model/clock';
 import { gradeOptions, type GradeOptions } from '../model/grade-options';
 import { parseCueCard } from '../model/speaking-cue';
-import { clearSession, useSessionRecordings } from '../model/speaking-session';
+import { clearSession, readPendingSend, useSessionRecordings, writePendingSend } from '../model/speaking-session';
 import { sendSpeakingSubmission, type RecordingToSend, type SendProgress } from './send-submission';
+import { playFromStart } from './use-recorder';
 
 const CATALOG = '/practice/catalog/speaking';
 const TEACHER_SOON = 'Giáo viên chấm Speaking sắp có. Hiện bài Speaking được AI chấm.';
@@ -82,6 +83,18 @@ export function SpeakingReview({ packageVersionId, parts }: { packageVersionId: 
   const [sent, setSent] = useState<{ id: string; count: number } | null>(null);
   const [activation, setActivation] = useState<ActivationProduct | null>(null);
   const requestId = useRef<string | null>(null);
+  /** Files uploaded under `requestId`; dropped with it. */
+  const sentFiles = useRef(new Map<string, string>());
+  // An unfinished send from an earlier visit (the app was closed mid-upload) is continued, not started over.
+  useEffect(() => {
+    let alive = true;
+    void readPendingSend(packageVersionId).then((pending) => {
+      if (!alive || !pending || requestId.current) return;
+      requestId.current = pending.requestId;
+      sentFiles.current = pending.sent;
+    });
+    return () => { alive = false; };
+  }, [packageVersionId]);
   const [playing, setPlaying] = useState<string | null>(null);
   const guardOff = useLeaveTestGuard(recordings.size > 0 && !sent, 'Các bản ghi được giữ trên thiết bị này. Bạn có thể quay lại để nộp sau.', 'Chưa gửi bài Speaking');
 
@@ -109,14 +122,21 @@ export function SpeakingReview({ packageVersionId, parts }: { packageVersionId: 
   }
 
   async function send() {
-    if (sending || !terms || terms.enabled === false || !consent || toSend.length === 0) return;
+    if (sending || problem || !terms || terms.enabled === false || !consent || toSend.length === 0) return;
     requestId.current ??= createRequestId();
+    const pending = { requestId: requestId.current, sent: sentFiles.current };
+    writePendingSend(packageVersionId, pending);
     setSending(true);
     setError('');
     setProgress(null);
     try {
-      const submission = await sendSpeakingSubmission({ requestId: requestId.current, packageVersionId, partSectionIds: parts, recordings: toSend, maxRecordingBytes: terms.maxRecordingBytes, onProgress: setProgress });
+      const submission = await sendSpeakingSubmission({
+        requestId: requestId.current, packageVersionId, partSectionIds: parts, recordings: toSend, maxRecordingBytes: terms.maxRecordingBytes, sent: sentFiles.current,
+        onProgress: (next) => { setProgress(next); writePendingSend(packageVersionId, pending); },
+      });
       requestId.current = null;
+      sentFiles.current = new Map();
+      writePendingSend(packageVersionId, null);
       guardOff();
       setSent({ id: submission.id, count: toSend.length });
       clearSession(packageVersionId);
@@ -124,7 +144,13 @@ export function SpeakingReview({ packageVersionId, parts }: { packageVersionId: 
       setPopup('sent');
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 402) { void wallet.checkAccess(); setPopup('short'); }
-      else setError(failureMessage(cause));
+      else if (cause instanceof ApiError && (cause.code === 'SPEAKING_SUBMISSION_NOT_UPLOADING' || cause.code === 'SPEAKING_SUBMISSION_ABANDONED')) {
+        // The server gave up the upload this send was continuing (left unfinished too long): the next send opens a new one.
+        requestId.current = null;
+        sentFiles.current = new Map();
+        writePendingSend(packageVersionId, null);
+        setError('Lần gửi trước đã quá hạn. Bản ghi của bạn vẫn còn, hãy bấm gửi lại.');
+      } else setError(failureMessage(cause));
     } finally {
       setSending(false);
     }
@@ -168,8 +194,8 @@ export function SpeakingReview({ packageVersionId, parts }: { packageVersionId: 
                   <Text className="text-sm leading-5 text-ink"><Text weight="black">{index + 1}. </Text>{parseCueCard(question.prompt).topic}</Text>
                   <Text className="mt-1 text-xs" style={{ color: tone }}>{!recording ? 'Chưa ghi âm' : recording.silent ? 'Không thu được tiếng nói' : `Đã ghi âm · ${formatClock(recording.durationSeconds)}`}</Text>
                   <View className="mt-2 flex-row gap-2">
-                    {recording ? <PlayButton uri={recording.uri} active={playing === question.questionVersionId} onToggle={(on) => setPlaying(on ? question.questionVersionId : null)} /> : null}
-                    <Pressable onPress={() => recordAgain(task, index)} accessibilityRole="button" accessibilityLabel={`${recording ? 'Ghi lại' : 'Ghi âm'} câu ${index + 1}`} className="min-h-10 flex-row items-center gap-1.5 rounded-full px-4" style={{ backgroundColor: colors.canvas }}>
+                    {recording ? <PlayButton label={`câu ${index + 1}`} uri={recording.uri} active={playing === question.questionVersionId} onToggle={(on) => setPlaying(on ? question.questionVersionId : null)} /> : null}
+                    <Pressable onPress={() => recordAgain(task, index)} accessibilityRole="button" accessibilityLabel={`${recording ? 'Ghi lại' : 'Ghi âm'} câu ${index + 1}`} className="min-h-11flex-row items-center gap-1.5 rounded-full px-4" style={{ backgroundColor: colors.canvas }}>
                       <Mic size={15} color={colors.ink} /><Text weight="bold" className="text-sm text-ink">{recording ? 'Ghi lại' : 'Ghi âm'}</Text>
                     </Pressable>
                   </View>
@@ -180,7 +206,9 @@ export function SpeakingReview({ packageVersionId, parts }: { packageVersionId: 
         ))}
       </ScrollView>
       <View className="border-t border-line bg-surface px-3 pt-2" style={{ paddingBottom: Math.max(insets.bottom, 8) }}>
-        <Button label={`Gửi chấm · ${recorded.length} bản ghi`} icon={<Send size={18} color={colors.onAccent} />} disabled={recorded.length === 0} onPress={() => void start()} />
+        {/* The server grades a submission only with every answer, so nothing is opened while one is missing or silent. */}
+        {problem ? <Text className="mb-2 text-center text-xs text-muted">{problem}</Text> : null}
+        <Button label={`Gửi chấm · ${recorded.length} bản ghi`} icon={<Send size={18} color={colors.onAccent} />} disabled={recorded.length === 0 || problem !== null} onPress={() => void start()} />
       </View>
 
       <TermsSheet visible={popup === 'terms' && !terms} loading={termsLoading} onRetry={() => void start()} onClose={() => setPopup(null)} />
@@ -215,14 +243,14 @@ export function SpeakingReview({ packageVersionId, parts }: { packageVersionId: 
 }
 
 /** Plays one recording; starting another stops this one (the parent tracks which is active). */
-function PlayButton({ uri, active, onToggle }: { uri: string; active: boolean; onToggle: (on: boolean) => void }) {
+function PlayButton({ label, uri, active, onToggle }: { label: string; uri: string; active: boolean; onToggle: (on: boolean) => void }) {
   const player = useAudioPlayer(uri);
   const status = useAudioPlayerStatus(player);
   useEffect(() => { if (!active && status.playing) player.pause(); }, [active, status.playing, player]);
   useEffect(() => { if (status.didJustFinish) { onToggle(false); void player.seekTo(0); } }, [status.didJustFinish, player, onToggle]);
   const playing = active && status.playing;
   return (
-    <Pressable onPress={() => { if (playing) { player.pause(); onToggle(false); } else { onToggle(true); void player.seekTo(0); player.play(); } }} accessibilityRole="button" className="min-h-10 flex-row items-center gap-1.5 rounded-full px-4" style={{ backgroundColor: colors.accentSoft }}>
+    <Pressable onPress={() => { if (playing) { player.pause(); onToggle(false); } else { onToggle(true); void playFromStart(player); } }} accessibilityRole="button" accessibilityLabel={`${playing ? 'Dừng phát' : 'Nghe lại'} ${label}`} className="min-h-11 flex-row items-center gap-1.5 rounded-full px-4" style={{ backgroundColor: colors.accentSoft }}>
       {playing ? <Pause size={15} color={colors.accentDeep} /> : <Play size={15} color={colors.accentDeep} />}
       <Text weight="bold" className="text-sm" style={{ color: colors.accentDeep }}>{playing ? 'Đang phát' : 'Nghe lại'}</Text>
     </Pressable>

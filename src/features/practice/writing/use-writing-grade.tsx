@@ -25,6 +25,9 @@ const AI_ERRORS: Record<string, string> = {
   GRADING_IN_PROGRESS: 'Bài này đang được chấm. Hãy đợi trong giây lát.',
   DAILY_LIMIT_REACHED: 'Bạn đã dùng hết số lần chấm bài trong hôm nay.',
   PAYMENT_UNAVAILABLE: 'Chưa thanh toán được point. Hãy thử lại sau.',
+  // The grade request waits for the AI; the server keeps grading after the app stops waiting, and a resend of the
+  // same essay reuses the request id, so it picks up that grade instead of paying again.
+  TIMEOUT: 'AI vẫn đang chấm bài. Đợi vài giây rồi bấm Chấm bài lại, bạn sẽ không bị trừ point hai lần.',
 };
 
 const EXAMINER_ERRORS: Record<string, string> = {
@@ -60,7 +63,10 @@ const BENEFITS = ['Band tổng và điểm 4 tiêu chí', 'Bài viết được 
  * resend never pays twice.
  */
 export function useWritingGrade({ task, mode, draftKey, essay, seconds, label, beforeLeave }: {
-  task: WritingTask; mode: WritingMode; draftKey: string; essay: string; seconds: number; label: string;
+  task: WritingTask; mode: WritingMode; draftKey: string; essay: string;
+  /** Reads the seconds spent writing when the grade is stored. */
+  seconds: () => number;
+  label: string;
   /** Lifts the leave guard before the screen is replaced by the result. */
   beforeLeave: () => void;
 }): { start: () => void; checking: boolean; sheets: ReactNode; pendingNotice: ReactNode } {
@@ -77,6 +83,8 @@ export function useWritingGrade({ task, mode, draftKey, essay, seconds, label, b
   const [pendingFromError, setPendingFromError] = useState<string | null>(null);
   const aiRequest = useRef<{ essay: string; id: string } | null>(null);
   const examinerRequest = useRef<{ essay: string; id: string } | null>(null);
+  // State flips one render late; a second tap in the same frame must not send a parallel request.
+  const inFlight = useRef(false);
 
   const terms = useQuery({ queryKey: ['practice', 'writing-terms'], queryFn: ({ signal }) => getGradingTerms(signal), staleTime: 300_000, retry: 1 });
   const pending = useQuery({ queryKey: ['practice', 'writing-pending', task.questionVersionId], queryFn: ({ signal }) => getPendingExaminerSubmission(task.questionVersionId, signal), staleTime: 30_000, retry: false });
@@ -88,17 +96,19 @@ export function useWritingGrade({ task, mode, draftKey, essay, seconds, label, b
   const context = `Writing ${task.task === 'TASK_2' ? 'Task 2' : 'Task 1'} · ${task.title} · ${label}`;
 
   const finish = async (submissionId: string) => {
-    await storeResultContext(submissionId, { seconds, timeLimitSeconds: task.timeLimitSeconds, title: task.title, mode, retryPath: `/practice/writing/${task.packageVersionId}/${task.sectionId}?mode=${mode}` });
+    // Stop the autosave before the draft is cleared, or a save in flight would bring the sent essay back.
+    beforeLeave();
+    await storeResultContext(submissionId, { seconds: seconds(), timeLimitSeconds: task.timeLimitSeconds, title: task.title, mode, retryPath: `/practice/writing/${task.packageVersionId}/${task.sectionId}?mode=${mode}` });
     await clearDraft(draftKey);
     void client.invalidateQueries({ queryKey: ['practice'] });
     setPopup(null);
-    beforeLeave();
     router.replace(`/practice/writing-result/${submissionId}` as never);
   };
 
   async function gradeWithAi() {
-    if (grading || !terms.data) return;
+    if (inFlight.current || !terms.data) return;
     if (aiRequest.current?.essay !== essay) aiRequest.current = { essay, id: createRequestId() };
+    inFlight.current = true;
     setGrading(true);
     setAiError('');
     try {
@@ -108,12 +118,15 @@ export function useWritingGrade({ task, mode, draftKey, essay, seconds, label, b
       if (cause instanceof ApiError && (cause.status === 402 || cause.code === 'INSUFFICIENT_POINTS')) setPopup('short');
       else setAiError(cause instanceof ApiError ? AI_ERRORS[cause.code ?? ''] ?? cause.message : 'Chưa chấm được bài. Hãy thử lại.');
       setGrading(false);
+    } finally {
+      inFlight.current = false;
     }
   }
 
   async function sendToExaminer(examinerId: string) {
-    if (sending) return;
+    if (inFlight.current) return;
     if (examinerRequest.current?.essay !== essay) examinerRequest.current = { essay, id: createRequestId() };
+    inFlight.current = true;
     setSending(true);
     setExaminerError('');
     try {
@@ -123,6 +136,8 @@ export function useWritingGrade({ task, mode, draftKey, essay, seconds, label, b
       setPendingFromError(pendingOf(cause));
       setExaminerError(examinerMessage(cause));
       setSending(false);
+    } finally {
+      inFlight.current = false;
     }
   }
 

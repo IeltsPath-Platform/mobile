@@ -20,6 +20,7 @@ type MatchingGroupProps = {
   onChange?: (itemId: string, value: string) => void;
   onFocusRow?: (itemId: string) => void;
   onToggleFlag?: (itemId: string) => void;
+  onRowLayout?: (itemId: string, y: number) => void;
   tint?: string;
 };
 
@@ -27,7 +28,7 @@ type MatchingGroupProps = {
  * A matching group without drag and drop: the shared option list is printed once, each statement has a chip that opens
  * a sheet of options. An option already used elsewhere stays selectable (IELTS lets options repeat) but says where.
  */
-export function MatchingGroup({ rows, options, disabled, activeId, onChange, onFocusRow, onToggleFlag, tint = colors.accent }: MatchingGroupProps) {
+export function MatchingGroup({ rows, options, disabled, activeId, onChange, onFocusRow, onToggleFlag, onRowLayout, tint = colors.accent }: MatchingGroupProps) {
   const { text, paper } = useReaderPrefs();
   const [picking, setPicking] = useState<MatchingRow | null>(null);
   const labelOf = (value: string) => options.find((option) => option.value === value)?.label ?? value;
@@ -45,9 +46,10 @@ export function MatchingGroup({ rows, options, disabled, activeId, onChange, onF
       </View>
       {rows.map((row) => {
         const review = row.review;
-        const tone = review ? (review.correct ? colors.success : colors.danger) : row.value ? tint : paper.line;
+        const graded = review && review.correct !== null;
+        const tone = graded ? (review.correct ? colors.success : colors.danger) : row.value ? tint : paper.line;
         return (
-          <View key={row.id} className="rounded-3xl px-3.5 py-3.5" style={{ borderWidth: activeId === row.id ? 2 : 1.5, borderColor: activeId === row.id ? tint : paper.line, backgroundColor: paper.background }}>
+          <View key={row.id} onLayout={(event) => onRowLayout?.(row.id, event.nativeEvent.layout.y)} className="rounded-3xl px-3.5 py-3.5" style={{ borderWidth: activeId === row.id ? 2 : 1.5, borderColor: activeId === row.id ? tint : paper.line, backgroundColor: paper.background }}>
             <View className="flex-row items-start gap-2">
               <View className="mt-0.5 h-7 min-w-7 items-center justify-center rounded-full px-1.5" style={{ backgroundColor: row.value ? tint : colors.canvas }}>
                 <Text weight="black" className="text-xs" style={{ color: row.value ? '#ffffff' : colors.ink }}>{row.number}</Text>
@@ -65,13 +67,14 @@ export function MatchingGroup({ rows, options, disabled, activeId, onChange, onF
               accessibilityRole="button"
               accessibilityLabel={row.value ? `Câu ${row.number}: đã chọn ${row.value}. Chạm để đổi` : `Chọn đáp án cho câu ${row.number}`}
               className="mt-3 min-h-12 flex-row items-center gap-2 rounded-xl px-3"
-              style={{ borderWidth: 2, borderColor: tone, borderStyle: row.value ? 'solid' : 'dashed', backgroundColor: review ? (review.correct ? colors.successSoft : colors.dangerSoft) : 'transparent' }}>
+              style={{ borderWidth: 2, borderColor: tone, borderStyle: row.value ? 'solid' : 'dashed', backgroundColor: graded ? (review.correct ? colors.successSoft : colors.dangerSoft) : 'transparent' }}>
               <Text weight={row.value ? 'bold' : 'regular'} numberOfLines={2} className="flex-1" style={{ color: row.value ? colors.ink : colors.muted }}>
                 {row.value ? `${row.value}. ${labelOf(row.value)}` : 'Chọn đáp án'}
               </Text>
               {!review ? <ChevronDown size={18} color={colors.muted} /> : null}
             </Pressable>
-            {review && !review.correct && review.correctAnswer ? (
+            {review?.correct === null ? <Text className="mt-2 text-sm text-muted">Câu này chưa có kết quả chấm.</Text> : null}
+            {review && review.correct === false && review.correctAnswer ? (
               <Text className="mt-2 text-sm text-ink"><Text weight="bold">Đáp án: </Text>{review.correctAnswer}</Text>
             ) : null}
           </View>

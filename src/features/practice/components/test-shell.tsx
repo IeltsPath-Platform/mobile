@@ -1,14 +1,14 @@
 import { router, usePreventRemove } from 'expo-router';
 import { Check, Send } from 'lucide-react-native';
 import { useRef, type ReactNode } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/src/components/ui/text';
 import { colors } from '@/src/theme';
 
 /** Horizontal section / passage switcher with per-section progress. */
-export function SectionTabs({ labels, progress, activeIndex, onSelect, tint }: { labels: string[]; progress: Array<{ answered: number; total: number }>; activeIndex: number; onSelect: (index: number) => void; tint: string }) {
+export function SectionTabs({ labels, progress, activeIndex, onSelect, tint, countLabel = 'đã làm' }: { labels: string[]; progress: Array<{ answered: number; total: number }>; activeIndex: number; onSelect: (index: number) => void; tint: string; /** What the count means, read by screen readers ("đã làm", "đúng"). */ countLabel?: string }) {
   if (labels.length <= 1) return null;
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-grow-0 border-b border-line bg-surface" contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8, gap: 8 }}>
@@ -18,7 +18,7 @@ export function SectionTabs({ labels, progress, activeIndex, onSelect, tint }: {
         const done = item.total > 0 && item.answered === item.total;
         const share = item.total ? item.answered / item.total : 0;
         return (
-          <Pressable key={label} onPress={() => onSelect(index)} accessibilityRole="tab" accessibilityState={{ selected: active }} accessibilityLabel={`${label}, đã làm ${item.answered} trên ${item.total}`} className="min-h-11 justify-center rounded-2xl px-3.5 py-1.5 active:opacity-80" style={{ minWidth: 92, backgroundColor: active ? tint : colors.canvas, borderWidth: 1.5, borderColor: active ? tint : colors.line }}>
+          <Pressable key={label} onPress={() => onSelect(index)} accessibilityRole="tab" accessibilityState={{ selected: active }} accessibilityLabel={`${label}, ${countLabel} ${item.answered} trên ${item.total}`} className="min-h-11 justify-center rounded-2xl px-3.5 py-1.5 active:opacity-80" style={{ minWidth: 92, backgroundColor: active ? tint : colors.canvas, borderWidth: 1.5, borderColor: active ? tint : colors.line }}>
             <View className="flex-row items-center justify-between gap-2">
               <Text weight="extrabold" className="text-[13px]" style={{ color: active ? '#ffffff' : colors.ink }}>{label}</Text>
               {done ? <Check size={14} color={active ? '#ffffff' : colors.success} strokeWidth={3} />
@@ -60,9 +60,12 @@ export function TestFooter({ children, onSubmit, unanswered, submitting, tint = 
   );
 }
 
-/** Lifts the content above the keyboard on iOS; Android resizes the window by itself. */
+/**
+ * Lifts the content above the keyboard. Both platforms need it: Expo apps are edge-to-edge on Android, so the window
+ * no longer resizes for the keyboard and a view without a `behavior` stays under it.
+ */
 export function KeyboardShell({ children }: { children: ReactNode }) {
-  return <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>{children}</KeyboardAvoidingView>;
+  return <KeyboardAvoidingView className="flex-1" behavior="padding">{children}</KeyboardAvoidingView>;
 }
 
 /**
@@ -76,7 +79,7 @@ export function useLeaveTestGuard(active: boolean, message = 'Đáp án đã đ�
       { text: 'Làm tiếp', style: 'cancel' },
       { text: 'Rời bài', style: 'destructive', onPress: () => { disable.current(); repeat(); } },
     ]);
-  }) as unknown as () => void;
+  });
   return disable.current;
 }
 
