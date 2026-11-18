@@ -16,7 +16,6 @@ import { colors } from '@/src/theme';
 
 import { getSpeakingTerms, type SpeakingTerms } from '../api/speaking';
 import { getSpeakingTask, type SpeakingTask } from '../api/speaking-task';
-import { Sheet } from '../components/sheet';
 import { useLeaveTestGuard } from '../components/test-shell';
 import { ActivateKeySheet, GradeConfirmSheet, GradeMethodSheet, NotEnoughPointsSheet, TermsSheet } from '../grading/grading-sheets';
 import { POINT_PRODUCTS, type ActivationProduct } from '../grading/products';
@@ -51,16 +50,23 @@ function speakingOptions(access: GradingAccess, cost: number, enabled: boolean):
   };
 }
 
+/** The server's Speaking refusals, which it words in English. */
+const SEND_ERRORS: Record<string, string> = {
+  SPEAKING_SUBMISSION_IN_PROGRESS: 'Bạn đang có một bài Speaking chờ chấm. Hãy đợi bài đó xong trước khi gửi bài mới.',
+  SPEAKING_GRADING_DISABLED: 'Chấm Speaking bằng AI hiện chưa được bật. Vui lòng thử lại sau.',
+  SPEAKING_UPLOAD_CONFLICT: 'Bản ghi này đang được gửi ở một lần gửi khác. Đợi vài giây rồi bấm gửi lại.',
+  SPEAKING_RECORDINGS_MISSING: 'Máy chủ chưa nhận đủ bản ghi. Bản ghi của bạn vẫn còn, hãy bấm gửi lại.',
+};
+
 function failureMessage(cause: unknown) {
   if (cause instanceof ApiError) {
-    if (cause.code === 'SPEAKING_SUBMISSION_IN_PROGRESS') return 'Bạn đang có một bài Speaking chờ chấm. Hãy đợi bài đó xong trước khi gửi bài mới.';
     if (cause.isNetworkError) return 'Mất kết nối khi gửi bài. Bản ghi của bạn vẫn còn, hãy bấm gửi lại.';
-    return cause.message;
+    return SEND_ERRORS[cause.code ?? ''] ?? cause.message;
   }
   return cause instanceof Error ? cause.message : 'Không gửi được bài. Bản ghi của bạn vẫn còn, hãy thử lại.';
 }
 
-type Popup = 'terms' | 'method' | 'confirm' | 'short' | 'sent' | null;
+type Popup = 'terms' | 'method' | 'confirm' | 'short' | null;
 
 /**
  * The review after the last answer: every question with its recording, to listen, record again and see what is still
@@ -80,7 +86,7 @@ export function SpeakingReview({ packageVersionId, parts }: { packageVersionId: 
   const [sending, setSending] = useState(false);
   const [progress, setProgress] = useState<SendProgress | null>(null);
   const [error, setError] = useState('');
-  const [sent, setSent] = useState<{ id: string; count: number } | null>(null);
+  const [sent, setSent] = useState(false);
   const [activation, setActivation] = useState<ActivationProduct | null>(null);
   const requestId = useRef<string | null>(null);
   /** Files uploaded under `requestId`; dropped with it. */
@@ -138,10 +144,12 @@ export function SpeakingReview({ packageVersionId, parts }: { packageVersionId: 
       sentFiles.current = new Map();
       writePendingSend(packageVersionId, null);
       guardOff();
-      setSent({ id: submission.id, count: toSend.length });
+      setSent(true);
       clearSession(packageVersionId);
       void client.invalidateQueries({ queryKey: ['practice'] });
-      setPopup('sent');
+      // Straight to the result: it shows the grading as it goes and the grade as soon as it is ready.
+      setPopup(null);
+      router.replace(`/practice/speaking-result/${submission.id}` as never);
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 402) { void wallet.checkAccess(); setPopup('short'); }
       else if (cause instanceof ApiError && (cause.code === 'SPEAKING_SUBMISSION_NOT_UPLOADING' || cause.code === 'SPEAKING_SUBMISSION_ABANDONED')) {
@@ -195,7 +203,7 @@ export function SpeakingReview({ packageVersionId, parts }: { packageVersionId: 
                   <Text className="mt-1 text-xs" style={{ color: tone }}>{!recording ? 'Chưa ghi âm' : recording.silent ? 'Không thu được tiếng nói' : `Đã ghi âm · ${formatClock(recording.durationSeconds)}`}</Text>
                   <View className="mt-2 flex-row gap-2">
                     {recording ? <PlayButton label={`câu ${index + 1}`} uri={recording.uri} active={playing === question.questionVersionId} onToggle={(on) => setPlaying(on ? question.questionVersionId : null)} /> : null}
-                    <Pressable onPress={() => recordAgain(task, index)} accessibilityRole="button" accessibilityLabel={`${recording ? 'Ghi lại' : 'Ghi âm'} câu ${index + 1}`} className="min-h-11flex-row items-center gap-1.5 rounded-full px-4" style={{ backgroundColor: colors.canvas }}>
+                    <Pressable onPress={() => recordAgain(task, index)} accessibilityRole="button" accessibilityLabel={`${recording ? 'Ghi lại' : 'Ghi âm'} câu ${index + 1}`} className="min-h-11 flex-row items-center gap-1.5 rounded-full px-4" style={{ backgroundColor: colors.canvas }}>
                       <Mic size={15} color={colors.ink} /><Text weight="bold" className="text-sm text-ink">{recording ? 'Ghi lại' : 'Ghi âm'}</Text>
                     </Pressable>
                   </View>
@@ -227,17 +235,6 @@ export function SpeakingReview({ packageVersionId, parts }: { packageVersionId: 
       />
       <NotEnoughPointsSheet visible={popup === 'short' && Boolean(terms)} cost={terms?.pointCost ?? 0} balance={wallet.access.balance} copy={METHOD_COPY} onClose={() => setPopup(null)} onActivate={() => { setPopup(null); setActivation(POINT_PRODUCTS[0]); }} />
       <ActivateKeySheet visible={activation !== null} product={activation} onActivated={wallet.onActivated} onClose={() => setActivation(null)} />
-      <Sheet
-        visible={popup === 'sent' && sent !== null}
-        onClose={() => router.replace(CATALOG as never)}
-        title="Đã gửi bài Speaking"
-        subtitle={`${sent?.count ?? 0} bản ghi · ${context}`}
-        footer={<>
-          <Button label="Xem kết quả" onPress={() => { setPopup(null); if (sent) router.replace(`/practice/speaking-result/${sent.id}` as never); }} />
-          <Button label="Về danh mục luyện tập" variant="secondary" onPress={() => router.replace(CATALOG as never)} />
-        </>}>
-        <Text className="text-sm leading-5 text-ink">AI đang chấm bài nói của bạn. Point chỉ bị trừ ({terms?.pointCost ?? 0} point) khi chấm xong. Bạn có thể xem kết quả ngay hoặc trong Lịch sử làm bài.</Text>
-      </Sheet>
     </View>
   );
 }

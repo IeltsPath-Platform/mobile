@@ -1,5 +1,6 @@
 // Mobile counterpart of frontend/src/features/practice/hooks/useSpokenPrompt.ts, reading with the device voice (expo-speech).
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { setAudioModeAsync } from 'expo-audio';
 import * as Speech from 'expo-speech';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -46,7 +47,10 @@ export function useExaminerVoice(text: string, muted = false) {
     if (!text || mutedRef.current) return;
     void Speech.stop();
     const turn = ++generation.current;
-    void pickVoice().then((voice) => {
+    // On iPhone the device voice is silent while the ring switch is on unless the app plays as media; the microphone
+    // is closed here (the voice never reads while recording), so this does not interfere with the answer.
+    const ready = Promise.all([pickVoice(), setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false }).catch(() => undefined)]);
+    void ready.then(([voice]) => {
       if (turn !== generation.current || mutedRef.current) return;
       Speech.speak(text, {
         language: 'en-GB', rate: RATE, voice,

@@ -55,6 +55,8 @@ export function WritingResultScreen({ submissionId }: { submissionId: string }) 
     void client.invalidateQueries({ queryKey: ['practice', 'progress'] });
     void client.invalidateQueries({ queryKey: ['practice', 'catalog'] });
     void client.invalidateQueries({ queryKey: ['practice', 'history'] });
+    // The grade took points: the balance shown elsewhere in the app is read again.
+    void client.invalidateQueries({ queryKey: ['access'] });
   }, [client, status]);
 
   if (submission.isPending) return <View className="flex-1 items-center justify-center bg-canvas"><ActivityIndicator color={colors.accent} /><Text className="mt-2 text-sm text-muted">Đang tải kết quả chấm bài…</Text></View>;

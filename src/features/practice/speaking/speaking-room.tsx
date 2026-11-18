@@ -1,8 +1,9 @@
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { router } from 'expo-router';
-import { Check, ChevronLeft, ChevronRight, Info, Mic, Pause, Play, Settings, Square, Volume2, VolumeX } from 'lucide-react-native';
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Check, ChevronLeft, ChevronRight, Ear, Eye, EyeOff, Info, Mic, Pause, Play, Settings, Square, Volume2, VolumeX } from 'lucide-react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, Pressable, ScrollView, View } from 'react-native';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -56,14 +57,36 @@ export function SpeakingRoom({ task, parts, initialIndex, timed }: Props) {
   const onActive = useCallback((active: boolean) => { setMediaActive(active); setMicLive(active); }, [setMediaActive]);
   const [opened] = useState(Date.now);
   const limit = timed && task.timeLimitSeconds ? task.timeLimitSeconds : null;
+  // Time spent out of the app (a phone call, another app) does not count against the part: the learner was not speaking.
+  const away = useRef({ total: 0, since: 0 });
+  const [resumes, setResumes] = useState(0);
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') { if (!away.current.since) away.current.since = Date.now(); return; }
+      if (!away.current.since) return;
+      away.current.total += Date.now() - away.current.since;
+      away.current.since = 0;
+      setResumes((count) => count + 1);
+    });
+    return () => subscription.remove();
+  }, []);
   // The clock ticks inside the header only; the room re-renders once, when the time is up.
-  const readRemaining = useCallback(() => (limit ? Math.max(0, limit - Math.floor((Date.now() - opened) / 1000)) : 0), [limit, opened]);
+  const readRemaining = useCallback(() => {
+    if (!limit) return 0;
+    const now = Date.now();
+    const awayMs = away.current.total + (away.current.since ? now - away.current.since : 0);
+    return Math.max(0, limit - Math.floor((now - opened - awayMs) / 1000));
+  }, [limit, opened]);
   const [expired, setExpired] = useState(() => limit !== null && readRemaining() <= 0);
   useEffect(() => {
     if (limit === null || expired) return;
-    const timer = setTimeout(() => setExpired(true), readRemaining() * 1000);
+    const timer = setTimeout(() => { if (readRemaining() <= 0) setExpired(true); else setResumes((count) => count + 1); }, readRemaining() * 1000);
     return () => clearTimeout(timer);
-  }, [limit, expired, readRemaining]);
+  }, [limit, expired, readRemaining, resumes]);
+  const [showText, setShowText] = useQuestionTextPreference();
+  // Part 2 is answered from a printed cue card, as in the exam; Parts 1 and 3 are only heard.
+  const isCueCard = cue.points.length > 0 || task.partNo === 2;
+  const textVisible = isCueCard || showText;
   const position = parts.indexOf(task.sectionId);
   const nextPart = position >= 0 ? parts[position + 1] : undefined;
   const isLast = index >= total - 1;
@@ -121,7 +144,15 @@ export function SpeakingRoom({ task, parts, initialIndex, timed }: Props) {
                 ))}
               </View>
             ) : null}
-            <Text weight="black" className="mt-4 text-center text-2xl leading-8 text-ink" accessibilityRole="header">{cue.topic}</Text>
+            {textVisible ? (
+              <Text weight="black" className="mt-4 text-center text-2xl leading-8 text-ink" accessibilityRole="header">{cue.topic}</Text>
+            ) : (
+              <View className="mt-4 items-center gap-2 rounded-2xl px-4 py-5" style={{ backgroundColor: colors.canvas }}>
+                <Ear size={28} color={colors.skill.speaking} />
+                <Text weight="black" className="text-center text-lg text-ink">Nghe giám khảo hỏi</Text>
+                <Text className="text-center text-sm leading-5 text-muted">Như khi thi thật, câu hỏi chỉ được đọc lên. Chữ của câu hỏi có trong phần xem lại và kết quả chấm.</Text>
+              </View>
+            )}
             {cue.points.length ? (
               <View className="mt-3 rounded-2xl p-3" style={{ backgroundColor: colors.canvas }}>
                 <Text weight="bold" className="text-sm text-muted">You should say:</Text>
@@ -134,6 +165,12 @@ export function SpeakingRoom({ task, parts, initialIndex, timed }: Props) {
                 <Text weight="bold" style={{ color: colors.accentDeep }}>{voice.speaking ? 'Dừng đọc' : 'Nghe câu hỏi'}</Text>
               </Pressable>
             </View>
+            {!isCueCard ? (
+              <Pressable onPress={() => setShowText(!showText)} accessibilityRole="switch" accessibilityState={{ checked: showText }} accessibilityLabel="Hiện chữ câu hỏi" className="mt-2 min-h-11 flex-row items-center justify-center gap-1.5 self-center px-3">
+                {showText ? <EyeOff size={15} color={colors.muted} /> : <Eye size={15} color={colors.muted} />}
+                <Text weight="bold" className="text-xs text-muted">{showText ? 'Ẩn chữ câu hỏi' : 'Hiện chữ câu hỏi (dễ hơn thi thật)'}</Text>
+              </Pressable>
+            ) : null}
             {task.instructions ? <View className="mt-3 flex-row gap-2"><Info size={15} color={colors.muted} /><Text className="flex-1 text-xs leading-4 text-muted">{task.instructions}</Text></View> : null}
           </View>
 
@@ -211,6 +248,7 @@ function RecorderCard({ saved, onSaved, onStart, onActive, locked, maxSeconds }:
           <Button label="Mở Cài đặt" variant="secondary" icon={<Settings size={16} color={colors.accentDeep} />} onPress={recorder.openSettings} />
         </View>
       ) : null}
+      {recorder.interrupted && recorder.status === 'recorded' ? <Text className="mt-3 text-center text-sm" style={{ color: colors.danger }}>Bản ghi đã dừng vì có cuộc gọi hoặc ứng dụng bị ẩn. Phần đã nói được giữ lại; nghe lại, nếu chưa trọn ý thì ghi lại câu này.</Text> : null}
       {recorder.error ? <Text className="mt-3 text-center text-sm" style={{ color: colors.danger }}>{recorder.error}</Text> : null}
       <Text className="mt-3 text-center text-[11px] text-muted">Bản ghi chỉ lưu trên thiết bị này và chưa được gửi đi.</Text>
     </View>
@@ -263,3 +301,16 @@ function Playback({ uri, disabled }: { uri: string; disabled: boolean }) {
   );
 }
 
+
+const SHOW_TEXT_KEY = 'practice.speaking.showQuestionText';
+
+/** Whether the learner chose to read the questions of Parts 1 and 3; off by default, as in the exam. Kept on the device. */
+function useQuestionTextPreference(): [boolean, (on: boolean) => void] {
+  const [on, setOn] = useState(false);
+  useEffect(() => { AsyncStorage.getItem(SHOW_TEXT_KEY).then((value) => setOn(value === 'on')).catch(() => undefined); }, []);
+  const set = useCallback((next: boolean) => {
+    setOn(next);
+    void AsyncStorage.setItem(SHOW_TEXT_KEY, next ? 'on' : 'off').catch(() => undefined);
+  }, []);
+  return [on, set];
+}

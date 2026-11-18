@@ -1,7 +1,7 @@
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { Headphones, Pause, Play, RotateCcw, RotateCw, Volume1, Volume2, VolumeX } from 'lucide-react-native';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, PanResponder, Pressable, View, type LayoutChangeEvent } from 'react-native';
+import { ActivityIndicator, AppState, PanResponder, Pressable, View, type LayoutChangeEvent } from 'react-native';
 
 import { Text } from '@/src/components/ui/text';
 import { colors } from '@/src/theme';
@@ -20,12 +20,22 @@ export function usePlaybackAudioMode() {
 }
 
 /**
+ * The audio address a player was opened with. The attempt is reloaded when the app comes back to the foreground (after a
+ * phone call, for one) and a signed address then comes back with a new signature; following it would load the recording
+ * again from the start. A player keeps the address it began with for as long as it is shown.
+ */
+function useFirstSource(src: string) {
+  const [first] = useState(src);
+  return first;
+}
+
+/**
  * The practice player of one section: play/pause, jump 5 s, a seek bar to drag or tap, speed and volume.
  * Reports `onPlayingChange` so study time counts while audio plays.
  */
 export function PracticePlayer({ src, durationHint, onPlayingChange, compact = false, label }: { src: string; durationHint: number | null; onPlayingChange?: (playing: boolean) => void; compact?: boolean; label?: string }) {
   usePlaybackAudioMode();
-  const player = useAudioPlayer(src, { updateInterval: 250 });
+  const player = useAudioPlayer(useFirstSource(src), { updateInterval: 250 });
   const status = useAudioPlayerStatus(player);
   const [rateIndex, setRateIndex] = useState(1);
   const [volumeIndex, setVolumeIndex] = useState(0);
@@ -125,10 +135,11 @@ function SeekBar({ current, duration, onSeek }: { current: number; duration: num
   );
 }
 
-type ExamPhase = 'starting' | 'playing' | 'blocked' | 'done' | 'failed';
+type ExamPhase = 'starting' | 'playing' | 'interrupted' | 'blocked' | 'done' | 'failed';
 const PHASE_LABEL: Record<ExamPhase, string> = {
   starting: 'Đang chuẩn bị bài nghe…',
   playing: 'Đang phát · chỉ nghe một lần',
+  interrupted: 'Bài nghe bị ngắt',
   blocked: 'Chạm để bắt đầu bài nghe',
   done: 'Đã nghe xong phần này',
   failed: 'Không phát được bài nghe',
@@ -137,11 +148,14 @@ const PHASE_LABEL: Record<ExamPhase, string> = {
 /**
  * The exam recording of one part, as in the real test: it starts by itself, plays once and has no controls. A part
  * heard before (even in an earlier session) does not play again. If the system refuses to start, one button starts it.
+ * A phone call, an alarm or leaving the app stops the sound mid-way: it carries on from the same second when the app is
+ * back, or with one button if the system does not let it, and never starts the part over.
  */
 export function ExamPlayer({ src, alreadyPlayed, onStarted, onEnded, onPlayingChange, label }: { src: string; alreadyPlayed: boolean; onStarted: () => void; onEnded: () => void; onPlayingChange?: (playing: boolean) => void; label?: string }) {
   usePlaybackAudioMode();
   const [wasPlayed] = useState(alreadyPlayed);
-  const player = useAudioPlayer(wasPlayed ? null : src, { updateInterval: 500 });
+  const source = useFirstSource(src);
+  const player = useAudioPlayer(wasPlayed ? null : source, { updateInterval: 500 });
   const status = useAudioPlayerStatus(player);
   const [phase, setPhase] = useState<ExamPhase>(wasPlayed ? 'done' : 'starting');
   const started = useRef(false);
@@ -158,14 +172,30 @@ export function ExamPlayer({ src, alreadyPlayed, onStarted, onEnded, onPlayingCh
   useEffect(() => {
     onPlayingChange?.(status.playing);
     if (status.playing && !started.current) { started.current = true; setPhase('playing'); onStarted(); }
+    else if (status.playing && started.current && !ended.current) setPhase('playing');
   }, [status.playing, onStarted, onPlayingChange]);
+
+  // Stopped by the system after it began (a call, an alarm, the app sent to the background): offer to carry on, and
+  // carry on by itself when the app is in front again.
+  const interrupted = started.current && !ended.current && !status.playing && !status.didJustFinish;
+  useEffect(() => {
+    if (!interrupted) return;
+    const timer = setTimeout(() => setPhase((current) => (current === 'playing' ? 'interrupted' : current)), 1200);
+    return () => clearTimeout(timer);
+  }, [interrupted]);
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && started.current && !ended.current) { try { player.play(); } catch { /* released */ } }
+    });
+    return () => subscription.remove();
+  }, [player]);
   useEffect(() => {
     if (status.didJustFinish && !ended.current) { ended.current = true; setPhase('done'); onPlayingChange?.(false); onEnded(); }
   }, [status.didJustFinish, onEnded, onPlayingChange]);
   useEffect(() => { if (status.error) setPhase('failed'); }, [status.error]);
 
   const progress = status.duration > 0 ? Math.min(1, status.currentTime / status.duration) : 0;
-  const live = phase === 'playing';
+  const live = phase === 'playing' || phase === 'interrupted';
   return (
     <PlayerCard>
       <View accessibilityRole="text" accessibilityLiveRegion="polite" className="flex-row items-center gap-3">
@@ -174,8 +204,14 @@ export function ExamPlayer({ src, alreadyPlayed, onStarted, onEnded, onPlayingCh
         </View>
         <View className="min-w-0 flex-1">
           <Text weight="black" className="text-sm text-ink" numberOfLines={1}>{PHASE_LABEL[phase]}</Text>
-          <Text className="text-xs text-muted" numberOfLines={1}>{live ? `${formatClock(status.currentTime)} / ${formatClock(status.duration)} · không tua, không dừng` : label ?? 'Bài nghe thi thật'}</Text>
+          <Text className="text-xs text-muted" numberOfLines={1}>{phase === 'interrupted' ? `Dừng ở ${formatClock(status.currentTime)} · nghe tiếp từ chỗ này` : live ? `${formatClock(status.currentTime)} / ${formatClock(status.duration)} · không tua, không dừng` : label ?? 'Bài nghe thi thật'}</Text>
         </View>
+        {phase === 'interrupted' ? (
+          <Pressable onPress={() => player.play()} accessibilityRole="button" accessibilityLabel="Nghe tiếp bài nghe" className="min-h-11 flex-row items-center gap-1.5 rounded-full px-4" style={{ backgroundColor: tint() }}>
+            <Play size={14} color="#ffffff" fill="#ffffff" />
+            <Text weight="black" style={{ color: '#ffffff' }}>Nghe tiếp</Text>
+          </Pressable>
+        ) : null}
         {phase === 'blocked' ? (
           <Pressable onPress={() => player.play()} accessibilityRole="button" accessibilityLabel="Bắt đầu bài nghe" className="min-h-11 flex-row items-center gap-1.5 rounded-full px-4" style={{ backgroundColor: tint() }}>
             <Play size={14} color="#ffffff" fill="#ffffff" />

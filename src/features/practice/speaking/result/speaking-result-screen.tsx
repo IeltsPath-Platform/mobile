@@ -73,6 +73,8 @@ export function SpeakingResultScreen({ submissionId }: { submissionId: string })
     refreshLearningProgressSoon(client);
     void client.invalidateQueries({ queryKey: ['practice', 'progress'] });
     void client.invalidateQueries({ queryKey: ['practice', 'catalog'] });
+    // The grade took points: the balance shown elsewhere in the app is read again.
+    void client.invalidateQueries({ queryKey: ['access'] });
   }, [client, status]);
   const view = status === 'GRADED' && submission?.result ? parseSpeakingResult(submission.result) : null;
   const working = status !== undefined && WORKING.has(status);

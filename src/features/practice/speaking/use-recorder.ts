@@ -11,6 +11,8 @@ export type RecorderStatus = 'idle' | 'requesting' | 'recording' | 'processing' 
 const LEVEL_COUNT = 28;
 /** Peak (0..1) under which a whole recording counts as silent. */
 const SILENT_PEAK = 0.02;
+/** No sound arriving from the microphone for this long while recording means the system took it (a call, Siri, an alarm). */
+const SILENCE_FROM_SYSTEM_MS = 2000;
 /** A WAV file no larger than its header holds no sound. */
 const WAV_HEADER_BYTES = 44;
 
@@ -60,7 +62,10 @@ export function useRecorder({ saved, onSaved }: { saved?: SavedRecording | null;
   const [levels, setLevels] = useState<number[]>(() => Array.from({ length: LEVEL_COUNT }, () => 0));
   const [recording, setRecording] = useState<SavedRecording | null>(saved ?? null);
   const [error, setError] = useState('');
+  /** The last answer was cut short by the system or by leaving the app, not by the learner. */
+  const [interrupted, setInterrupted] = useState(false);
   const peak = useRef(0);
+  const lastBufferAt = useRef(0);
   const started = useRef(0);
   const lastLevelUpdate = useRef(0);
   /** The file being written, known from the moment recording starts so an unmount can still keep it. */
@@ -76,6 +81,7 @@ export function useRecorder({ saved, onSaved }: { saved?: SavedRecording | null;
     channels: 1,
     encoding: 'int16',
     onBuffer: (buffer) => {
+      lastBufferAt.current = Date.now();
       const level = peakOf(buffer);
       if (level > peak.current) peak.current = level;
       // PCM arrives far more often than the waveform needs to paint.
@@ -94,8 +100,9 @@ export function useRecorder({ saved, onSaved }: { saved?: SavedRecording | null;
     setStatus('recorded');
   }, [saved]);
 
-  const stop = useCallback(async () => {
+  const stop = useCallback(async (cause: 'learner' | 'interrupted' = 'learner') => {
     if (statusRef.current !== 'recording') return;
+    setInterrupted(cause === 'interrupted');
     statusRef.current = 'processing';
     setStatus('processing');
     const uri = fileUri.current;
@@ -145,6 +152,8 @@ export function useRecorder({ saved, onSaved }: { saved?: SavedRecording | null;
       }
       fileUri.current = file.uri;
       started.current = Date.now();
+      lastBufferAt.current = Date.now();
+      setInterrupted(false);
       setElapsed(0);
       setStatus('recording');
       statusRef.current = 'recording';
@@ -159,13 +168,17 @@ export function useRecorder({ saved, onSaved }: { saved?: SavedRecording | null;
 
   useEffect(() => {
     if (status !== 'recording') return;
-    const timer = setInterval(() => setElapsed(Math.floor((Date.now() - started.current) / 1000)), 250);
+    const timer = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - started.current) / 1000));
+      // On iPhone an incoming call can take the microphone while the app stays in front: the sound simply stops.
+      if (Date.now() - lastBufferAt.current > SILENCE_FROM_SYSTEM_MS) void stop('interrupted');
+    }, 250);
     return () => clearInterval(timer);
-  }, [status]);
+  }, [status, stop]);
 
   // A call or switching apps ends the answer here; what was said is kept.
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', (state) => { if (state !== 'active') void stop(); });
+    const subscription = AppState.addEventListener('change', (state) => { if (state !== 'active') void stop('interrupted'); });
     return () => subscription.remove();
   }, [stop]);
 
@@ -186,5 +199,5 @@ export function useRecorder({ saved, onSaved }: { saved?: SavedRecording | null;
     };
   }, [stream]);
 
-  return { status, elapsed, levels, recording, error, start, stop, openSettings: () => void Linking.openSettings() };
+  return { status, elapsed, levels, recording, error, interrupted, start, stop, openSettings: () => void Linking.openSettings() };
 }

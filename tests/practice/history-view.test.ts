@@ -23,7 +23,6 @@ describe('a line of the knowledge point practice', () => {
     expect(row.facts).toContain('Đúng 3/4 câu')
     expect(row.status).toBe('Đạt')
     expect(row.href).toBe(`/learn/practice/${id(5)}`)
-    expect(row.state?.freePractice).toEqual({ pointName: 'Từ vựng xu hướng', pointCode: 'TREND', backTo: '/submission-history?tab=knowledge', backLabel: 'Lịch sử nộp bài' })
   })
 
   it('falls back to a plain name when the catalog gave none, and marks a set that did not pass', () => {

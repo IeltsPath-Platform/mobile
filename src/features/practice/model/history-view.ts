@@ -1,7 +1,6 @@
 // Ported from frontend/src/features/practice/history/submissionHistoryView.ts. Links keep the web paths; routeOf() maps them to app screens.
 const lessonPracticePath = (lessonId: string) => `/learn/lessons/${lessonId}?view=practice`
 const freePracticePath = (attemptId: string) => `/learn/practice/${attemptId}`
-interface FreePracticeNavigationState { freePractice?: { pointName: string; pointCode: string; backTo: string; backLabel?: string } }
 import { dateText, taskText } from './examiner-reviews-view'
 import type { ReadingHistoryItem } from '../api/attempts'
 import type { SubmissionHistoryItem } from '../api/history'
@@ -21,8 +20,6 @@ export interface HistoryRow {
   /** Where the line opens; null when the record has nothing to open. */
   href: string | null
   openLabel: string
-  /** What the opened page needs to name itself and lead back here; only some pages take it. */
-  state?: FreePracticeNavigationState
 }
 
 /** Names the client looked up for the ids of a page; a name that could not be found is simply missing. */
@@ -131,9 +128,6 @@ export function freeRow(item: SubmissionHistoryItem): HistoryRow {
   return essayRow(item, 'Luyện tập tự do')
 }
 
-/** Where the tab of practised knowledge points lives, so the practice page can lead back to it. */
-export const KNOWLEDGE_HISTORY_PATH = '/submission-history?tab=knowledge'
-
 /** A line of the "Luyện theo kiến thức" tab: one free practice set on a knowledge point. */
 export function knowledgeRow(item: SubmissionHistoryItem): HistoryRow {
   const total = item.totalCount ?? 0
@@ -147,7 +141,6 @@ export function knowledgeRow(item: SubmissionHistoryItem): HistoryRow {
     title: name,
     facts: [`Nộp ${dateText(item.submittedAt)}`, ...(total > 0 ? [`Đúng ${correct}/${total} câu`] : [])],
     status: passed ? 'Đạt' : 'Chưa đạt', href: freePracticePath(attemptId), openLabel: 'Xem kết quả',
-    state: { freePractice: { pointName: name, pointCode: item.knowledgePointCode ?? '', backTo: KNOWLEDGE_HISTORY_PATH, backLabel: 'Lịch sử nộp bài' } },
   }
 }
 

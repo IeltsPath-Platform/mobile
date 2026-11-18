@@ -1,5 +1,5 @@
 // Ported from frontend/src/features/practice/reading/readingPracticeApi.ts. Keep behaviour in step with the web version.
-import { apiRequest } from '@/src/lib/api-client'
+import { ApiError, apiRequest } from '@/src/lib/api-client'
 import { buildReadingAttemptRequest } from '../model/attempt-request'
 import { attemptCovers, isExactScope } from '../model/completed-attempt'
 
@@ -190,11 +190,26 @@ export function startAttemptSection(attemptId: string, sectionId: string) {
   return apiRequest<void>(`/api/assessments/attempts/${attemptId}/sections/${sectionId}/start`, { method: 'POST', auth: true })
 }
 
-export function saveAttemptAnswer(attemptId: string, itemId: string, answer: string, expectedRevision: number) {
+function putAttemptAnswer(attemptId: string, itemId: string, answer: string, expectedRevision: number) {
   return apiRequest<AttemptResponse>(`/api/assessments/attempts/${attemptId}/items/${itemId}/response`, {
     method: 'PUT', auth: true,
     body: { payload: JSON.stringify({ answer }), schemaVersion: 1, expectedRevision },
   })
+}
+
+/**
+ * Saves one answer at the revision this device holds. A save the server stored but whose reply was lost (a timeout on a
+ * weak line) leaves that revision behind, and every later save of the item would be refused as a conflict (409 without
+ * a code; an expired test has its own code). On that refusal the server's revision is read and the save is sent once more.
+ */
+export async function saveAttemptAnswer(attemptId: string, itemId: string, answer: string, expectedRevision: number) {
+  try {
+    return await putAttemptAnswer(attemptId, itemId, answer, expectedRevision)
+  } catch (cause) {
+    if (!(cause instanceof ApiError) || cause.status !== 409 || cause.code) throw cause
+    const stored = (await getAttemptResponses(attemptId)).find((response) => response.attemptItemId === itemId)
+    return putAttemptAnswer(attemptId, itemId, answer, stored?.revision ?? 0)
+  }
 }
 
 /** Seconds the learner was active in each section (keyed by the attempt section id); the result shows where the time went. */
