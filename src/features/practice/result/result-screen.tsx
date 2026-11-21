@@ -13,6 +13,7 @@ import { Text } from '@/src/components/ui/text';
 import { colors } from '@/src/theme';
 
 import { restartReadingAttempt, type ReadingScope } from '../api/attempts';
+import { leaveToCatalog } from '../components/test-shell';
 import { useResultData } from '../hooks/use-result-data';
 import { practiceFormatLabel } from '../model/format-labels';
 import { RATING_LABELS, WEAK_BELOW_PERCENT, adviseTime, formatClockTime, formatMinutes, formatTip, mascotMessage, priorityFormats, rateFormats, skippedFormats, weakFormats, type AccuracyRating, type RatedFormat } from '../model/practice-analysis';
@@ -66,7 +67,7 @@ export function ResultScreen({ attemptId, skill }: { attemptId: string; skill: '
   return (
     <View className="flex-1 bg-canvas">
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-        <SkillBand color={skillColor(skill)} title={`Kết quả ${config.label}`} subtitle={scopeLabel} onBack={() => router.replace(catalog as never)}>
+        <SkillBand color={skillColor(skill)} title={`Kết quả ${config.label}`} subtitle={scopeLabel} onBack={() => leaveToCatalog(catalog)}>
           <Hero view={view} />
         </SkillBand>
         <View style={{ padding: 16, gap: 16 }}>
@@ -75,7 +76,7 @@ export function ResultScreen({ attemptId, skill }: { attemptId: string; skill: '
           <Button label="Xem giải thích từng câu" icon={<BookOpenCheck size={18} color={colors.onAccent} />} onPress={() => router.push({ pathname: '/practice/review/[attemptId]', params: { attemptId, skill } } as never)} />
           <View className="flex-row gap-3">
             <View className="flex-1"><Button label="Làm lại" variant="secondary" loading={retrying} icon={<RotateCcw size={16} color={colors.accentDeep} />} onPress={() => void retry()} /></View>
-            <View className="flex-1"><Button label="Đề khác" variant="secondary" onPress={() => router.replace(catalog as never)} /></View>
+            <View className="flex-1"><Button label="Đề khác" variant="secondary" onPress={() => leaveToCatalog(catalog)} /></View>
           </View>
           {retryError ? <FormAlert message={retryError} /> : null}
         </View>

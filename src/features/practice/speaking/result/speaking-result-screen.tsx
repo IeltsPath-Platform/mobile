@@ -1,5 +1,4 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { router } from 'expo-router';
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Info, Mic, Quote, TrendingUp } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
@@ -14,9 +13,10 @@ import { getSpeakingSubmission, settleSpeakingSubmission, type SpeakingSubmissio
 import { ActivateKeySheet, PremiumPlansSheet } from '../../grading/grading-sheets';
 import type { ActivationProduct } from '../../grading/products';
 import { useWallet } from '../../grading/use-wallet';
-import { averageBand, bandComment, errorLabel, groupErrors, parseSpeakingResult, summaryLine, toneOf, weakestCriteria, weakestWord, type ResultCriterion, type ResultWord, type SpeakingResultView } from '../../model/speaking-result-view';
+import { averageBand, bandComment, splitWeakness, errorLabel, groupErrors, parseSpeakingResult, summaryLine, toneOf, weakestCriteria, weakestWord, type ResultCriterion, type ResultWord, type SpeakingResultView } from '../../model/speaking-result-view';
 import { BandIcon, BandScore, SkillBand } from '../../components/skill-band';
 import { Card } from '../../writing/result/writing-blocks';
+import { leaveToCatalog } from '../../components/test-shell';
 
 const CATALOG = '/practice/catalog/speaking';
 const WORKING = new Set(['UPLOADING', 'QUEUED', 'ANALYZING', 'GRADING', 'PAYMENT_PENDING', 'FAILED_RETRYABLE']);
@@ -82,7 +82,7 @@ export function SpeakingResultScreen({ submissionId }: { submissionId: string })
 
   return (
     <View className="flex-1 bg-canvas">
-      <SkillBand color={colors.skill.speaking} title="Kết quả Speaking" subtitle={view ? 'Đã chấm xong' : query.isPending || working ? 'AI đang chấm bài nói' : 'Bài luyện Speaking'} onBack={() => router.replace(CATALOG as never)} right={<BandIcon><Mic size={22} color={colors.skill.speaking} /></BandIcon>} />
+      <SkillBand color={colors.skill.speaking} title="Kết quả Speaking" subtitle={view ? 'Đã chấm xong' : query.isPending || working ? 'AI đang chấm bài nói' : 'Bài luyện Speaking'} onBack={() => leaveToCatalog(CATALOG)} right={<BandIcon><Mic size={22} color={colors.skill.speaking} /></BandIcon>} />
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 14 }}>
         {query.isPending ? <Waiting status={undefined} /> : null}
         {working && !short ? <Waiting status={status} /> : null}
@@ -91,7 +91,7 @@ export function SpeakingResultScreen({ submissionId }: { submissionId: string })
         {status === 'ABANDONED' ? <Notice tone="stop" title="Bài nộp đã dừng" text="Bài này chưa được gửi đủ bản ghi nên đã dừng. Bạn có thể ghi âm và gửi lại." /> : null}
         {error ? <Notice tone="stop" title="Có lỗi xảy ra" text={error} action={<Button label="Tải lại" variant="secondary" onPress={retry} />} /> : null}
         {view ? <ResultDetail view={view} /> : null}
-        <Button label="Về danh mục Speaking" variant="ghost" onPress={() => router.replace(CATALOG as never)} />
+        <Button label="Về danh mục Speaking" variant="ghost" onPress={() => leaveToCatalog(CATALOG)} />
       </ScrollView>
     </View>
   );
@@ -258,7 +258,7 @@ function CriteriaAccordion({ criteria, worstCode }: { criteria: ResultCriterion[
               <View className="gap-2 px-4 pb-4">
                 {item.comment ? <Text className="text-sm leading-5 text-ink">{item.comment}</Text> : null}
                 {item.strengths.length ? <View><View className="flex-row items-center gap-1"><CheckCircle2 size={14} color={colors.success} /><Text weight="bold" className="text-sm" style={{ color: colors.success }}>Điểm tốt</Text></View>{item.strengths.map((point, index) => <Text key={index} className="mt-1 text-sm leading-5 text-ink">• {point}</Text>)}</View> : null}
-                {item.weaknesses.length ? <View><View className="flex-row items-center gap-1"><TrendingUp size={14} color={colors.accentWarm} /><Text weight="bold" className="text-sm" style={{ color: colors.accentWarm }}>Cần cải thiện</Text></View>{item.weaknesses.map((point, index) => <Text key={index} className="mt-1 text-sm leading-5 text-ink">• {point}</Text>)}</View> : null}
+                {item.weaknesses.length ? <View><View className="flex-row items-center gap-1"><TrendingUp size={14} color={colors.accentWarm} /><Text weight="bold" className="text-sm" style={{ color: colors.accentWarm }}>Cần cải thiện</Text></View>{item.weaknesses.map((point, index) => <WeaknessRow key={index} point={point} />)}</View> : null}
                 {item.evidence.length ? <View><View className="flex-row items-center gap-1"><Quote size={14} color={colors.muted} /><Text weight="bold" className="text-sm text-muted">Trích từ bài của bạn</Text></View>{item.evidence.map((entry, index) => <View key={index} className="mt-1 rounded-xl p-2" style={{ backgroundColor: colors.canvas }}><Text className="text-sm italic text-ink">“{entry.quote}”</Text>{entry.note ? <Text className="text-xs text-muted">{entry.note}</Text> : null}</View>)}</View> : null}
                 {!item.comment && !item.strengths.length && !item.weaknesses.length ? <Text className="text-sm text-muted">Chưa có nhận xét chi tiết cho tiêu chí này.</Text> : null}
               </View>
@@ -363,5 +363,18 @@ function Transcripts({ view }: { view: SpeakingResultView }) {
         </View>
       ))}
     </Card>
+  );
+}
+
+/** One weakness: its title, then the fix, the rule and the drill the grader wrote under their labels (plain text when it wrote none). */
+function WeaknessRow({ point }: { point: string }) {
+  const parts = splitWeakness(point);
+  return (
+    <View className="mt-1 gap-0.5">
+      <Text className="text-sm leading-5 text-ink">• {parts.title || point}</Text>
+      {parts.fix ? <Text className="pl-3 text-sm leading-5 text-ink"><Text weight="bold" style={{ color: colors.success }}>Sửa: </Text>{parts.fix}</Text> : null}
+      {parts.rule ? <Text className="pl-3 text-sm leading-5 text-ink"><Text weight="bold">Quy tắc: </Text>{parts.rule}</Text> : null}
+      {parts.drill ? <Text className="pl-3 text-sm leading-5 text-ink"><Text weight="bold" style={{ color: colors.accentWarm }}>Luyện: </Text>{parts.drill}</Text> : null}
+    </View>
   );
 }

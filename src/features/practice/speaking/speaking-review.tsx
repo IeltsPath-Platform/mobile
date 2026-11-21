@@ -16,7 +16,7 @@ import { colors } from '@/src/theme';
 
 import { getSpeakingTerms, type SpeakingTerms } from '../api/speaking';
 import { getSpeakingTask, type SpeakingTask } from '../api/speaking-task';
-import { useLeaveTestGuard } from '../components/test-shell';
+import { leaveToCatalog, useLeaveTestGuard } from '../components/test-shell';
 import { ActivateKeySheet, GradeConfirmSheet, GradeMethodSheet, NotEnoughPointsSheet, TermsSheet } from '../grading/grading-sheets';
 import { POINT_PRODUCTS, type ActivationProduct } from '../grading/products';
 import { useWallet, type GradingAccess } from '../grading/use-wallet';
@@ -171,7 +171,7 @@ export function SpeakingReview({ packageVersionId, parts }: { packageVersionId: 
 
   const leave = () => Alert.alert('Bỏ bài Speaking này?', 'Các bản ghi trên thiết bị sẽ bị xoá.', [
     { text: 'Ở lại', style: 'cancel' },
-    { text: 'Bỏ bài', style: 'destructive', onPress: () => { guardOff(); clearSession(packageVersionId); router.replace(CATALOG as never); } },
+    { text: 'Bỏ bài', style: 'destructive', onPress: () => { guardOff(); clearSession(packageVersionId); leaveToCatalog(CATALOG); } },
   ]);
 
   if (tasks.isPending) return <View className="flex-1 items-center justify-center bg-canvas"><ActivityIndicator color={colors.accent} /><Text className="mt-2 text-sm text-muted">Đang tải bài của bạn…</Text></View>;

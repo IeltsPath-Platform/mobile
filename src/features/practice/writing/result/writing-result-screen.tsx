@@ -18,6 +18,7 @@ import { correctedEssay, errorNames, markEssay, segmentAt } from '../../model/wr
 import { formatClock } from '../../model/clock';
 import { loadResultContext, lowestIndex, measureEssay, roundBand } from '../../model/writing-text';
 import { BandScore, SkillBand } from '../../components/skill-band';
+import { leaveToCatalog } from '../../components/test-shell';
 import { ExaminerResultView } from './examiner-result';
 import { Card, Collapsible, CorrectionCard, DataChecksView, NextSteps, Priorities, RevisionSummary, TaskChecksView, categoryOf } from './writing-blocks';
 
@@ -89,7 +90,7 @@ export function WritingResultScreen({ submissionId }: { submissionId: string }) 
         <BackHeader title="Kết quả Writing" fallbackHref={CATALOG} />
         <EmptyState title="Bài viết chưa có điểm" message={data.status === 'PAYMENT_PENDING'
           ? 'Bài đã được chấm nhưng chưa trừ được point nên kết quả chưa mở. Hãy kiểm tra số dư rồi gửi chấm lại bài này; point chỉ bị trừ khi bạn nhận được kết quả.'
-          : `Bài này chưa được chấm xong${data.failureCode ? ` (${data.failureCode})` : ''}. Point chỉ bị trừ khi chấm thành công.`} mood="oops" action={<Button label="Về danh mục Writing" variant="secondary" onPress={() => router.replace(CATALOG as never)} />} />
+          : `Bài này chưa được chấm xong${data.failureCode ? ` (${data.failureCode})` : ''}. Point chỉ bị trừ khi chấm thành công.`} mood="oops" action={<Button label="Về danh mục Writing" variant="secondary" onPress={() => leaveToCatalog(CATALOG)} />} />
       </View>
     );
   }

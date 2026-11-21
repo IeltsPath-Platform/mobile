@@ -203,3 +203,21 @@ export function weakestWord(words: ResultWord[]): number {
   })
   return worst
 }
+
+/** A weakness laid out by the labels of prompt spk7; an older one, or one without the labels, has only `title`. */
+export interface WeaknessParts { title: string; fix: string; rule: string; drill: string }
+
+const LABELS: [keyof Omit<WeaknessParts, 'title'>, string][] = [['fix', 'Sửa:'], ['rule', 'Quy tắc:'], ['drill', 'Luyện:']];
+
+/** Splits a weakness at its `Sửa:` / `Quy tắc:` / `Luyện:` labels, and drops any `SPK_*` code the stored text still carries. */
+export function splitWeakness(raw: string): WeaknessParts {
+  const clean = raw.replace(/\s*\(?\bSPK_[A-Z0-9_]+\b\)?/g, '').trim();
+  const parts: WeaknessParts = { title: clean, fix: '', rule: '', drill: '' };
+  const marks = LABELS.map(([key, label]) => ({ key, label, at: clean.indexOf(label) })).filter((mark) => mark.at >= 0).sort((a, b) => a.at - b.at);
+  if (marks.length === 0) return parts;
+  parts.title = clean.slice(0, marks[0]!.at).trim();
+  marks.forEach((mark, index) => {
+    parts[mark.key] = clean.slice(mark.at + mark.label.length, marks[index + 1]?.at ?? clean.length).trim();
+  });
+  return parts;
+}

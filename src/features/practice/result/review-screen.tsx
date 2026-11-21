@@ -13,7 +13,7 @@ import { useTheme } from '@/src/theme/app-theme';
 
 import { ReaderSettingsSheet, useReaderPrefs } from '../components/reader-prefs';
 import { SkillBand } from '../components/skill-band';
-import { SectionTabs } from '../components/test-shell';
+import { SectionTabs, leaveToCatalog } from '../components/test-shell';
 import { useResultData } from '../hooks/use-result-data';
 import { useScrollToItem } from '../hooks/use-scroll-to-item';
 import { PracticePlayer } from '../listening/audio-players';
@@ -221,7 +221,7 @@ export function ReviewScreen({ attemptId, skill }: { attemptId: string; skill: '
         </ScrollView>
         <View className="flex-row gap-3 px-3">
           <View className="flex-1"><Button label="Kết quả" variant="secondary" onPress={backToResult} /></View>
-          <View className="flex-1"><Button label="Bài khác" onPress={() => router.replace(`/practice/catalog/${skill}` as never)} /></View>
+          <View className="flex-1"><Button label="Bài khác" onPress={() => leaveToCatalog(`/practice/catalog/${skill}`)} /></View>
         </View>
       </View>
       <ReaderSettingsSheet visible={settingsOpen} onClose={() => setSettingsOpen(false)} />

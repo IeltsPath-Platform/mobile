@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { averageBand, bandComment, groupErrors, learnerIpa, parseSpeakingResult, summaryLine, weakestCriteria } from '@/src/features/practice/model/speaking-result-view'
+import { averageBand, bandComment, groupErrors, learnerIpa, parseSpeakingResult, splitWeakness, summaryLine, weakestCriteria } from '@/src/features/practice/model/speaking-result-view'
 
 describe('parseSpeakingResult', () => {
   it('reads a partly filled or wrongly typed result without throwing', () => {
@@ -94,3 +94,16 @@ describe('learnerIpa', () => {
     expect(view.transcripts[0]!.words[0]!.sounds[0]).toEqual({ symbol: 'r', accuracy: 23, heardAs: 'g' })
   })
 })
+
+describe('splitWeakness', () => {
+  it('splits the three labels of a spk7 weakness', () => {
+    const parts = splitWeakness('Sai thì (3 lần, Part 1): "I go yesterday". Sửa: "I went". Quy tắc: quá khứ đơn dùng V2. Luyện: kể lại hôm qua.');
+    expect(parts.title).toBe('Sai thì (3 lần, Part 1): "I go yesterday".');
+    expect(parts.fix).toBe('"I went".');
+    expect(parts.rule).toBe('quá khứ đơn dùng V2.');
+    expect(parts.drill).toBe('kể lại hôm qua.');
+  });
+  it('keeps an older weakness as plain text and removes SPK codes', () => {
+    expect(splitWeakness('Thiếu từ nối (SPK_NO_LINKER)')).toEqual({ title: 'Thiếu từ nối', fix: '', rule: '', drill: '' });
+  });
+});

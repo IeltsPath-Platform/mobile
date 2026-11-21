@@ -87,3 +87,8 @@ export function closeTest(fallback: string) {
   if (router.canGoBack()) router.back();
   else router.replace(fallback as never);
 }
+
+/** Leaves a finished test for its catalog. The catalog is usually already in the stack, so pop back to it instead of stacking a second copy. */
+export function leaveToCatalog(catalog: string) {
+  router.dismissTo(catalog as never);
+}
