@@ -1,4 +1,6 @@
 import { API_BASE_URL, API_CONFIGURATION_ERROR, REQUEST_TIMEOUT_MS } from './env';
+import { userFacingMessage } from './error-message';
+import { observeServerDate } from './server-clock';
 import { tokenStorage, type SessionTokens } from './token-storage';
 
 type ErrorBody = {
@@ -49,8 +51,7 @@ type RequestOptions = {
 
 type TokenPair = { accessToken: string; refreshToken: string };
 
-const NETWORK_ERROR_MESSAGE = 'Không kết nối được máy chủ. Kiểm tra mạng hoặc địa chỉ API.';
-const FALLBACK_ERROR_MESSAGE = 'Có lỗi xảy ra, vui lòng thử lại.';
+const NETWORK_ERROR_MESSAGE = 'Không kết nối được máy chủ. Kiểm tra kết nối mạng rồi thử lại.';
 const MULTIPART_TIMEOUT_MS = 60_000;
 
 let sessionExpiredListener: (() => void) | null = null;
@@ -76,7 +77,8 @@ async function send(path: string, options: RequestOptions, accessToken?: string)
   if (options.signal?.aborted) controller.abort();
 
   try {
-    return await fetch(`${API_BASE_URL}${path}`, {
+    const sentAt = Date.now();
+    const response = await fetch(`${API_BASE_URL}${path}`, {
       method: options.method ?? 'GET',
       headers,
       body: options.body === undefined ? undefined : multipart ? options.body as FormData : JSON.stringify(options.body),
@@ -84,6 +86,8 @@ async function send(path: string, options: RequestOptions, accessToken?: string)
       credentials: 'omit',
       signal: controller.signal,
     });
+    observeServerDate(response.headers.get('Date'), sentAt, Date.now());
+    return response;
   } catch (cause) {
     if (options.signal?.aborted && !timedOut) {
       const cancelled = new Error('Request cancelled');
@@ -116,7 +120,7 @@ async function parse<T>(response: Response): Promise<T> {
     // The gateway's rate-limit body is English; show a Vietnamese message instead.
     const message = response.status === 429
       ? rateLimitMessage(retryAfterSeconds)
-      : body.message || body.detail || (response.status === 503 ? 'Dịch vụ tạm chưa sẵn sàng. Kiểm tra backend rồi thử lại.' : FALLBACK_ERROR_MESSAGE);
+      : userFacingMessage(response.status, body.message || body.detail);
     throw new ApiError(response.status, message, body.details, { code: body.code, retryAfterSeconds, body: data });
   }
   return data as T;

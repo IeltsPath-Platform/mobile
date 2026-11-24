@@ -6,6 +6,7 @@ import { View } from 'react-native';
 import { Button } from '@/src/components/ui/button';
 import { FormAlert } from '@/src/components/ui/form-alert';
 import { Text } from '@/src/components/ui/text';
+import { USER_DATA_KEYS } from '@/src/lib/user-data-keys';
 import { colors } from '@/src/theme';
 
 import { cancelRequest, cancelRequestMessage, changeExaminer, changeExaminerMessage, type MyGradingJob } from '../api/grading-jobs';
@@ -13,7 +14,7 @@ import { Sheet } from '../components/sheet';
 import { ChangeExaminerSheet } from './grading-sheets';
 
 /** Whether the learner chose to keep waiting, per job and per examiner (a new examiner starts a new deadline). */
-const keptKey = (job: Pick<MyGradingJob, 'id' | 'requestedAt'>) => `grading-keep-waiting:${job.id}:${job.requestedAt ?? ''}`;
+const keptKey = (job: Pick<MyGradingJob, 'id' | 'requestedAt'>) => `${USER_DATA_KEYS.gradingKeepWaiting}${job.id}:${job.requestedAt ?? ''}`;
 
 /**
  * Once the chosen examiner is 48 hours late: keep waiting, or ask for another examiner (at most twice, no extra credit).

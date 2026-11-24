@@ -5,6 +5,7 @@ import { AppState } from 'react-native';
 
 import { ApiError } from '@/src/lib/api-client';
 import { haptics } from '@/src/lib/haptics';
+import { serverNow } from '@/src/lib/server-clock';
 
 import { startAttemptSection, submitReadingAttempt, type ReadingAttempt } from '../api/attempts';
 import type { NavQuestion } from '../components/question-nav';
@@ -104,7 +105,7 @@ export function useTestRunner({ attemptId, attempt, sections, saved, skill }: {
     if (!Number.isFinite(deadline)) return;
     let done = false;
     const check = () => {
-      if (done || Date.now() < deadline) return;
+      if (done || serverNow() < deadline) return;
       done = true;
       setExpired(true);
       void submitRef.current();

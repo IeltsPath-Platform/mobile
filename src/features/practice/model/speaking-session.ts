@@ -5,6 +5,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { File } from 'expo-file-system';
 import { useEffect, useSyncExternalStore } from 'react';
 
+import { USER_DATA_KEYS } from '@/src/lib/user-data-keys';
+
 /** One finished answer to a question. */
 export interface SavedRecording {
   uri: string;
@@ -17,7 +19,7 @@ export interface SavedRecording {
 
 type Recordings = ReadonlyMap<string, SavedRecording>;
 const EMPTY: Recordings = new Map();
-const KEY_PREFIX = 'speaking-session:';
+const KEY_PREFIX = USER_DATA_KEYS.speakingSession;
 const sessions = new Map<string, Recordings>();
 const loaded = new Set<string>();
 const loadVersions = new Map<string, number>();
@@ -67,7 +69,25 @@ export function clearSession(sessionId: string) {
   writePendingSend(sessionId, null);
 }
 
-const SEND_PREFIX = 'speaking-send:';
+/**
+ * Removes every saved answer and its file, in memory and in storage, for the learner who signed out or when another
+ * learner signs in. A storage read still in flight cannot bring an answer back afterwards.
+ */
+export async function resetSpeakingSessions() {
+  new Set([...sessions.keys(), ...loaded]).forEach((sessionId) => loadVersions.set(sessionId, (loadVersions.get(sessionId) ?? 0) + 1));
+  sessions.forEach((recordings) => recordings.forEach((recording) => deleteFile(recording.uri)));
+  sessions.clear();
+  loaded.clear();
+  try {
+    const keys = (await AsyncStorage.getAllKeys()).filter((key) => key.startsWith(KEY_PREFIX));
+    for (const [, raw] of await AsyncStorage.multiGet(keys)) {
+      try { (JSON.parse(raw ?? '[]') as Array<[string, SavedRecording]>).forEach(([, recording]) => deleteFile(recording.uri)); } catch { /* unreadable list */ }
+    }
+  } catch { /* storage unavailable: the keys are removed by the caller */ }
+  listeners.forEach((listener) => listener());
+}
+
+const SEND_PREFIX = USER_DATA_KEYS.speakingSend;
 
 /**
  * A send that has not finished: its request id and the file uploaded for each question under it. Kept on the device so

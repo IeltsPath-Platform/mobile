@@ -5,6 +5,7 @@ vi.mock('../src/lib/token-storage', () => ({
   tokenStorage: { load: async () => state.tokens, save: async (v: typeof state.tokens) => { state.tokens = v; }, clear: async () => { state.tokens = null; } },
 }));
 import { apiRequest } from '../src/lib/api-client';
+import { resetServerClock, serverOffsetMs } from '../src/lib/server-clock';
 
 beforeEach(() => {
   state.tokens = { accessToken: 'old', refreshToken: 'refresh-old' };
@@ -84,6 +85,24 @@ describe('error messages', () => {
     vi.stubGlobal('fetch', async () => json(409, { message: 'Hết tim', code: 'VOCAB_NO_HEARTS' }));
     await expect(apiRequest('/x', { method: 'POST' })).rejects.toMatchObject({ status: 409, code: 'VOCAB_NO_HEARTS', message: 'Hết tim' });
   });
+  it('never shows an English service message: it becomes a Vietnamese sentence for the status and keeps the original body', async () => {
+    vi.stubGlobal('fetch', async () => json(404, { status: 404, message: 'Submission was not found' }));
+    await expect(apiRequest('/x')).rejects.toMatchObject({
+      status: 404,
+      message: 'Không tìm thấy nội dung này. Nội dung có thể đã bị xóa hoặc không còn khả dụng.',
+      body: { message: 'Submission was not found' },
+    });
+  });
+  it.each([
+    [500, 'Máy chủ đang gặp sự cố. Vui lòng thử lại sau.'],
+    [503, 'Dịch vụ tạm thời chưa sẵn sàng. Vui lòng thử lại sau ít phút.'],
+    [418, 'Có lỗi xảy ra, vui lòng thử lại.'],
+  ])('uses a Vietnamese sentence for an English %i body and for an empty one', async (status, expected) => {
+    vi.stubGlobal('fetch', async () => json(status, { message: 'Internal Server Error' }));
+    await expect(apiRequest('/x')).rejects.toMatchObject({ status, message: expected });
+    vi.stubGlobal('fetch', async () => new Response('', { status }));
+    await expect(apiRequest('/x')).rejects.toMatchObject({ status, message: expected });
+  });
 });
 
 describe('401 that rejects user input, not the session', () => {
@@ -111,5 +130,16 @@ describe('401 that rejects user input, not the session', () => {
     await expect(apiRequest('/api/users/me', { auth: true })).resolves.toEqual({ ok: true });
     expect(calls.filter((url) => url.endsWith('/auth/refresh'))).toHaveLength(1);
     expect(state.tokens?.refreshToken).toBe('refresh-new');
+  });
+});
+
+describe('server clock', () => {
+  it('learns the server time from the Date header of a response', async () => {
+    resetServerClock();
+    const serverTime = Date.now() + 10 * 60_000; // the server is ten minutes ahead of this phone
+    vi.stubGlobal('fetch', async () => new Response('{}', { status: 200, headers: { Date: new Date(serverTime).toUTCString() } }));
+    await apiRequest('/x');
+    expect(Math.abs(serverOffsetMs() - 10 * 60_000)).toBeLessThan(2_000);
+    resetServerClock();
   });
 });

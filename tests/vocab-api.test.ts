@@ -87,3 +87,15 @@ describe('vocabulary topic catalog API', () => {
   });
 
 });
+
+describe('vocabApi.achievements', () => {
+  it('drops the badge for finishing a vocabulary topic, which the app can no longer earn', async () => {
+    apiRequestMock.mockResolvedValueOnce({ items: [
+      { code: 'REVIEW_STREAK_7', achieved: false, progress: 2, target: 7 },
+      { code: 'TOPIC_COMPLETED', achieved: false, progress: 0, target: 1 },
+      { code: 'MASTERED_300', achieved: false, progress: 10, target: 300 },
+    ] });
+    const result = await vocabApi.achievements();
+    expect(result.items.map((item) => item.code)).toEqual(['REVIEW_STREAK_7', 'MASTERED_300']);
+  });
+});

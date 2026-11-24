@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { createRequestId } from '@/src/lib/request-id';
+import { USER_DATA_KEYS } from '@/src/lib/user-data-keys';
 
 import { eraseMarks, paintMarks, pruneLinks, type Mark, type Segment } from '../model/highlight-marks';
 
@@ -11,7 +12,7 @@ export type Highlight = Mark;
 export type Note = { id: string; sectionId: string; highlightId: string | null; quote: string; text: string; createdAt: number };
 
 type Stored = { highlights: Highlight[]; notes: Note[] };
-const KEY_PREFIX = 'practice.annotations:';
+const KEY_PREFIX = USER_DATA_KEYS.annotations;
 
 /**
  * Highlights and notes of one attempt, kept on the device (the web app keeps them in the page). They survive closing

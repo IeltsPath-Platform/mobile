@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { profileApi, profileQueryKeys } from '@/src/features/profile/api';
 import { ApiError } from '@/src/lib/api-client';
+import { serverNow } from '@/src/lib/server-clock';
 
 import { getReadingAttempt } from '../api/attempts';
 import { loadBankHistory, loadFreeHistory } from '../model/history-loaders';
@@ -22,7 +23,7 @@ const LOADERS: Record<SkillType, () => Promise<{ rows: HistoryRow[] }>> = {
 /** The server closes a timed practice attempt 30 seconds after its deadline; the status only changes on the next submit, so the deadline is checked here. */
 function pastDeadline(attempt: { mode?: string; expiresAt?: string | null }) {
   const deadline = attempt.mode === 'TIMED' && attempt.expiresAt ? Date.parse(attempt.expiresAt) : NaN;
-  return Number.isFinite(deadline) && Date.now() >= deadline + 30_000;
+  return Number.isFinite(deadline) && serverNow() >= deadline + 30_000;
 }
 
 export const HOME_SKILLS: readonly SkillType[] = ['listening', 'reading', 'writing', 'speaking'];

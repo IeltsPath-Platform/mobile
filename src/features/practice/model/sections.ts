@@ -1,4 +1,6 @@
 // Ported from frontend/src/features/practice/reading/{readingSections,workspace-support}.ts.
+import { serverNow } from '@/src/lib/server-clock';
+
 import type { AttemptResponse, AttemptStructure as ApiAttemptStructure, ReadingAttempt } from '../api/attempts';
 import { parseAttemptStructure, type TestItem, type TestSection } from './attempt-snapshot';
 
@@ -28,7 +30,7 @@ export function answerOf(payload: string): string | null {
 }
 
 /** Seconds left (timed) or seconds spent (untimed) right now, read from the server times so a resumed clock is right. */
-export function clockSeconds(attempt: ReadingAttempt, timed: boolean, now = Date.now()) {
+export function clockSeconds(attempt: ReadingAttempt, timed: boolean, now = serverNow()) {
   if (timed) {
     const expiry = attempt.expiresAt ? Date.parse(attempt.expiresAt) : NaN;
     return Number.isFinite(expiry) ? Math.max(0, Math.ceil((expiry - now) / 1000)) : 0;

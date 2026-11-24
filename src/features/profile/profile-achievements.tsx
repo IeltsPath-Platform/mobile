@@ -10,7 +10,6 @@ type AchievementTone = 'accent' | 'warm' | 'success';
 
 export const ACHIEVEMENT_COPY: Record<string, { title: string; detail: string; tone: AchievementTone }> = {
   REVIEW_STREAK_7: { title: 'Bền bỉ 7 ngày', detail: 'Ôn từ liên tục một tuần', tone: 'accent' },
-  TOPIC_COMPLETED: { title: 'Chinh phục chủ đề', detail: 'Hoàn thành 1 chủ đề từ vựng', tone: 'warm' },
   MASTERED_300: { title: 'Bậc thầy từ vựng', detail: 'Thành thạo 300 từ vựng', tone: 'success' },
 };
 

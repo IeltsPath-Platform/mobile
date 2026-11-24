@@ -7,6 +7,7 @@ const apiLocation = resolveApiUrl({
   port: process.env.EXPO_PUBLIC_API_PORT,
   device: process.env.EXPO_PUBLIC_DEVICE,
   platform: Platform.OS,
+  release: !__DEV__,
   metroHost: Constants.expoConfig?.hostUri ?? Constants.expoGoConfig?.debuggerHost,
   webHost: Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.hostname : undefined,
 });

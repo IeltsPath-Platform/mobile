@@ -1,6 +1,6 @@
-import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
-import { Headphones, Pause, Play, RotateCcw, RotateCw, Volume1, Volume2, VolumeX } from 'lucide-react-native';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus, type AudioPlayer } from 'expo-audio';
+import { Headphones, Pause, Play, RotateCcw, RotateCw, RefreshCw, Volume1, Volume2, VolumeX } from 'lucide-react-native';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, AppState, PanResponder, Pressable, View, type LayoutChangeEvent } from 'react-native';
 
 import { Text } from '@/src/components/ui/text';
@@ -30,6 +30,29 @@ function useFirstSource(src: string) {
 }
 
 /**
+ * Loads the recording again from the latest address (a signed link comes back fresh when the attempt is reloaded) and
+ * carries on from the second where it stopped, so a dropped connection never leaves the learner without the audio.
+ */
+function useRetryPlayback(player: AudioPlayer, src: string, currentTime: number) {
+  const lastTime = useRef(0);
+  useEffect(() => { if (currentTime > 0) lastTime.current = currentTime; }, [currentTime]);
+  return useCallback(() => {
+    player.replace(src);
+    if (lastTime.current > 0) void player.seekTo(lastTime.current).catch(() => undefined);
+    player.play();
+  }, [player, src]);
+}
+
+function RetryButton({ onPress, label = 'Thử lại' }: { onPress: () => void; label?: string }) {
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel="Thử phát lại bài nghe" className="min-h-11 flex-row items-center gap-1.5 rounded-full px-4" style={{ backgroundColor: tint() }}>
+      <RefreshCw size={14} color="#ffffff" />
+      <Text weight="black" style={{ color: '#ffffff' }}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/**
  * The practice player of one section: play/pause, jump 5 s, a seek bar to drag or tap, speed and volume.
  * Reports `onPlayingChange` so study time counts while audio plays.
  */
@@ -40,6 +63,7 @@ export function PracticePlayer({ src, durationHint, onPlayingChange, compact = f
   const [rateIndex, setRateIndex] = useState(1);
   const [volumeIndex, setVolumeIndex] = useState(0);
   const duration = status.duration || durationHint || 0;
+  const retry = useRetryPlayback(player, src, status.currentTime);
 
   useEffect(() => { onPlayingChange?.(status.playing); }, [status.playing, onPlayingChange]);
   useEffect(() => () => { onPlayingChange?.(false); }, [onPlayingChange]);
@@ -51,7 +75,16 @@ export function PracticePlayer({ src, durationHint, onPlayingChange, compact = f
   const seek = (seconds: number) => { void player.seekTo(Math.max(0, Math.min(duration || seconds, seconds))); };
   const VolumeIcon = volumeIndex === 0 ? Volume2 : volumeIndex === VOLUMES.length - 1 ? VolumeX : Volume1;
 
-  if (status.error) return <PlayerCard><Text className="text-sm text-danger">Không phát được bài nghe. Kiểm tra mạng rồi mở lại.</Text></PlayerCard>;
+  if (status.error) {
+    return (
+      <PlayerCard compact={compact}>
+        <View className="flex-row items-center gap-3">
+          <Text className="min-w-0 flex-1 text-sm text-danger">Không phát được bài nghe. Kiểm tra mạng rồi thử lại.</Text>
+          <RetryButton onPress={() => { try { retry(); } catch { /* the error stays on screen */ } }} />
+        </View>
+      </PlayerCard>
+    );
+  }
 
   return (
     <PlayerCard compact={compact}>
@@ -160,7 +193,21 @@ export function ExamPlayer({ src, alreadyPlayed, onStarted, onEnded, onPlayingCh
   const [phase, setPhase] = useState<ExamPhase>(wasPlayed ? 'done' : 'starting');
   const started = useRef(false);
   const ended = useRef(false);
+  const retryPlayback = useRetryPlayback(player, src, status.currentTime);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const errorRef = useRef(status.error);
+  useEffect(() => { errorRef.current = status.error; }, [status.error]);
   useEffect(() => () => { onPlayingChange?.(false); }, [onPlayingChange]);
+  useEffect(() => () => clearTimeout(retryTimer.current), []);
+
+  /** Plays the part again after a failure, from the same second; it never counts as a new listen. */
+  const retry = () => {
+    setPhase('starting');
+    try { retryPlayback(); } catch { setPhase('failed'); return; }
+    clearTimeout(retryTimer.current);
+    // No sound after 4 s: the system wants a tap (blocked) or the address failed again.
+    retryTimer.current = setTimeout(() => setPhase((current) => (current === 'starting' ? (errorRef.current ? 'failed' : 'blocked') : current)), 4000);
+  };
 
   useEffect(() => {
     if (wasPlayed) return;
@@ -204,7 +251,7 @@ export function ExamPlayer({ src, alreadyPlayed, onStarted, onEnded, onPlayingCh
         </View>
         <View className="min-w-0 flex-1">
           <Text weight="black" className="text-sm text-ink" numberOfLines={1}>{PHASE_LABEL[phase]}</Text>
-          <Text className="text-xs text-muted" numberOfLines={1}>{phase === 'interrupted' ? `Dừng ở ${formatClock(status.currentTime)} · nghe tiếp từ chỗ này` : live ? `${formatClock(status.currentTime)} / ${formatClock(status.duration)} · không tua, không dừng` : label ?? 'Bài nghe thi thật'}</Text>
+          <Text className="text-xs text-muted" numberOfLines={1}>{phase === 'interrupted' ? `Dừng ở ${formatClock(status.currentTime)} · nghe tiếp từ chỗ này` : phase === 'failed' ? 'Kiểm tra mạng rồi thử lại · bài nghe tiếp tục từ chỗ đã dừng' : live ? `${formatClock(status.currentTime)} / ${formatClock(status.duration)} · không tua, không dừng` : label ?? 'Bài nghe thi thật'}</Text>
         </View>
         {phase === 'interrupted' ? (
           <Pressable onPress={() => player.play()} accessibilityRole="button" accessibilityLabel="Nghe tiếp bài nghe" className="min-h-11 flex-row items-center gap-1.5 rounded-full px-4" style={{ backgroundColor: tint() }}>
@@ -212,6 +259,7 @@ export function ExamPlayer({ src, alreadyPlayed, onStarted, onEnded, onPlayingCh
             <Text weight="black" style={{ color: '#ffffff' }}>Nghe tiếp</Text>
           </Pressable>
         ) : null}
+        {phase === 'failed' ? <RetryButton onPress={retry} /> : null}
         {phase === 'blocked' ? (
           <Pressable onPress={() => player.play()} accessibilityRole="button" accessibilityLabel="Bắt đầu bài nghe" className="min-h-11 flex-row items-center gap-1.5 rounded-full px-4" style={{ backgroundColor: tint() }}>
             <Play size={14} color="#ffffff" fill="#ffffff" />

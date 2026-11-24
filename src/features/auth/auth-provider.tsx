@@ -9,6 +9,7 @@ import { signOutGoogle } from './components/google-sign-in-button';
 import { registerCurrentInstallation, unregisterCurrentInstallation } from '@/src/features/community/push-notifications';
 
 import { authApi } from './api';
+import { adoptSessionOwner, clearUserData } from './clear-user-data';
 import type { LoginInput, RegisterInput } from './schemas';
 
 export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
@@ -67,6 +68,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const startSession = useCallback(
     async (tokens: { accessToken: string; refreshToken: string }) => {
       await tokenStorage.save({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken });
+      // Work left on the device by another account (drafts, recordings) must not reach this learner.
+      await adoptSessionOwner(tokens.accessToken);
       void queryClient.cancelQueries();
       queryClient.clear();
       setStatus('authenticated');
@@ -120,6 +123,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ]);
     await Promise.race([serverCleanup, new Promise((resolve) => setTimeout(resolve, 3_000))]);
     await tokenStorage.clear();
+    // Signing out hands the phone over: the learner's drafts, answers and recordings go with the session.
+    await clearUserData();
     void signOutGoogle();
     void queryClient.cancelQueries();
     queryClient.clear();

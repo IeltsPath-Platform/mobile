@@ -19,6 +19,8 @@ export type VocabularySet = {
   coverUrl: string | null; sortOrder: number; status: LibraryStatus; topicCount: number | null; wordCount: number | null;
 };
 export type VocabularyAchievement = { code: string; achieved: boolean; progress: number; target: number };
+/** Badges the server still reports but the app can no longer earn: finishing a vocabulary topic needed the removed topic study flow. */
+const RETIRED_ACHIEVEMENTS: ReadonlySet<string> = new Set(['TOPIC_COMPLETED']);
 export type VocabularyCatalogWord = {
   id: string; lemma: string; ipa: string | null; pronunciationAudioReference: string | null;
   senses: Array<Pick<VocabularySense, 'id' | 'partOfSpeech' | 'englishDefinition' | 'vietnameseMeaning' | 'exampleSentence'>>;
@@ -72,7 +74,10 @@ export const vocabApi = {
     return pages.flat();
   },
   listTopics: (signal?: AbortSignal) => apiRequest<VocabularyTopic[]>(`${contentVocabularyPath}/topics`, { auth: false, signal }),
-  achievements: (timezone = 'Asia/Ho_Chi_Minh') => apiRequest<{ items: VocabularyAchievement[] }>(`/api/learning-support/flashcards/notebook/achievements${params({ timezone })}`, { auth: true }),
+  achievements: async (timezone = 'Asia/Ho_Chi_Minh') => {
+    const result = await apiRequest<{ items: VocabularyAchievement[] }>(`/api/learning-support/flashcards/notebook/achievements${params({ timezone })}`, { auth: true });
+    return { ...result, items: result.items.filter((item) => !RETIRED_ACHIEVEMENTS.has(item.code)) };
+  },
   listTopicWords: (topicId: string, page = 0, size = 30, signal?: AbortSignal) =>
     apiRequest<PageResponse<VocabularyCatalogWord>>(`${contentVocabularyPath}${params({ topicId, page, size })}`, { auth: false, signal }),
   listSets: (kind: 'BAND' | 'TOPIC' | undefined = 'TOPIC', page = 0, size = 50, signal?: AbortSignal) =>

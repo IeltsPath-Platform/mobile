@@ -10,18 +10,24 @@ export function isLanIPv4(host: string): boolean {
 export function resolveApiUrl(input: {
   explicit?: string; metroHost?: string | null; platform: string;
   device?: string; port?: string; webHost?: string;
+  /** A store build: only an explicit https address is accepted and messages carry no developer commands. */
+  release?: boolean;
 }): ApiLocation {
-  const fail = (error: string): ApiLocation => ({ url: '', error });
+  const fail = (error: string): ApiLocation => ({
+    url: '',
+    error: input.release ? 'Ứng dụng chưa được cấu hình đúng. Vui lòng cập nhật lên phiên bản mới nhất.' : error,
+  });
   if (input.explicit?.trim()) {
     try {
       const url = new URL(input.explicit.trim());
       if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.search || url.hash
-        || url.pathname !== '/' || /[<>]/.test(input.explicit)) throw new Error();
+        || url.pathname !== '/' || /[<>]/.test(input.explicit) || (input.release && url.protocol !== 'https:')) throw new Error();
       return { url: url.origin, error: null };
     } catch {
       return fail('EXPO_PUBLIC_API_BASE_URL phải là địa chỉ gốc http:// hoặc https:// hợp lệ, không chứa mật khẩu, đường dẫn hay query.');
     }
   }
+  if (input.release) return fail('');
   const port = Number(input.port || '8080');
   if (!Number.isInteger(port) || port < 1 || port > 65535) return fail('EXPO_PUBLIC_API_PORT phải nằm trong khoảng 1–65535.');
   if (input.platform === 'web') {

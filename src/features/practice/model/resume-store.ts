@@ -1,11 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { USER_DATA_KEYS } from '@/src/lib/user-data-keys';
+
 import type { SkillType } from './types';
 
 /** The last Reading or Listening attempt opened on this device, so the hub can offer to continue it. */
 export type ResumeEntry = { attemptId: string; skill: Extract<SkillType, 'reading' | 'listening'>; title: string; savedAt: number };
 
-const KEY = 'practice.resume';
+const KEY = USER_DATA_KEYS.resume;
 
 export async function rememberAttempt(entry: Omit<ResumeEntry, 'savedAt'>) {
   try { await AsyncStorage.setItem(KEY, JSON.stringify({ ...entry, savedAt: Date.now() })); } catch { /* best effort */ }

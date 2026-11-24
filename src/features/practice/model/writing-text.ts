@@ -1,5 +1,6 @@
 // Ported from frontend/src/features/practice/writing/writingText.ts; drafts are kept with AsyncStorage instead of localStorage.
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { USER_DATA_KEYS } from '@/src/lib/user-data-keys'
 /** Same rule as the grader: letters and digits, joined by an apostrophe or a hyphen, count as one word. */
 const WORD = /[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*/gu
 
@@ -86,7 +87,7 @@ export function roundBand(bands: number[]) {
   return Math.floor(mean * 2 + 0.5) / 2
 }
 
-const DRAFT_PREFIX = 'writing-draft:'
+const DRAFT_PREFIX = USER_DATA_KEYS.writingDraft
 
 export interface WritingDraft {
   texts: string[]
@@ -117,7 +118,7 @@ export async function clearDraft(key: string) {
   try { await AsyncStorage.removeItem(DRAFT_PREFIX + key) } catch { /* nothing stored */ }
 }
 
-const RESULT_PREFIX = 'writing-result:'
+const RESULT_PREFIX = USER_DATA_KEYS.writingResult
 
 /** What the result page shows besides the grade: how long the learner wrote and which task it was. */
 export interface WritingResultContext {
