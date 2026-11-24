@@ -13,7 +13,7 @@ import { QuestionGridSheet, QuestionStrip } from '../components/question-nav';
 import { QuestionGroups } from '../components/question-groups';
 import { ReaderSettingsSheet, useReaderPrefs } from '../components/reader-prefs';
 import { SubmitSheet } from '../components/submit-sheet';
-import { KeyboardShell, SectionTabs, TestFooter, closeTest, useLeaveTestGuard } from '../components/test-shell';
+import { KeyboardShell, SectionTabs, TestFooter, closeTest, leaveToCatalog, useLeaveTestGuard } from '../components/test-shell';
 import { useAnnotations } from '../hooks/use-annotations';
 import { useScrollToItem } from '../hooks/use-scroll-to-item';
 import { useStudySession } from '../hooks/use-study-session';
@@ -54,7 +54,7 @@ export function ListeningScreen({ attemptId, attempt, sections, saved }: { attem
   const questions = useScrollToItem(12);
   const scroll = questions.scrollRef;
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const guardOff = useLeaveTestGuard(!runner.submitting);
+  const guardOff = useLeaveTestGuard(!runner.submitting && !runner.closed);
 
   useEffect(() => { if (runner.timed) void readPlayedSections(attemptId).then(setPlayed); }, [attemptId, runner.timed]);
   useEffect(() => () => {
@@ -158,7 +158,7 @@ export function ListeningScreen({ attemptId, attempt, sections, saved }: { attem
       <ReaderSettingsSheet visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <QuestionGridSheet tint={TINT} visible={gridOpen} onClose={() => setGridOpen(false)} questions={runner.navQuestions} sectionLabels={sectionLabels} currentId={runner.currentId} onSelect={select} />
       <SubmitSheet
-        visible={submitOpen || runner.expired}
+        visible={submitOpen || runner.expired || runner.closed}
         onClose={() => setSubmitOpen(false)}
         onSubmit={() => void submit()}
         total={runner.navQuestions.length}
@@ -169,6 +169,8 @@ export function ListeningScreen({ attemptId, attempt, sections, saved }: { attem
         error={runner.submitError}
         timed={runner.timed}
         expired={runner.expired}
+        closed={runner.closed}
+        onExit={() => leaveToCatalog(CATALOG)}
       />
       <MarkingSheets marking={marking} annotations={annotations} sectionId={section.id} sectionLabel={label(runner.activeIndex)} />
       <SelectionCallout marking={marking} lookupEnabled={lookupEnabled} />

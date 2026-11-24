@@ -9,7 +9,6 @@ import { Button } from '@/src/components/ui/button';
 import { EmptyState } from '@/src/components/ui/empty-state';
 import { Text } from '@/src/components/ui/text';
 import { colors } from '@/src/theme';
-import { refreshLearningProgressSoon } from '@/src/features/progress/learning-progress-api';
 
 import { getWritingSubmission, type WritingCorrection, type WritingCriterion, type WritingSubmission } from '../../api/writing';
 import { Sheet } from '../../components/sheet';
@@ -52,7 +51,6 @@ export function WritingResultScreen({ submissionId }: { submissionId: string }) 
   const status = submission.data?.status;
   useEffect(() => {
     if (status !== 'GRADED') return;
-    refreshLearningProgressSoon(client);
     void client.invalidateQueries({ queryKey: ['practice', 'progress'] });
     void client.invalidateQueries({ queryKey: ['practice', 'catalog'] });
     void client.invalidateQueries({ queryKey: ['practice', 'history'] });

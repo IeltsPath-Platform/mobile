@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
-import { refreshLearningProgressSoon } from '@/src/features/progress/learning-progress-api';
+import { ApiError } from '@/src/lib/api-client';
 import { haptics } from '@/src/lib/haptics';
 
 import { startAttemptSection, submitReadingAttempt, type ReadingAttempt } from '../api/attempts';
@@ -33,6 +33,8 @@ export function useTestRunner({ attemptId, attempt, sections, saved, skill }: {
   const [flagged, setFlagged] = useState<ReadonlySet<string>>(() => new Set());
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  // The server closed the attempt (its time ran out before a submit): nothing can be submitted or graded any more.
+  const [closed, setClosed] = useState(false);
   const submittingRef = useRef(false);
   const spent = useRef<Record<string, number>>({});
   const activeSectionId = useRef(sections[activeIndex]?.id);
@@ -71,10 +73,16 @@ export function useTestRunner({ attemptId, attempt, sections, saved, skill }: {
       haptics.success();
       void forgetAttempt(attemptId);
       void client.invalidateQueries({ queryKey: ['practice'] });
-      refreshLearningProgressSoon(client);
       router.replace({ pathname: '/practice/result/[attemptId]', params: { attemptId, skill } } as never);
       return true;
     } catch (cause) {
+      if (cause instanceof ApiError && cause.code === 'ATTEMPT_EXPIRED') {
+        void forgetAttempt(attemptId);
+        void client.invalidateQueries({ queryKey: ['practice'] });
+        setClosed(true);
+        setSubmitting(false);
+        return false;
+      }
       setSubmitError(cause instanceof Error && cause.message ? cause.message : 'Chưa nộp được bài. Hãy thử lại.');
       setSubmitting(false);
       submittingRef.current = false;
@@ -147,6 +155,6 @@ export function useTestRunner({ attemptId, attempt, sections, saved, skill }: {
     timed, answers, numberByItem, items, navQuestions, unanswered, sectionProgress,
     activeIndex, section: sections[activeIndex], selectSection,
     currentId, setCurrentId, goTo, flagged, toggleFlag,
-    readClock, expired, submit, submitting, submitError,
+    readClock, expired, closed, submit, submitting, submitError,
   };
 }

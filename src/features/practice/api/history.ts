@@ -42,7 +42,6 @@ const pageSchema = z.object({
   size: z.number().int().positive(),
   hasNext: z.boolean(),
 })
-export type SubmissionHistoryPage = z.infer<typeof pageSchema>
 
 /**
  * What was submitted inside a course (`COURSE`), the free practice Writing or Speaking of the practice bank (`FREE`), or the free
@@ -67,7 +66,6 @@ export const practiceSinceSchema = z.object({
   lastTotalCount: z.number().int().nullish(),
   lastPassed: z.boolean().nullish(),
 })
-export type PracticeSince = z.infer<typeof practiceSinceSchema>
 
 /** At most this many points are asked about at once (the service refuses more). */
 export const MAX_PRACTICE_POINTS = 20

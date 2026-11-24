@@ -1,4 +1,5 @@
 import { BookOpenCheck, Check, Headphones, Mic, MonitorCheck, Timer, Volume2 } from 'lucide-react-native';
+import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { Button } from '@/src/components/ui/button';
@@ -38,13 +39,59 @@ type ModeSheetProps = {
   onClose: () => void;
 };
 
-/** "Chọn giao diện làm bài": practice tools or the real-exam simulation. */
+const EXAM_TIPS: Record<'reading' | 'listening' | 'writing', { icon: 'headphones' | 'volume' | 'timer'; text: string }[]> = {
+  listening: [
+    { icon: 'headphones', text: 'Đeo tai nghe và chỉnh âm lượng vừa nghe trước khi bắt đầu.' },
+    { icon: 'volume', text: 'Audio tự phát ngay khi bạn bấm Bắt đầu thi, chỉ phát một lần, không tua và không tạm dừng.' },
+    { icon: 'timer', text: 'Đồng hồ đếm ngược chạy ngay. Hết giờ bài tự nộp.' },
+  ],
+  reading: [
+    { icon: 'timer', text: 'Đồng hồ đếm ngược chạy ngay khi bạn bấm Bắt đầu thi.' },
+    { icon: 'timer', text: 'Hết giờ bài tự nộp và bạn không sửa được đáp án.' },
+  ],
+  writing: [
+    { icon: 'timer', text: 'Đồng hồ đếm ngược chạy ngay khi bạn bấm Bắt đầu thi.' },
+    { icon: 'timer', text: 'Không có hướng dẫn trong lúc viết. Hết giờ bài tự chuyển sang bước nộp.' },
+  ],
+};
+
+/** "Chọn giao diện làm bài": practice tools or the real-exam simulation, which asks "ready?" first because the clock (and the audio) starts at once. */
 export function ModeSheet({ card, skill, busy, error, onStart, onClose }: ModeSheetProps) {
+  const [confirming, setConfirming] = useState(false);
+  // A different (or closed) card starts over at the mode choice.
+  const [shownCard, setShownCard] = useState(card);
+  if (card !== shownCard) { setShownCard(card); setConfirming(false); }
+  if (confirming) {
+    const icons = { headphones: <Headphones size={18} color={colors.accent} />, volume: <Volume2 size={18} color={colors.accent} />, timer: <Timer size={18} color={colors.accent} /> };
+    return (
+      <Sheet
+        visible={card !== null}
+        onClose={onClose}
+        dismissable={!busy}
+        title="Sẵn sàng thi thật?"
+        subtitle={card?.title}
+        footer={<>
+          <Button label="Bắt đầu thi" icon={<Timer size={18} color={colors.onAccent} />} loading={busy} loadingLabel="Đang tạo bài làm…" onPress={() => onStart('exam')} />
+          <Button label="Quay lại" variant="secondary" disabled={busy} onPress={() => setConfirming(false)} />
+        </>}>
+        {card ? (
+          <View className="flex-row gap-2">
+            <Info label="Số câu" value={String(card.questionCount)} />
+            <Info label="Thời gian" value={formatDuration(card.timeLimitSeconds)} />
+          </View>
+        ) : null}
+        <View className="mt-4 gap-3">
+          {EXAM_TIPS[skill].map((tip) => <Tip key={tip.text} icon={icons[tip.icon]} text={tip.text} />)}
+        </View>
+        {error ? <View className="mt-3"><FormAlert message={error} /></View> : null}
+      </Sheet>
+    );
+  }
   return (
     <Sheet visible={card !== null} onClose={onClose} dismissable={!busy} title="Chọn chế độ làm bài" subtitle={card?.title}>
       <View className="gap-3">
         <ModeOption soft={colors.accentSoft} icon={<BookOpenCheck size={24} color={colors.accent} />} title="Luyện tập" text={MODE_COPY[skill].practice} disabled={busy} onPress={() => onStart('practice')} />
-        <ModeOption soft={colors.dangerSoft} icon={<Timer size={24} color={colors.danger} />} title="Thi thật" badge="Giống thi máy" text={MODE_COPY[skill].exam} disabled={busy} onPress={() => onStart('exam')} />
+        <ModeOption soft={colors.dangerSoft} icon={<Timer size={24} color={colors.danger} />} title="Thi thật" badge="Giống thi máy" text={MODE_COPY[skill].exam} disabled={busy} onPress={() => setConfirming(true)} />
         {busy ? <Text className="text-center text-sm text-muted">Đang tạo bài làm…</Text> : null}
         {error ? <FormAlert message={error} /> : null}
       </View>

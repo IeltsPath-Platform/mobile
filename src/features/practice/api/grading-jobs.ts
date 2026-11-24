@@ -4,7 +4,6 @@ import { ApiError, apiRequest } from '@/src/lib/api-client'
 
 /** Where a learner's job stands: waiting for the chosen examiner, late (48 hours), finished or closed (human-review-v1). */
 export const jobStateSchema = z.enum(['AWAITING_CHOICE', 'WAITING', 'OVERDUE', 'COMPLETED', 'CANCELLED', 'CLOSED'])
-export type JobState = z.infer<typeof jobStateSchema>
 
 export const myGradingJobSchema = z.object({
   id: z.guid(),

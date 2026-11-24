@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { CalendarDays, Flame, PenLine, UsersRound, Zap } from 'lucide-react-native';
+import { CalendarDays, ChevronRight, PenLine, UsersRound } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 
 import { Text } from '@/src/components/ui/text';
@@ -15,52 +15,13 @@ function joinedLabel(value?: string) {
   return `Tham gia ${date.getMonth() + 1}/${date.getFullYear()}`;
 }
 
-type StatProps = {
-  label: string;
-  value: string | number;
-  color: string;
-  icon: typeof Flame;
-  onPress?: () => void;
-  accessibilityLabel?: string;
-};
-
-/** One coloured stat tile; the tint is the stat colour at low opacity so it follows light/dark. */
-function StatTile({ label, value, color, icon: Icon, onPress, accessibilityLabel }: StatProps) {
-  const body = (
-    <View className="flex-1 rounded-2xl px-2.5 py-3" style={{ backgroundColor: `${color}1f` }}>
-      <View className="h-8 w-8 items-center justify-center rounded-xl" style={{ backgroundColor: color }}>
-        <Icon size={16} color="#ffffff" fill={Icon === UsersRound ? 'transparent' : '#ffffff'} />
-      </View>
-      <Text weight="black" className="mt-2.5 text-xl leading-6 text-ink" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-        {value}
-      </Text>
-      {/* Shrinks instead of truncating so "Người theo dõi" fits on narrow phones. */}
-      <Text className="text-[11px] text-muted" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-        {label}
-      </Text>
-    </View>
-  );
-  if (!onPress) return body;
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel ?? label}
-      onPress={onPress}
-      className="flex-1 active:opacity-70">
-      {body}
-    </Pressable>
-  );
-}
-
-/** Identity row (avatar beside name and details) followed by three stat tiles. */
+/** Identity row (avatar beside name and details) followed by the followers row. */
 export function ProfileHero({
   name,
   email,
   band,
   createdAt,
   avatarUrl,
-  streak,
-  xp,
   followers,
   onEdit,
   onOpenCommunity,
@@ -70,8 +31,6 @@ export function ProfileHero({
   band: string | null;
   createdAt?: string;
   avatarUrl?: string | null;
-  streak: string | number;
-  xp: string | number;
   followers: string | number;
   onEdit: () => void;
   onOpenCommunity: () => void;
@@ -129,18 +88,19 @@ export function ProfileHero({
         </View>
       </View>
 
-      <View className="mt-4 flex-row gap-2">
-        <StatTile label="Ngày liên tiếp" value={streak} color={colors.flame} icon={Flame} />
-        <StatTile label="Tổng XP" value={xp} color={colors.coin} icon={Zap} />
-        <StatTile
-          label="Người theo dõi"
-          value={followers}
-          color={colors.social}
-          icon={UsersRound}
-          onPress={onOpenCommunity}
-          accessibilityLabel="Xem hồ sơ cộng đồng và người theo dõi"
-        />
-      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Người theo dõi: ${followers}. Xem hồ sơ cộng đồng`}
+        onPress={onOpenCommunity}
+        className="mt-4 min-h-12 flex-row items-center gap-3 rounded-2xl px-3 active:opacity-70"
+        style={{ backgroundColor: `${colors.social}1f` }}>
+        <View className="h-8 w-8 items-center justify-center rounded-xl" style={{ backgroundColor: colors.social }}>
+          <UsersRound size={16} color="#ffffff" />
+        </View>
+        <Text weight="bold" className="flex-1 text-sm text-ink">Người theo dõi</Text>
+        <Text weight="black" className="text-base text-ink">{followers}</Text>
+        <ChevronRight size={18} color={colors.muted} />
+      </Pressable>
     </View>
   );
 }

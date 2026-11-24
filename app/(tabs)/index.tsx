@@ -5,7 +5,6 @@ import { View, type ScrollViewInstance } from 'react-native';
 import { useTabBarScrollHandler, useTabReselect } from '@/src/components/navigation/tab-reselect-context';
 import { useAuth } from '@/src/features/auth/auth-provider';
 import { PracticeHome } from '@/src/features/practice/home/practice-home';
-import { learningProgressKeys } from '@/src/features/progress/learning-progress-api';
 import { useTheme } from '@/src/theme/app-theme';
 
 /** The home tab: IELTS practice of the four skills. */
@@ -24,7 +23,6 @@ export default function HomeScreen() {
     if (!refreshPrimed.current) { refreshPrimed.current = true; return; }
     refreshPrimed.current = false;
     void queryClient.invalidateQueries({ queryKey: ['practice'] });
-    void queryClient.invalidateQueries({ queryKey: learningProgressKeys.all });
   }, [queryClient]);
   useTabReselect('index', refreshFromTop);
 

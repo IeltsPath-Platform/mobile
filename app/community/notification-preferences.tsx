@@ -93,7 +93,9 @@ export default function NotificationPreferencesScreen() {
   const user = useCurrentUser();
   // The server lists every type for every account; grading-queue reminders only concern examiners.
   const isExaminer = user.data?.roles.some((role) => role.name === 'EXAMINER') ?? false;
+  const mail = useQuery({ queryKey: ['community', 'mail-preferences'], queryFn: communityApi.mailPreferences });
   const [busy, setBusy] = useState<string>();
+  const [mailBusy, setMailBusy] = useState(false);
   const sections = SECTIONS
     .filter((section) => section.key !== 'examiner' || isExaminer)
     .map((section) => ({
@@ -112,6 +114,15 @@ export default function NotificationPreferencesScreen() {
     } finally { setBusy(undefined); }
   };
 
+  const updateMail = async (learning: boolean) => {
+    setMailBusy(true);
+    try {
+      queryClient.setQueryData(['community', 'mail-preferences'], await communityApi.updateMailPreferences(learning));
+    } catch (error) {
+      Alert.alert('Chưa thể lưu tuỳ chọn email', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+    } finally { setMailBusy(false); }
+  };
+
   return <View className="flex-1 bg-canvas">
     <BackHeader title="Tuỳ chọn thông báo" fallbackHref="/(tabs)/community" />
     <ScrollView contentContainerClassName="px-4 pb-10 pt-4">
@@ -119,6 +130,16 @@ export default function NotificationPreferencesScreen() {
       {query.isPending ? <View className="items-center py-16"><ActivityIndicator color={colors.accent} /><Text className="mt-3 text-sm text-muted">Đang tải tuỳ chọn…</Text></View>
         : query.isError ? <Pressable onPress={() => void query.refetch()} className="items-center rounded-3xl border border-line bg-surface p-6"><Text weight="bold">Không tải được tuỳ chọn</Text><Text className="mt-2 text-sm text-accent">Chạm để thử lại</Text></Pressable>
         : sections.length ? <View className="gap-4">
+          {mail.data ? <View>
+            <Text weight="bold" className="mb-2 ml-1 text-[11px] tracking-wide text-muted">EMAIL</Text>
+            <View className="min-h-[76px] flex-row items-center overflow-hidden rounded-3xl border border-line bg-surface px-4 py-3">
+              <View className="flex-1 pr-3">
+                <Text weight="semibold" className="text-sm text-ink">Email học tập</Text>
+                <Text className="mt-1 text-xs leading-4 text-muted">Nhận email khi bài được chấm hoặc có kết quả. Email bảo mật và thanh toán luôn được gửi.</Text>
+              </View>
+              {mailBusy ? <ActivityIndicator color={colors.accent} className="mx-2" /> : <Switch value={mail.data.learning} disabled={busy !== undefined} accessibilityLabel="Email học tập" trackColor={{ false: colors.line, true: colors.accent }} thumbColor={colors.canvas} onValueChange={(learning) => void updateMail(learning)} />}
+            </View>
+          </View> : null}
           {sections.map((section) => <View key={section.key}>
             <Text weight="bold" className="mb-2 ml-1 text-[11px] tracking-wide text-muted">{section.title}</Text>
             <View className="overflow-hidden rounded-3xl border border-line bg-surface">

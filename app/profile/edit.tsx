@@ -16,7 +16,6 @@ import { TextField } from '@/src/components/ui/text-field';
 import { useCurrentUser } from '@/src/features/auth/auth-provider';
 import { profileApi, profileQueryKeys } from '@/src/features/profile/api';
 import { gamificationApi } from '@/src/features/progress/gamification-api';
-import { studyKeys } from '@/src/features/vocab/study-api';
 import { colors, fonts } from '@/src/theme';
 
 const MAX_SOURCE_AVATAR_BYTES = 20 * 1024 * 1024;
@@ -123,7 +122,6 @@ export default function EditProfileScreen() {
         queryClient.invalidateQueries({ queryKey: profileQueryKeys.user }),
         queryClient.invalidateQueries({ queryKey: profileQueryKeys.learner }),
         queryClient.invalidateQueries({ queryKey: ['gamification', 'settings'] }),
-        queryClient.invalidateQueries({ queryKey: studyKeys.summary }),
         refreshCommunityAvatar(),
       ]);
       router.back();

@@ -16,6 +16,8 @@ export type CursorPage<T> = { content: T[]; nextCursor: string | null; hasNext: 
 export type OffsetPage<T> = { content: T[]; page: number; size: number; totalElements: number; totalPages: number; last: boolean };
 export type Comment = { id: string; authorId: string; parentCommentId: string | null; body: string; createdAt?: string; updatedAt?: string; replyCount: number; author?: PublicProfile | null; myComment?: boolean; reactionCounts: Record<ReactionType, number>; myReaction: ReactionType | null };
 export type Notification = { id: string; actorId: string; actor?: PublicProfile | null; eventType: string; postId?: string | null; commentId?: string | null; createdAt: string; readAt?: string | null };
+/** Whether learning emails (essay graded, result ready, examiner queue) are sent; security and billing emails always are. */
+export type MailPreferences = { learning: boolean };
 export type NotificationPreference = { eventType: string; enabled: boolean };
 export type NotificationDeviceRegistration = {
   provider: 'FCM';
@@ -95,6 +97,8 @@ export const communityApi = {
   deleteNotification: (id: string) => apiRequest<void>(`/api/notifications/${encodeURIComponent(id)}`, { method: 'DELETE', auth: true }),
   deleteReadNotifications: () => apiRequest<{ count: number }>('/api/notifications/read', { method: 'DELETE', auth: true }),
   preferences: () => apiRequest<NotificationPreference[]>('/api/notifications/preferences', { auth: true }),
+  mailPreferences: () => apiRequest<MailPreferences>('/api/notifications/mail-preferences', { auth: true }),
+  updateMailPreferences: (learning: boolean) => apiRequest<MailPreferences>('/api/notifications/mail-preferences', { method: 'PUT', body: { learning }, auth: true }),
   updatePreference: (eventType: string, enabled: boolean) => apiRequest<NotificationPreference>(`/api/notifications/preferences/${encodeURIComponent(eventType)}`, { method: 'PUT', body: { enabled }, auth: true }),
   registerNotificationDevice: (installationId: string, body: NotificationDeviceRegistration) =>
     apiRequest<void>(`/api/notifications/devices/${installationId}`, { method: 'PUT', body, auth: true }),

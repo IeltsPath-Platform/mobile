@@ -5,7 +5,6 @@ export type FontSizeOption = 'S' | 'M' | 'L';
 export type ThemeOption = 'light' | 'dark' | 'system';
 
 export type AppSettings = {
-  dailyXpGoal: number;
   fontSize: FontSizeOption;
   theme: ThemeOption;
   /** Answer chimes, tap sounds and word pronunciation. */
@@ -15,7 +14,6 @@ export type AppSettings = {
 };
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
-  dailyXpGoal: 50,
   fontSize: 'M',
   theme: 'system',
   soundEnabled: true,
@@ -42,7 +40,6 @@ async function readSettings(): Promise<AppSettings> {
     // Pick known keys only so fields removed in later versions (e.g. old reminder toggles) are dropped.
     const parsed = JSON.parse(raw) as Partial<AppSettings>;
     memoryCache = {
-      dailyXpGoal: typeof parsed.dailyXpGoal === 'number' ? parsed.dailyXpGoal : DEFAULT_APP_SETTINGS.dailyXpGoal,
       soundEnabled: typeof parsed.soundEnabled === 'boolean' ? parsed.soundEnabled : DEFAULT_APP_SETTINGS.soundEnabled,
       musicEnabled: typeof parsed.musicEnabled === 'boolean' ? parsed.musicEnabled : DEFAULT_APP_SETTINGS.musicEnabled,
       theme: parsed.theme === 'dark' || parsed.theme === 'light' ? parsed.theme : 'system',
@@ -113,11 +110,6 @@ export function useAppSettings() {
     setSettings(next);
   }, []);
 
-  const setDailyXpGoal = useCallback(
-    (dailyXpGoal: number) => update({ dailyXpGoal: Math.min(200, Math.max(10, Math.round(dailyXpGoal))) }),
-    [update],
-  );
-
   const resetSettings = useCallback(async () => {
     await clearAppSettingsStorage();
     setSettings({ ...DEFAULT_APP_SETTINGS });
@@ -127,7 +119,6 @@ export function useAppSettings() {
     settings,
     ready,
     update,
-    setDailyXpGoal,
     resetSettings,
   };
 }

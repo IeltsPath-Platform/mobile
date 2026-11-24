@@ -21,10 +21,25 @@ type SubmitSheetProps = {
   timed: boolean;
   /** The exam time is up: the sheet stays open, offering only to (re)submit. */
   expired?: boolean;
+  /** The server already closed the attempt (late submit): the test cannot be graded, so the only way on is to leave. */
+  closed?: boolean;
+  onExit?: () => void;
 };
 
 /** The finish screen before submitting: what is still empty or flagged, and the irreversible submit. */
-export function SubmitSheet({ visible, onClose, onSubmit, total, unanswered, flagged, unsaved, submitting, error, timed, expired = false }: SubmitSheetProps) {
+export function SubmitSheet({ visible, onClose, onSubmit, total, unanswered, flagged, unsaved, submitting, error, timed, expired = false, closed = false, onExit }: SubmitSheetProps) {
+  if (closed) {
+    return (
+      <Sheet
+        visible={visible}
+        onClose={() => onExit?.()}
+        title="Bài đã hết hạn"
+        subtitle="Thời gian làm bài đã kết thúc trước khi bài được nộp, nên bài này không được chấm. Bạn có thể chọn đề và làm lại."
+        footer={<Button label="Về danh mục" onPress={() => onExit?.()} />}>
+        <View />
+      </Sheet>
+    );
+  }
   return (
     <Sheet
       visible={visible}

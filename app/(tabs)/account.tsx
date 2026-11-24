@@ -1,16 +1,15 @@
 import Constants from 'expo-constants';
 import {
-  BookOpen,
   CircleHelp,
   Palette,
   KeyRound,
+  Link2Off,
   LogOut,
   MailCheck,
   Settings2,
   Trash2,
   Trophy,
   UserRound,
-  Zap,
 } from 'lucide-react-native';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
@@ -46,16 +45,14 @@ import {
 } from '@/src/features/settings/components/settings-rows';
 import { clearAppSettingsStorage, useAppSettings } from '@/src/features/settings/use-app-settings';
 import { vocabApi } from '@/src/features/vocab/api';
-import { learningProgressKeys, useLearningProgress } from '@/src/features/progress/learning-progress-api';
 import { haptics } from '@/src/lib/haptics';
 import { colors } from '@/src/theme';
 import { useTabBarScrollHandler, useTabReselect } from '@/src/components/navigation/tab-reselect-context';
 
-const XP_PRESETS = [30, 50, 80, 100] as const;
 const APP_VERSION = Constants.expoConfig?.version ?? Constants.nativeAppVersion ?? '1.0.0';
 const SUPPORT_EMAIL = 'theenglishspace01@gmail.com';
 
-type ExpandableSection = 'goal' | 'settings' | null;
+type ExpandableSection = 'settings' | null;
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Vui lòng thử lại.';
@@ -75,6 +72,23 @@ export default function AccountScreen() {
     enabled: signedIn,
   });
 
+  const oauthQuery = useQuery({ queryKey: profileQueryKeys.oauth, queryFn: profileApi.getOAuthIdentities, enabled: signedIn });
+  const googleIdentity = oauthQuery.data?.find((item) => item.provider.toLowerCase() === 'google');
+  const unlinkGoogle = () =>
+    Alert.alert('Huỷ liên kết Google?', 'Bạn sẽ không đăng nhập bằng Google được nữa. Hãy chắc chắn đã có mật khẩu để đăng nhập.', [
+      { text: 'Giữ lại', style: 'cancel' },
+      {
+        text: 'Huỷ liên kết',
+        style: 'destructive',
+        onPress: () => {
+          profileApi
+            .unlinkOAuthIdentity(googleIdentity?.provider ?? 'google')
+            .then(() => queryClient.invalidateQueries({ queryKey: profileQueryKeys.oauth }))
+            .catch((error) => Alert.alert('Chưa huỷ được liên kết', errorMessage(error)));
+        },
+      },
+    ]);
+
   const relationshipsQuery = useQuery({
     queryKey: ['community', 'relationship', user?.id],
     queryFn: () => communityApi.relationship(user?.id ?? ''),
@@ -89,11 +103,9 @@ export default function AccountScreen() {
     staleTime: 60_000,
   });
 
-  // Streak and XP of the learning service, as on the web profile; practice tests feed them on the server.
-  const { streak: learningStreak, progress: learningXp } = useLearningProgress();
   const unread = useUnread();
-  const { settings, setDailyXpGoal } = useAppSettings();
-
+  const { settings } = useAppSettings();
+  
   const [busy, setBusy] = useState<'signout' | 'cache' | null>(null);
   const [pullRefreshing, setPullRefreshing] = useState(false);
   const [tabRefreshing, setTabRefreshing] = useState(false);
@@ -109,7 +121,6 @@ export default function AccountScreen() {
         profileQueryKeys.learner,
         ['community', 'relationship', user?.id],
         ['vocab', 'achievements'],
-        learningProgressKeys.all,
         ['community', 'unread'],
       ] as const,
     [user?.id],
@@ -152,8 +163,6 @@ export default function AccountScreen() {
         learnerQuery.refetch(),
         relationshipsQuery.refetch(),
         achievementsQuery.refetch(),
-        learningStreak.refetch(),
-        learningXp.refetch(),
         unread.refetch(),
       ]);
     } finally {
@@ -218,19 +227,15 @@ export default function AccountScreen() {
   const displayName = learnerQuery.data?.displayName || user?.fullName || 'Học viên';
   const avatarReference = learnerQuery.data?.avatarReference;
   const band = learnerQuery.data?.selfReportedBand != null ? `Band ${learnerQuery.data.selfReportedBand}` : null;
-  const streakDays = learningStreak.data?.currentDays ?? (learningStreak.isPending ? '…' : '—');
-  const totalXp = learningXp.data?.totalXp ?? (learningXp.isPending ? '…' : '—');
   const followersCount = relationshipsQuery.data?.followerCount ?? (relationshipsQuery.isPending ? '…' : '—');
   const achievementItems = achievementsQuery.data?.items;
   const completedAchievements = achievementItems?.filter((item) => item.achieved).length ?? 0;
   const hasSummaryError =
-    learnerQuery.isError || relationshipsQuery.isError || achievementsQuery.isError || learningStreak.isError || learningXp.isError;
+    learnerQuery.isError || relationshipsQuery.isError || achievementsQuery.isError;
   const retrySummary = () => {
     if (learnerQuery.isError) void learnerQuery.refetch();
     if (relationshipsQuery.isError) void relationshipsQuery.refetch();
     if (achievementsQuery.isError) void achievementsQuery.refetch();
-    if (learningStreak.isError) void learningStreak.refetch();
-    if (learningXp.isError) void learningXp.refetch();
   };
 
   return (
@@ -290,8 +295,6 @@ export default function AccountScreen() {
             band={band}
             createdAt={user.createdAt}
             avatarUrl={avatarReference}
-            streak={streakDays}
-            xp={totalXp}
             followers={followersCount}
             onEdit={() => router.push('/profile/edit' as never)}
             onOpenCommunity={() => router.push(`/community/users/${user.id}` as never)}
@@ -327,50 +330,6 @@ export default function AccountScreen() {
 
           <View className="h-5" />
           <SettingsSection title="Học tập">
-            <SettingsAccordionRow
-              icon={Zap}
-              title="Mục tiêu học mỗi ngày"
-              summary={`${settings.dailyXpGoal} XP / ngày`}
-              expanded={expandedSection === 'goal'}
-              onToggle={() => toggleSection('goal')}
-            >
-              <View className="bg-canvas/40 px-4 py-3">
-                <Text className="mb-2 text-xs text-muted">Chọn số XP bạn muốn đạt được mỗi ngày:</Text>
-                <View className="flex-row gap-2">
-                  {XP_PRESETS.map((preset) => {
-                    const selected = settings.dailyXpGoal === preset;
-                    return (
-                      <Pressable
-                        key={preset}
-                        accessibilityRole="radio"
-                        accessibilityLabel={`${preset} XP mỗi ngày`}
-                        accessibilityState={{ checked: selected }}
-                        onPress={() => void setDailyXpGoal(preset)}
-                        className="min-h-11 flex-1 items-center justify-center rounded-xl border py-2 active:opacity-75"
-                        style={{
-                          backgroundColor: selected ? colors.accentSoft : colors.surface,
-                          borderColor: selected ? colors.accent : colors.line,
-                        }}
-                      >
-                        <Text
-                          weight="black"
-                          className="text-xs"
-                          style={{ color: selected ? colors.accentDeep : colors.ink }}
-                        >
-                          {preset} XP
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </View>
-            </SettingsAccordionRow>
-
-            <SettingsLinkRow
-              icon={BookOpen}
-              title="Tiến độ học tập chi tiết"
-              onPress={() => router.push('/progress' as never)}
-            />
             <SettingsLinkRow
               icon={Trophy}
               title="Thành tích & Huy hiệu"
@@ -404,6 +363,7 @@ export default function AccountScreen() {
               title={user?.hasPassword === false ? 'Tạo mật khẩu' : 'Đổi mật khẩu'}
               onPress={() => router.push('/profile/change-password' as never)}
             />
+            {googleIdentity ? <SettingsLinkRow icon={Link2Off} title="Huỷ liên kết Google" value="Đã liên kết" onPress={unlinkGoogle} /> : null}
             {user?.emailVerified === false ? (
               <SettingsLinkRow
                 icon={MailCheck}

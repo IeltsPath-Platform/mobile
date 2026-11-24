@@ -7,7 +7,6 @@ import { Button } from '@/src/components/ui/button';
 import { Text } from '@/src/components/ui/text';
 import { ApiError } from '@/src/lib/api-client';
 import { colors } from '@/src/theme';
-import { refreshLearningProgressSoon } from '@/src/features/progress/learning-progress-api';
 
 import { getSpeakingSubmission, settleSpeakingSubmission, type SpeakingSubmission } from '../../api/speaking';
 import { ActivateKeySheet, PremiumPlansSheet } from '../../grading/grading-sheets';
@@ -70,7 +69,6 @@ export function SpeakingResultScreen({ submissionId }: { submissionId: string })
   const status = submission?.status;
   useEffect(() => {
     if (status !== 'GRADED') return;
-    refreshLearningProgressSoon(client);
     void client.invalidateQueries({ queryKey: ['practice', 'progress'] });
     void client.invalidateQueries({ queryKey: ['practice', 'catalog'] });
     // The grade took points: the balance shown elsewhere in the app is read again.

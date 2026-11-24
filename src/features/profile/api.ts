@@ -22,9 +22,16 @@ export type LearnerProfileDraft = Pick<
 export const profileQueryKeys = {
   user: ['auth', 'me'] as const,
   learner: ['profile', 'learner'] as const,
+  oauth: ['profile', 'oauth'] as const,
 };
 
+export type OAuthIdentity = { id: string; provider: string; linkedAt?: string };
+
 export const profileApi = {
+  /** Sign-in providers linked to the account (Google). */
+  getOAuthIdentities: () => apiRequest<OAuthIdentity[]>('/api/users/me/oauth', { auth: true }),
+  unlinkOAuthIdentity: (provider: string) => apiRequest<void>(`/api/users/me/oauth/${encodeURIComponent(provider)}`, { method: 'DELETE', auth: true }),
+
   getLearnerProfile: () => apiRequest<LearnerProfile>('/api/users/me/profile', { auth: true }),
 
   updateAccount: (body: { fullName: string; phoneNumber: string | null }) =>
