@@ -11,8 +11,8 @@ export interface HistoryPage { rows: HistoryRow[]; hasNext: boolean }
 /** The names of the topics and courses a page mentions; a name that cannot be read is left out. */
 async function resolveNames(items: readonly SubmissionHistoryItem[]): Promise<HistoryNames> {
   const [topics, courses] = await Promise.all([
-    items.some((item) => item.topicId) ? apiRequest<Array<{ topicId: string; name: string }>>('/api/learning/topics', { auth: true }).catch(() => []) : Promise.resolve([]),
-    items.some((item) => item.courseId) ? apiRequest<Array<{ courseId: string; name: string }>>('/api/learning/courses', { auth: true }).catch(() => []) : Promise.resolve([]),
+    items.some((item) => item.topicId) ? apiRequest<{ topicId: string; name: string }[]>('/api/learning/topics', { auth: true }).catch(() => []) : Promise.resolve([]),
+    items.some((item) => item.courseId) ? apiRequest<{ courseId: string; name: string }[]>('/api/learning/courses', { auth: true }).catch(() => []) : Promise.resolve([]),
   ]);
   return {
     topics: new Map(topics.map((topic) => [topic.topicId, topic.name] as const)),

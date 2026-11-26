@@ -1,6 +1,6 @@
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus, type AudioPlayer } from 'expo-audio';
 import { Headphones, Pause, Play, RotateCcw, RotateCw, RefreshCw, Volume1, Volume2, VolumeX } from 'lucide-react-native';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, AppState, PanResponder, Pressable, View, type LayoutChangeEvent } from 'react-native';
 
 import { Text } from '@/src/components/ui/text';
@@ -67,7 +67,10 @@ export function PracticePlayer({ src, durationHint, onPlayingChange, compact = f
 
   useEffect(() => { onPlayingChange?.(status.playing); }, [status.playing, onPlayingChange]);
   useEffect(() => () => { onPlayingChange?.(false); }, [onPlayingChange]);
+  // The player is a native object whose properties are set directly; there is no setter to call instead.
+  // eslint-disable-next-line react-hooks/immutability
   useEffect(() => { player.volume = VOLUMES[volumeIndex]; }, [player, volumeIndex]);
+  // eslint-disable-next-line react-hooks/immutability
   useEffect(() => { player.shouldCorrectPitch = true; player.setPlaybackRate(RATES[rateIndex]); }, [player, rateIndex]);
   useEffect(() => { if (status.didJustFinish) void player.seekTo(0); }, [status.didJustFinish, player]);
 
@@ -139,16 +142,19 @@ function SeekBar({ current, duration, onSeek }: { current: number; duration: num
   const width = useRef(1);
   const [dragging, setDragging] = useState<number | null>(null);
   const ratioAt = (x: number) => Math.max(0, Math.min(1, x / width.current));
-  const responder = useRef(PanResponder.create({
+  // The drag handlers below are created once; they call the seek of the latest render through this ref.
+  const seekRef = useRef((ratio: number) => onSeek(ratio * duration));
+  useLayoutEffect(() => { seekRef.current = (ratio: number) => onSeek(ratio * duration); });
+  // The handlers read `width` and `seekRef` when a finger touches the bar, never while rendering.
+  // eslint-disable-next-line react-hooks/refs
+  const [responder] = useState(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
     onPanResponderGrant: (event) => setDragging(ratioAt(event.nativeEvent.locationX)),
     onPanResponderMove: (event) => setDragging(ratioAt(event.nativeEvent.locationX)),
     onPanResponderRelease: (event) => { const ratio = ratioAt(event.nativeEvent.locationX); setDragging(null); seekRef.current(ratio); },
     onPanResponderTerminate: () => setDragging(null),
-  })).current;
-  const seekRef = useRef((ratio: number) => onSeek(ratio * duration));
-  seekRef.current = (ratio: number) => onSeek(ratio * duration);
+  }));
   const ratio = dragging ?? (duration > 0 ? Math.min(1, current / duration) : 0);
   return (
     <View
@@ -224,7 +230,8 @@ export function ExamPlayer({ src, alreadyPlayed, onStarted, onEnded, onPlayingCh
 
   // Stopped by the system after it began (a call, an alarm, the app sent to the background): offer to carry on, and
   // carry on by itself when the app is in front again.
-  const interrupted = started.current && !ended.current && !status.playing && !status.didJustFinish;
+  // `playing` is the phase once the part has begun and not ended, so a stop in that phase is the system's doing.
+  const interrupted = phase === 'playing' && !status.playing && !status.didJustFinish;
   useEffect(() => {
     if (!interrupted) return;
     const timer = setTimeout(() => setPhase((current) => (current === 'playing' ? 'interrupted' : current)), 1200);

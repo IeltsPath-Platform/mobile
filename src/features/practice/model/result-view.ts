@@ -1,19 +1,19 @@
 // Ported from frontend/src/features/practice/lib/readingResultView.ts. Keep behaviour in step with the web version.
 interface ResultStructure {
-  sections: Array<{
+  sections: {
     id: string
     sortOrder: number
     snapshot: string | Record<string, unknown>
-    items: Array<{ id: string; sortOrder: number; questionSnapshot: string }>
-  }>
+    items: { id: string; sortOrder: number; questionSnapshot: string }[]
+  }[]
 }
 interface ResultResponse { attemptItemId: string; payload: string }
 interface ResultData {
   score: number
   maxScore: number
   percent: number
-  items: Array<{ attemptItemId: string; correct: boolean | null }>
-  solutions?: Array<{ attemptItemId: string; correctAnswer?: string | null; explanation?: string | null }>
+  items: { attemptItemId: string; correct: boolean | null }[]
+  solutions?: { attemptItemId: string; correctAnswer?: string | null; explanation?: string | null }[]
   practice?: PracticeData | null
 }
 interface AttemptTimes { startedAt: string | null; submittedAt: string | null }
@@ -24,7 +24,7 @@ interface PracticeData {
   submittedAt?: string | null
   timeLimitSeconds?: number | null
   band?: number | null
-  sections?: Array<{ attemptSectionId: string; partNo: number | null; title: string | null; questionCount: number; timeSpentSeconds: number | null; timeLimitSeconds: number | null }>
+  sections?: { attemptSectionId: string; partNo: number | null; title: string | null; questionCount: number; timeSpentSeconds: number | null; timeLimitSeconds: number | null }[]
 }
 
 export interface ReadingResultItem {

@@ -10,7 +10,7 @@ export const CRITERION_NAME: Record<string, string> = {
 };
 
 /** Which rubric criteria an AI focus title is about, by the words the grader's model tends to use. */
-const FOCUS_TOPICS: Array<[RegExp, string[]]> = [
+const FOCUS_TOPICS: [RegExp, string[]][] = [
   [/task\s*(achievement|response)/i, ['TA', 'TR']],
   [/coheren|cohesi/i, ['CC']],
   [/lexical|vocabular/i, ['LR']],

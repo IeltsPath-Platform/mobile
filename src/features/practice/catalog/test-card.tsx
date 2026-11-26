@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { Check, ChevronRight, Clock, ListChecks } from 'lucide-react-native';
+import { Check, ChevronRight, Clock, Crown, ListChecks, Lock } from 'lucide-react-native';
 import { memo } from 'react';
 import { Pressable, View } from 'react-native';
 
@@ -20,6 +20,8 @@ type TestCardProps = {
   config: PracticeSkillConfig;
   partNo?: number;
   done: boolean;
+  /** A Premium test the learner cannot open yet. */
+  locked?: boolean;
   tint: string;
   onPress: (card: ReadingTestCard) => void;
 };
@@ -32,7 +34,7 @@ function shortTitle(title: string) {
 }
 
 /** One test of the catalog: a square cover, the part, title, source, question formats, size and time. */
-export const TestCard = memo(function TestCard({ card, skill, config, partNo, done, tint, onPress }: TestCardProps) {
+export const TestCard = memo(function TestCard({ card, skill, config, partNo, done, locked, tint, onPress }: TestCardProps) {
   const badge = partBadge(config, card.scope, card.parts[0]?.partNo ?? partNo);
   const formats = card.formats.slice(0, 2).map(practiceFormatLabel);
   const more = card.formats.length - formats.length;
@@ -42,7 +44,7 @@ export const TestCard = memo(function TestCard({ card, skill, config, partNo, do
     <Pressable
       onPress={() => onPress(card)}
       accessibilityRole="button"
-      accessibilityLabel={`${card.title}, ${badge}, ${card.questionCount} ${config.unit}, ${formatDuration(card.timeLimitSeconds)}${done ? ', đã làm' : ''}`}
+      accessibilityLabel={`${card.title}, ${badge}, ${card.questionCount} ${config.unit}, ${formatDuration(card.timeLimitSeconds)}${done ? ', đã làm' : ''}${card.requiredFeatureKey ? (locked ? ', cần gói Premium' : ', đề Premium') : ''}`}
       className="mb-3 active:opacity-80">
       <View className="flex-row items-center gap-3 rounded-3xl bg-surface p-3" style={{ borderWidth: 1.5, borderBottomWidth: 3.5, borderColor: colors.line, borderBottomColor: colors.edge }}>
         {/* Fixed square so a tall cover image can never stretch the card. */}
@@ -62,6 +64,12 @@ export const TestCard = memo(function TestCard({ card, skill, config, partNo, do
             {badge}{card.source ? <Text className="text-[11px] normal-case tracking-normal text-muted">{`  ·  ${card.source.name}`}</Text> : null}
           </Text>
           <Text weight="extrabold" numberOfLines={2} className="mt-0.5 text-[15px] leading-5 text-ink">{shortTitle(card.title)}</Text>
+          {card.requiredFeatureKey ? (
+            <View className="mt-1 flex-row items-center gap-1 self-start rounded-lg px-2 py-0.5" style={{ backgroundColor: colors.warmSoft }}>
+              <Crown size={12} color={colors.accentWarm} />
+              <Text weight="black" className="text-[11px] text-ink">Premium</Text>
+            </View>
+          ) : null}
           <View className="mt-1.5 flex-row flex-wrap items-center gap-x-3 gap-y-1">
             <View className="flex-row items-center gap-1"><ListChecks size={13} color={colors.muted} /><Text className="text-xs text-muted">{card.questionCount} {config.unit}</Text></View>
             <View className="flex-row items-center gap-1"><Clock size={13} color={colors.muted} /><Text className="text-xs text-muted">{formatDuration(card.timeLimitSeconds)}</Text></View>
@@ -77,7 +85,7 @@ export const TestCard = memo(function TestCard({ card, skill, config, partNo, do
             </View>
           ) : null}
         </View>
-        <ChevronRight size={20} color={colors.muted} />
+        {locked ? <Lock size={18} color={colors.accentWarm} /> : <ChevronRight size={20} color={colors.muted} />}
       </View>
     </Pressable>
   );

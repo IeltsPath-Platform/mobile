@@ -21,6 +21,8 @@ import { PRACTICE_SKILL_CONFIG, defaultPracticePart, toScopeAndPart, type Practi
 import { SKILL_META, skillColor, skillInk } from '../model/skill-meta';
 import type { SkillType } from '../model/types';
 import { BandIcon, SkillBand } from '../components/skill-band';
+import { usePremiumStatus, usePremiumUpgrade } from '../grading/use-premium-upgrade';
+import { isPremiumRequired } from '../api/premium-error';
 import { CompletedSheet, FormatFilterSheet, ModeSheet, SpeakingReadySheet, type StartMode } from './start-sheets';
 import { TestCard } from './test-card';
 import { catalogQueryState, isCompletedUnknown } from './catalog-query-state';
@@ -110,12 +112,20 @@ export function CatalogScreen({ skill, initialPart, initialFormat }: { skill: Sk
   // The server total does not know a filter applied on the device, so it is hidden then.
   const localFilter = formatsUnavailable && selectedFormats.length > 0;
 
+  const premium = usePremiumStatus();
+  const upgrade = usePremiumUpgrade();
+  const openUpgrade = upgrade.open;
+  // Unknown Premium status does not lock anything: the server refuses and the same plans open then.
+  const isLocked = useCallback((card: ReadingTestCard) => Boolean(card.requiredFeatureKey) && premium === false, [premium]);
+
   const openCard = useCallback((card: ReadingTestCard) => {
     setStartError('');
+    // A finished test still opens: its result stays readable without Premium.
     if (activeTab === 'completed') { setDoneError(''); setDoneCard(card); return; }
+    if (isLocked(card)) { openUpgrade(); return; }
     if (skill === 'speaking') setReadyCard(card);
     else setModeCard(card);
-  }, [activeTab, skill]);
+  }, [activeTab, skill, isLocked, openUpgrade]);
 
   function sectionOf(card: ReadingTestCard) {
     return card.parts.find((item) => item.partNo === partNo) ?? card.parts[0];
@@ -140,6 +150,7 @@ export function CatalogScreen({ skill, initialPart, initialFormat }: { skill: Sk
       router.push(`/practice/${skill}/${attempt.id}` as never);
     }).catch((cause: unknown) => {
       busyRef.current = false;
+      if (isPremiumRequired(cause)) { setModeCard(null); upgrade.open(); return; }
       setStartError(errorMessage(cause, 'Chưa bắt đầu được bài làm. Vui lòng thử lại.'));
     }).finally(() => setStarting(false));
   }
@@ -182,6 +193,7 @@ export function CatalogScreen({ skill, initialPart, initialFormat }: { skill: Sk
   function redo(card: ReadingTestCard) {
     setDoneCard(null);
     setStartError('');
+    if (isLocked(card)) { upgrade.open(); return; }
     if (skill === 'speaking') setReadyCard(card);
     else setModeCard(card);
   }
@@ -264,7 +276,7 @@ export function CatalogScreen({ skill, initialPart, initialFormat }: { skill: Sk
       <FlatList
         data={loading || loadError ? [] : cards}
         keyExtractor={(card) => `${card.packageId}:${card.scope}:${card.parts[0]?.partNo ?? 'full'}`}
-        renderItem={({ item }) => <TestCard card={item} skill={skill} config={config} partNo={partNo} done={doneKeys.has(doneKey(item))} tint={tint} onPress={openCard} />}
+        renderItem={({ item }) => <TestCard card={item} skill={skill} config={config} partNo={partNo} done={doneKeys.has(doneKey(item))} locked={isLocked(item)} tint={tint} onPress={openCard} />}
         ListHeaderComponent={header}
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: insets.bottom + 32 }}
         keyboardShouldPersistTaps="handled"
@@ -299,6 +311,7 @@ export function CatalogScreen({ skill, initialPart, initialFormat }: { skill: Sk
       ) : null}
       <SpeakingReadySheet card={readyCard} partNo={partNo} onStart={() => readyCard && startSpeaking(readyCard)} onClose={() => setReadyCard(null)} />
       <CompletedSheet card={doneCard} busy={findingResult} error={doneError} onViewResult={() => doneCard && viewResult(doneCard)} onRedo={() => doneCard && redo(doneCard)} onClose={() => setDoneCard(null)} />
+      {upgrade.sheets}
     </View>
   );
 }

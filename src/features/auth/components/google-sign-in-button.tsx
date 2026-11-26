@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NativeModules, Platform, TurboModuleRegistry, View } from 'react-native';
+import { Platform, View } from 'react-native';
 
 import { Button } from '@/src/components/ui/button';
 import { FormAlert } from '@/src/components/ui/form-alert';
@@ -9,6 +9,7 @@ import { GOOGLE_WEB_CLIENT_ID } from '@/src/lib/env';
 import { haptics } from '@/src/lib/haptics';
 
 import { useAuth } from '../auth-provider';
+import { configureGoogle, loadGoogleSignin } from '../google';
 
 const GOOGLE_ERRORS: Record<string, string> = {
   GOOGLE_SIGNIN_NOT_ALLOWED: 'Tài khoản này không đăng nhập bằng Google được. Hãy dùng email và mật khẩu.',
@@ -17,46 +18,9 @@ const GOOGLE_ERRORS: Record<string, string> = {
   GOOGLE_SIGNIN_UNAVAILABLE: 'Đăng nhập Google tạm chưa sẵn sàng. Vui lòng thử lại sau.',
 };
 
-type GoogleSigninModule = typeof import('@react-native-google-signin/google-signin');
-
 const EXPO_GO_MESSAGE = 'Bản ứng dụng này chưa hỗ trợ đăng nhập Google (Expo Go hoặc bản cài cũ). Hãy cài bản dev build mới nhất, hoặc dùng email và mật khẩu.';
 
-let googleModule: GoogleSigninModule | null | undefined;
-
-/**
- * The library has a native module that Expo Go (and builds made before it was added) do not ship,
- * so importing it at the top of the file would crash the whole app on launch. Check the binary for
- * the module first (requiring the JS would raise a red-box invariant) and treat absence as "unavailable".
- */
-function loadGoogleSignin(): GoogleSigninModule | null {
-  if (googleModule !== undefined) return googleModule;
-  if (!TurboModuleRegistry.get('RNGoogleSignin') && !NativeModules.RNGoogleSignin) {
-    googleModule = null;
-    return googleModule;
-  }
-  try {
-    googleModule = require('@react-native-google-signin/google-signin') as GoogleSigninModule;
-  } catch {
-    googleModule = null;
-  }
-  return googleModule;
-}
-
-let configured = false;
-
-function configureGoogle(google: GoogleSigninModule) {
-  if (configured || !GOOGLE_WEB_CLIENT_ID) return;
-  google.GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID });
-  configured = true;
-}
-
-/** Clears the cached Google account so the next sign-in shows the account chooser. */
-export async function signOutGoogle() {
-  if (Platform.OS === 'web' || !configured) return;
-  await loadGoogleSignin()?.GoogleSignin.signOut().catch(() => undefined);
-}
-
-function describe(error: unknown, google: GoogleSigninModule | null): string | null {
+function describe(error: unknown, google: ReturnType<typeof loadGoogleSignin>): string | null {
   if (error instanceof ApiError) return (error.code && GOOGLE_ERRORS[error.code]) || error.message;
   if (google?.isErrorWithCode(error)) {
     const { statusCodes } = google;

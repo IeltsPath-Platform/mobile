@@ -3,7 +3,7 @@ import type { ReadingHistoryItem, ReadingScope, ReadingTestCard } from '../api/a
 
 export interface HistoryTitleRequest {
   scope: ReadingScope
-  only: Array<{ packageId: string; partNo: number | null }>
+  only: { packageId: string; partNo: number | null }[]
 }
 
 export function historyTitleRequests(items: ReadingHistoryItem[]): HistoryTitleRequest[] {
@@ -23,7 +23,7 @@ export function historyTitleRequests(items: ReadingHistoryItem[]): HistoryTitleR
   return requests
 }
 
-export function historyTitleMap(requests: Array<{ scope: ReadingScope; items: ReadingTestCard[] }>) {
+export function historyTitleMap(requests: { scope: ReadingScope; items: ReadingTestCard[] }[]) {
   const titles = new Map<string, string>()
   for (const request of requests) {
     for (const card of request.items) {

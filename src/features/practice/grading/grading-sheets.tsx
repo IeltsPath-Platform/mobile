@@ -29,7 +29,9 @@ export type GradeCopy = {
   kept?: string;
 };
 
-export type GradeFigures = { cost: number; balance: number | null; context: string; benefits: string[]; checks: Array<{ text: string; ok: boolean }> };
+export type GradeFigures = { cost: number; balance: number | null; context: string; benefits: string[]; checks: { text: string; ok: boolean }[] };
+
+const priceLabel = (cost: number) => (cost === 0 ? 'miễn phí' : `${cost} point`);
 
 /** "Chọn cách chấm bài": a teacher (Premium credit) or the AI (points). A closed way says why. */
 export function GradeMethodSheet({ visible, options, context, copy, onTeacher, onAi, onPremium, onClose }: {
@@ -61,10 +63,10 @@ export function GradeMethodSheet({ visible, options, context, copy, onTeacher, o
             icon={<Sparkles size={22} color={colors.accentDeep} />}
             title="AI chấm"
             text={copy?.ai ?? 'AI chấm ngay trong vài giây, trả band, lỗi cần sửa và gợi ý cải thiện.'}
-            status={ai.reason ?? `Chi phí ${ai.cost} point${ai.balance === null ? '' : ` · số dư ${ai.balance} point`}${ai.enabled ? '' : ` · còn thiếu ${ai.shortBy} point`}`}
+            status={ai.reason ?? (ai.cost === 0 ? 'Miễn phí với gói Premium.' : `Chi phí ${ai.cost} point${ai.balance === null ? '' : ` · số dư ${ai.balance} point`}${ai.enabled ? '' : ` · còn thiếu ${ai.shortBy} point`}`)}
             ok={ai.enabled && !ai.reason}
             statusIcon={ai.enabled && !ai.reason ? <Wallet size={15} color={colors.success} /> : <CircleAlert size={15} color={colors.accentWarm} />}
-            action={<Button label={ai.reason ? 'Chưa khả dụng' : ai.enabled ? `Chấm bằng AI · ${ai.cost} point` : 'Nạp point để AI chấm'} disabled={Boolean(ai.reason)} onPress={onAi} />}
+            action={<Button label={ai.reason ? 'Chưa khả dụng' : ai.enabled ? `Chấm bằng AI · ${priceLabel(ai.cost)}` : 'Nạp point để AI chấm'} disabled={Boolean(ai.reason)} onPress={onAi} />}
           />
         </View>
       ) : null}
@@ -118,13 +120,13 @@ export function GradeConfirmSheet({ visible, figures, busy, error, canGrade, onG
       title="Chấm bài bằng AI"
       subtitle={figures.context}
       footer={<>
-        <Button label={busy ? (copy?.busyLabel ?? 'Đang chấm bài…') : `Chấm bài · ${cost} point`} loading={busy} disabled={!canGrade || (consent !== undefined && !consent.checked)} icon={<Sparkles size={18} color={colors.onAccent} />} onPress={onGrade} />
+        <Button label={busy ? (copy?.busyLabel ?? 'Đang chấm bài…') : `Chấm bài · ${priceLabel(cost)}`} loading={busy} disabled={!canGrade || (consent !== undefined && !consent.checked)} icon={<Sparkles size={18} color={colors.onAccent} />} onPress={onGrade} />
         <Button label={copy?.backLabel ?? 'Quay lại chỉnh sửa'} variant="secondary" disabled={busy} onPress={onClose} />
         <Text className="text-center text-xs text-muted">{copy?.note ?? 'Bài sẽ được khóa sau khi chấm. Nếu AI gặp lỗi, point sẽ được hoàn lại.'}</Text>
       </>}>
       <Text className="text-sm leading-5 text-muted">{copy?.confirmDescription ?? 'AI chấm theo 4 tiêu chí IELTS Writing và trả về Band, lỗi cần sửa và gợi ý cải thiện.'}</Text>
       <View className="mt-3 overflow-hidden rounded-2xl" style={{ borderWidth: 2, borderColor: colors.line }}>
-        <Figure label="Chi phí chấm" value={`−${cost} point`} strong />
+        <Figure label="Chi phí chấm" value={cost === 0 ? 'Miễn phí (Premium)' : `−${cost} point`} strong />
         <Figure label="Số dư hiện tại" value={balance === null ? '—' : `${balance} point`} />
         <Figure label="Số dư sau khi chấm" value={balance === null ? '—' : `${balance - cost} point`} strong last />
       </View>
@@ -365,7 +367,7 @@ export function PremiumPlansSheet({ visible, onChoose, onClose }: { visible: boo
         {['Lượt chấm Writing/Speaking trực tiếp từ giáo viên', 'Toàn bộ bài học, đề thi và tài liệu nâng cao', 'Báo cáo phân tích tiến độ học tập nâng cao'].map((line) => (
           <View key={line} className="flex-row gap-2"><Check size={16} color={colors.success} /><Text className="flex-1 text-sm text-ink">{line}</Text></View>
         ))}
-        <Text className="text-sm text-muted">— Không kèm AI Points; AI chấm vẫn trừ điểm trong Ví Point</Text>
+        <Text className="text-sm text-muted">AI chấm Writing/Speaking không trừ point khi gói còn hạn (có giới hạn số lượt mỗi ngày).</Text>
       </View>
       <View className="mt-4 flex-row gap-2">
         {PREMIUM_PRODUCTS.map((product) => {

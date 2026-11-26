@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import type { EssayKnowledgeJudgment, EssayStudyPoint } from '@/src/features/practice/model/types'
 import { buildNextSteps } from '@/src/features/practice/model/writing-study-steps'
 

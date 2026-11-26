@@ -1,5 +1,5 @@
-import { Pressable, View } from 'react-native';
-import { ActivityIndicator } from 'react-native';
+import { Pressable, View , ActivityIndicator } from 'react-native';
+
 import { Award, X } from 'lucide-react-native';
 
 import { Text } from '@/src/components/ui/text';

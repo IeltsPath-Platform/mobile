@@ -17,6 +17,7 @@ import { useCurrentUser } from '@/src/features/auth/auth-provider';
 import { profileApi, profileQueryKeys } from '@/src/features/profile/api';
 import { gamificationApi } from '@/src/features/progress/gamification-api';
 import { colors, fonts } from '@/src/theme';
+import { safeErrorMessage } from '@/src/lib/error-message';
 
 const MAX_SOURCE_AVATAR_BYTES = 20 * 1024 * 1024;
 
@@ -88,7 +89,7 @@ export default function EditProfileScreen() {
       setAvatarError('');
       await refreshCommunityAvatar();
     },
-    onError: (error: Error) => setAvatarError(error.message),
+    onError: (error: Error) => setAvatarError(safeErrorMessage(error, 'Không thể cập nhật ảnh đại diện.')),
   });
 
   const saveMutation = useMutation({
@@ -126,7 +127,7 @@ export default function EditProfileScreen() {
       ]);
       router.back();
     },
-    onError: (error: Error) => setFormError(error.message),
+    onError: (error: Error) => setFormError(safeErrorMessage(error)),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: profileQueryKeys.user });
     },
@@ -174,7 +175,7 @@ export default function EditProfileScreen() {
       await queryClient.invalidateQueries({ queryKey: profileQueryKeys.learner });
       await refreshCommunityAvatar();
     } catch (error) {
-      setAvatarError(error instanceof Error ? error.message : 'Không tải được ảnh đại diện.');
+      setAvatarError(safeErrorMessage(error, 'Không tải được ảnh đại diện.'));
     } finally {
       setAvatarUploading(false);
     }
@@ -279,7 +280,7 @@ export default function EditProfileScreen() {
             </Card>
 
             <Card className="mt-4 gap-3 p-4">
-              <SectionHeading icon={<Clock3 size={18} color={colors.accentDeep} />} title="Thiết lập học tập" subtitle="Múi giờ dùng để tính ngày học và streak" />
+              <SectionHeading icon={<Clock3 size={18} color={colors.accentDeep} />} title="Thiết lập học tập" subtitle="Múi giờ dùng để tính ngày học" />
               <TextField label="Múi giờ" value={timezone} onChangeText={setTimezone} autoCapitalize="none" maxLength={50} placeholder="Asia/Ho_Chi_Minh" hint="Dùng tên múi giờ IANA, ví dụ Asia/Ho_Chi_Minh" />
             </Card>
             {formError ? <View className="mt-4"><FormAlert message={formError} /></View> : null}

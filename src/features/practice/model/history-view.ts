@@ -1,9 +1,9 @@
 // Ported from frontend/src/features/practice/history/submissionHistoryView.ts. Links keep the web paths; routeOf() maps them to app screens.
-const lessonPracticePath = (lessonId: string) => `/learn/lessons/${lessonId}?view=practice`
-const freePracticePath = (attemptId: string) => `/learn/practice/${attemptId}`
 import { dateText, taskText } from './examiner-reviews-view'
 import type { ReadingHistoryItem } from '../api/attempts'
 import type { SubmissionHistoryItem } from '../api/history'
+const lessonPracticePath = (lessonId: string) => `/learn/lessons/${lessonId}?view=practice`
+const freePracticePath = (attemptId: string) => `/learn/practice/${attemptId}`
 
 /** How a line of the history looks: `done` is a result, `wait` something still being graded, `late` a result that did not pass. */
 export type HistoryTone = 'done' | 'wait' | 'late'

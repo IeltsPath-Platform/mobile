@@ -1,5 +1,6 @@
 import { API_BASE_URL, API_CONFIGURATION_ERROR, REQUEST_TIMEOUT_MS } from './env';
 import { userFacingMessage } from './error-message';
+import { weakPasswordMessage } from './password-rules';
 import { observeServerDate } from './server-clock';
 import { tokenStorage, type SessionTokens } from './token-storage';
 
@@ -47,6 +48,7 @@ type RequestOptions = {
   auth?: boolean;
   signal?: AbortSignal;
   timeoutMs?: number;
+  headers?: Record<string, string>;
 };
 
 type TokenPair = { accessToken: string; refreshToken: string };
@@ -63,7 +65,7 @@ export function onSessionExpired(listener: (() => void) | null) {
 
 async function send(path: string, options: RequestOptions, accessToken?: string): Promise<Response> {
   if (API_CONFIGURATION_ERROR) throw new ApiError(0, API_CONFIGURATION_ERROR, null, { code: 'API_CONFIGURATION' });
-  const headers: Record<string, string> = { Accept: 'application/json' };
+  const headers: Record<string, string> = { ...options.headers, Accept: 'application/json' };
   const multipart = typeof FormData !== 'undefined' && options.body instanceof FormData;
   if (options.body !== undefined && !multipart) headers['Content-Type'] = 'application/json';
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
@@ -120,7 +122,8 @@ async function parse<T>(response: Response): Promise<T> {
     // The gateway's rate-limit body is English; show a Vietnamese message instead.
     const message = response.status === 429
       ? rateLimitMessage(retryAfterSeconds)
-      : userFacingMessage(response.status, body.message || body.detail);
+      : (body.code === 'WEAK_PASSWORD' ? weakPasswordMessage(body.details?.reasons) : null)
+        ?? userFacingMessage(response.status, body.message || body.detail);
     throw new ApiError(response.status, message, body.details, { code: body.code, retryAfterSeconds, body: data });
   }
   return data as T;
@@ -169,10 +172,12 @@ async function refreshTokens(): Promise<SessionTokens | null> {
  * A 401 that carries an error code rejects something the user typed (e.g. CURRENT_PASSWORD_INVALID
  * on password change), not the session. Token failures from the gateway and services have no code.
  * Treating those as session expiry would refresh, fail again and sign the user out.
+ * The exception is `SESSION_REVOKED`: the gateway sends it for a token whose session was ended elsewhere.
  */
 async function isBusinessRejection(response: Response): Promise<boolean> {
   const body = safeJson(await response.clone().text().catch(() => '')) as ErrorBody | null;
-  return Boolean(body?.code || body?.details?.code);
+  const code = body?.code || body?.details?.code;
+  return Boolean(code) && code !== 'SESSION_REVOKED';
 }
 
 // Refresh tokens rotate, so concurrent 401s must share a single refresh call.

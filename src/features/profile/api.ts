@@ -23,14 +23,37 @@ export const profileQueryKeys = {
   user: ['auth', 'me'] as const,
   learner: ['profile', 'learner'] as const,
   oauth: ['profile', 'oauth'] as const,
+  sessions: ['profile', 'sessions'] as const,
 };
 
 export type OAuthIdentity = { id: string; provider: string; linkedAt?: string };
 
+/** One signed-in device. The server masks the end of the address. */
+export type DeviceSession = {
+  sessionId: string;
+  startedAt: string;
+  lastUsedAt: string | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  current: boolean;
+};
+
 export const profileApi = {
+  getSessions: () => apiRequest<DeviceSession[]>('/api/users/me/sessions', { auth: true }),
+  revokeSession: (sessionId: string) => apiRequest<void>(`/api/users/me/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE', auth: true }),
+  revokeOtherSessions: () => apiRequest<void>('/api/users/me/sessions?exceptCurrent=true', { method: 'DELETE', auth: true }),
+
+  /** Proves it is the account owner; the token works once, for five minutes, in this session. */
+  reauthenticate: (credential: { googleIdToken: string } | { currentPassword: string }) =>
+    apiRequest<{ reauthToken: string; expiresInSeconds: number; method: 'PASSWORD' | 'GOOGLE' }>('/api/users/me/reauth', { method: 'POST', body: credential, auth: true }),
+  setInitialPassword: (newPassword: string, reauthToken: string) =>
+    apiRequest<void>('/api/users/me/password/initial', { method: 'POST', body: { newPassword }, auth: true, headers: { 'X-Reauth-Token': reauthToken } }),
+
   /** Sign-in providers linked to the account (Google). */
   getOAuthIdentities: () => apiRequest<OAuthIdentity[]>('/api/users/me/oauth', { auth: true }),
-  unlinkOAuthIdentity: (provider: string) => apiRequest<void>(`/api/users/me/oauth/${encodeURIComponent(provider)}`, { method: 'DELETE', auth: true }),
+  unlinkOAuthIdentity: (provider: string, reauthToken?: string) => apiRequest<void>(`/api/users/me/oauth/${encodeURIComponent(provider)}`, {
+    method: 'DELETE', auth: true, ...(reauthToken ? { headers: { 'X-Reauth-Token': reauthToken } } : {}),
+  }),
 
   getLearnerProfile: () => apiRequest<LearnerProfile>('/api/users/me/profile', { auth: true }),
 

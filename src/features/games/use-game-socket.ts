@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
 import { API_BASE_URL } from '@/src/lib/env';
@@ -17,7 +17,7 @@ export function useGameSocket(
   const [connected, setConnected] = useState(false);
   // Handlers change identity between renders; a ref keeps the socket from reconnecting for that.
   const onEventRef = useRef(onEvent);
-  onEventRef.current = onEvent;
+  useLayoutEffect(() => { onEventRef.current = onEvent; });
 
   useEffect(() => {
     if (!roomId) return;
@@ -62,7 +62,8 @@ export function useGameSocket(
 
         const url = new URL('/ws/games', API_BASE_URL);
         url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-        const candidate = new WebSocket(url, ticket.subprotocols);
+        // React Native's native WebSocket accepts only a string URL (the browser also takes a URL object).
+        const candidate = new WebSocket(url.toString(), ticket.subprotocols);
         socket = candidate;
         connecting = false;
 

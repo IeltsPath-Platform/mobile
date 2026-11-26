@@ -2,7 +2,7 @@ import { keepPreviousData, useInfiniteQuery, useQuery, useQueryClient } from '@t
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Image as CachedImage } from 'expo-image';
 import { PenLine, Search, X } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, TextInput, View, type FlatList as NativeFlatList, type LayoutChangeEvent, type ListViewToken } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { interpolate, runOnJS, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
@@ -66,19 +66,19 @@ export default function CommunityScreen() {
     if (nextHeight <= 0) return;
     setHeaderHeight((current) => current === nextHeight ? current : nextHeight);
     const wasVisible = headerReveal.value >= headerHeightShared.value - 1;
-    headerHeightShared.value = nextHeight;
-    headerReveal.value = wasVisible ? nextHeight : Math.min(headerReveal.value, nextHeight);
+    headerHeightShared.set(nextHeight);
+    headerReveal.set(wasVisible ? nextHeight : Math.min(headerReveal.value, nextHeight));
   }, [headerHeightShared, headerReveal]);
 
   const onFeedScroll = useAnimatedScrollHandler({
     onScroll: (event) => {
       const offset = Math.max(0, event.contentOffset.y);
       const delta = offset - previousScrollOffset.value;
-      previousScrollOffset.value = offset;
+      previousScrollOffset.set(offset);
       if (searching || offset <= 0) {
-        headerReveal.value = headerHeightShared.value;
+        headerReveal.set(headerHeightShared.value);
       } else if (Math.abs(delta) > 0.2) {
-        headerReveal.value = Math.max(0, Math.min(headerHeightShared.value, headerReveal.value - delta));
+        headerReveal.set(Math.max(0, Math.min(headerHeightShared.value, headerReveal.value - delta)));
       }
       runOnJS(handleTabBarOffset)(offset);
     },
@@ -132,7 +132,7 @@ export default function CommunityScreen() {
   useFocusEffect(
     useCallback(() => {
       refreshPrimed.current = false;
-      headerReveal.value = headerHeightShared.value;
+      headerReveal.set(headerHeightShared.value);
       if (!signedIn) return;
       // Refresh only the first page of stale active feeds; refetchQueries would re-request every loaded page.
       for (const cached of queryClient.getQueryCache().findAll({ queryKey: ['community', 'feed'], type: 'active', stale: true })) {
@@ -162,9 +162,10 @@ export default function CommunityScreen() {
   // Keep only a few upcoming post images warm in the disk/memory cache. FlatList
   // still mounts rows on demand, while the image request starts just before they appear.
   const postsRef = useRef(posts);
-  postsRef.current = posts;
+  useLayoutEffect(() => { postsRef.current = posts; });
   const prefetchedImages = useRef(new Set<string>());
-  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ListViewToken[] }) => {
+  // Stable for the life of the list: FlatList does not accept a new viewability callback after it has mounted.
+  const [onViewableItemsChanged] = useState(() => ({ viewableItems }: { viewableItems: ListViewToken[] }) => {
     const visibleIndexes = viewableItems
       .map((token) => token.index)
       .filter((index): index is number => index != null);
@@ -185,7 +186,7 @@ export default function CommunityScreen() {
     void CachedImage.prefetch(urls, 'disk').then((ok) => {
       if (!ok) urls.forEach((url) => prefetchedImages.current.delete(url));
     }).catch(() => urls.forEach((url) => prefetchedImages.current.delete(url)));
-  }).current;
+  });
 
   const menu = usePostMenu(user.data?.id);
   const openPost = useCallback((id: string) => router.push(`/community/${id}` as never), [router]);
@@ -294,7 +295,7 @@ export default function CommunityScreen() {
                 {(manualRefreshing || (feed.isRefetching && !feed.isFetchingNextPage)) ? <ActivityIndicator size="small" color={colors.accent} /> : null}
                 {signedIn ? (
                   <>
-                    <Pressable onPress={() => { haptics.tap(); setSearching(true); headerReveal.value = headerHeightShared.value; }} accessibilityRole="button" accessibilityLabel="Tìm bài viết" className="h-12 w-12 items-center justify-center rounded-full active:opacity-70">
+                    <Pressable onPress={() => { haptics.tap(); setSearching(true); headerReveal.set(headerHeightShared.value); }} accessibilityRole="button" accessibilityLabel="Tìm bài viết" className="h-12 w-12 items-center justify-center rounded-full active:opacity-70">
                       <Search size={22} color={colors.ink} />
                     </Pressable>
                     <Pressable onPress={openOwnProfile} disabled={!user.data?.id} accessibilityRole="button" accessibilityLabel="Hồ sơ cộng đồng của tôi" className="h-12 w-12 items-center justify-center rounded-full active:opacity-80">

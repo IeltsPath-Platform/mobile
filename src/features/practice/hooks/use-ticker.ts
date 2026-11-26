@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
 /**
@@ -11,8 +11,8 @@ export function useTicker(read: () => number, options: { running?: boolean; onZe
   const readRef = useRef(read);
   const zeroRef = useRef(onZero);
   const fired = useRef(false);
-  readRef.current = read;
-  zeroRef.current = onZero;
+  useLayoutEffect(() => { readRef.current = read; });
+  useLayoutEffect(() => { zeroRef.current = onZero; });
 
   useEffect(() => {
     if (!running) return;

@@ -2,7 +2,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setAudioModeAsync } from 'expo-audio';
 import * as Speech from 'expo-speech';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 const STORAGE_KEY = 'practice.speaking.autoRead';
 /** A short pause before the first word so the screen has settled. */
@@ -35,7 +35,7 @@ export function useExaminerVoice(text: string, muted = false) {
   /** Bumped by every stop, so a reading still choosing its voice does not start after it was cancelled. */
   const generation = useRef(0);
   const mutedRef = useRef(muted);
-  mutedRef.current = muted;
+  useLayoutEffect(() => { mutedRef.current = muted; });
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then((value) => setAutoReadState(value !== 'off')).catch(() => undefined);

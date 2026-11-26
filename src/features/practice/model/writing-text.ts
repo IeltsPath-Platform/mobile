@@ -31,7 +31,7 @@ export function parseGuide(markdown: string | null): GuideBlock[] {
 }
 
 /** Splits `**bold**` runs so a guide line can be drawn without raw HTML. */
-export function boldRuns(text: string): Array<{ text: string; bold: boolean }> {
+export function boldRuns(text: string): { text: string; bold: boolean }[] {
   return text.split(/(\*\*[^*]+\*\*)/).filter(Boolean).map((part) => (
     part.startsWith('**') && part.endsWith('**') ? { text: part.slice(2, -2), bold: true } : { text: part, bold: false }
   ))
@@ -46,7 +46,7 @@ export interface EssayMetrics {
   words: number
   paragraphs: number
   wordsPerSentence: number
-  linking: Array<{ word: string; count: number }>
+  linking: { word: string; count: number }[]
   linkingTotal: number
   mostRepeated: { word: string; count: number } | null
 }

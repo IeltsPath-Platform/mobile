@@ -44,7 +44,7 @@ export async function loadSession(sessionId: string) {
   try {
     const raw = await AsyncStorage.getItem(KEY_PREFIX + sessionId);
     if (!raw || version !== (loadVersions.get(sessionId) ?? 0)) return;
-    const entries = (JSON.parse(raw) as Array<[string, SavedRecording]>).filter(([, recording]) => {
+    const entries = (JSON.parse(raw) as [string, SavedRecording][]).filter(([, recording]) => {
       try { return new File(recording.uri).exists; } catch { return false; }
     });
     const merged = new Map([...entries, ...(sessions.get(sessionId) ?? EMPTY)]);
@@ -81,7 +81,7 @@ export async function resetSpeakingSessions() {
   try {
     const keys = (await AsyncStorage.getAllKeys()).filter((key) => key.startsWith(KEY_PREFIX));
     for (const [, raw] of await AsyncStorage.multiGet(keys)) {
-      try { (JSON.parse(raw ?? '[]') as Array<[string, SavedRecording]>).forEach(([, recording]) => deleteFile(recording.uri)); } catch { /* unreadable list */ }
+      try { (JSON.parse(raw ?? '[]') as [string, SavedRecording][]).forEach(([, recording]) => deleteFile(recording.uri)); } catch { /* unreadable list */ }
     }
   } catch { /* storage unavailable: the keys are removed by the caller */ }
   listeners.forEach((listener) => listener());

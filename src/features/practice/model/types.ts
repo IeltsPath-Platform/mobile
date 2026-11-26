@@ -42,12 +42,12 @@ export interface SectionSnapshot {
   passage: Passage | null;
   audio: MediaAudio | null;
   partNo?: number | null;
-  groups?: Array<{ groupId: string; sortOrder: number; formatCode: string; instructions: string | null }>;
+  groups?: { groupId: string; sortOrder: number; formatCode: string; instructions: string | null }[];
 }
 
 /** Attempt structure with each snapshot still as JSON text, the shape the snapshot parser reads. */
 export interface AttemptStructure {
-  sections: Array<{
+  sections: {
     id: string;
     contentSectionId: string;
     sortOrder: number;
@@ -55,8 +55,8 @@ export interface AttemptStructure {
     startedAt: string | null;
     completedAt: string | null;
     partNo?: number | null;
-    items: Array<{ id: string; questionVersionId: string; sortOrder: number; questionSnapshot: string; answerSnapshot: string | null; knowledgeSnapshot: string | null }>;
-  }>;
+    items: { id: string; questionVersionId: string; sortOrder: number; questionSnapshot: string; answerSnapshot: string | null; knowledgeSnapshot: string | null }[];
+  }[];
 }
 
 export type EssayJudgment = 'PASS' | 'FAIL' | 'NOT_ASSESSED';

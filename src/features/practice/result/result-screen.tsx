@@ -13,6 +13,8 @@ import { Text } from '@/src/components/ui/text';
 import { colors } from '@/src/theme';
 
 import { restartReadingAttempt, type ReadingScope } from '../api/attempts';
+import { usePremiumUpgrade } from '../grading/use-premium-upgrade';
+import { isPremiumRequired } from '../api/premium-error';
 import { leaveToCatalog } from '../components/test-shell';
 import { useResultData } from '../hooks/use-result-data';
 import { practiceFormatLabel } from '../model/format-labels';
@@ -34,6 +36,7 @@ export function ResultScreen({ attemptId, skill }: { attemptId: string; skill: '
   const catalog = `/practice/catalog/${skill}`;
   const [retrying, setRetrying] = useState(false);
   const [retryError, setRetryError] = useState('');
+  const upgrade = usePremiumUpgrade();
 
   if (data.isPending) return <Loading label={`Đang tải kết quả ${config.label}…`} />;
   if (data.isError) {
@@ -58,6 +61,7 @@ export function ResultScreen({ attemptId, skill }: { attemptId: string; skill: '
       void rememberAttempt({ attemptId: restarted.id, skill, title: `${config.label} · làm lại` });
       router.replace(`/practice/${skill}/${restarted.id}` as never);
     } catch (cause) {
+      if (isPremiumRequired(cause)) upgrade.open();
       setRetryError(cause instanceof Error ? cause.message : 'Không tạo lại được bài làm.');
     } finally {
       setRetrying(false);
@@ -66,6 +70,7 @@ export function ResultScreen({ attemptId, skill }: { attemptId: string; skill: '
 
   return (
     <View className="flex-1 bg-canvas">
+      {upgrade.sheets}
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         <SkillBand color={skillColor(skill)} title={`Kết quả ${config.label}`} subtitle={scopeLabel} onBack={() => leaveToCatalog(catalog)}>
           <Hero view={view} />

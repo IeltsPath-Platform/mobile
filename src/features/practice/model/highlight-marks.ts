@@ -37,9 +37,9 @@ export function selectionSegments(order: readonly string[], lengthOf: (block: st
 }
 
 /** The marked word ranges of a block, sorted, with touching or overlapping ranges joined. */
-export function rangesOf(marks: readonly Mark[], block: string): Array<[number, number]> {
+export function rangesOf(marks: readonly Mark[], block: string): [number, number][] {
   const ranges = marks.filter((mark) => mark.block === block).map((mark): [number, number] => [mark.start, mark.end]).sort((x, y) => x[0] - y[0]);
-  const merged: Array<[number, number]> = [];
+  const merged: [number, number][] = [];
   for (const [start, end] of ranges) {
     const last = merged[merged.length - 1];
     if (last && start <= last[1] + 1) last[1] = Math.max(last[1], end);
@@ -75,13 +75,13 @@ export function marksIn(marks: readonly Mark[], segments: readonly Segment[]): M
 export function eraseMarks(marks: readonly Mark[], segments: readonly Segment[], newId: () => string): Mark[] {
   const result: Mark[] = [];
   for (const mark of marks) {
-    let pieces: Array<[number, number]> = [[mark.start, mark.end]];
+    let pieces: [number, number][] = [[mark.start, mark.end]];
     for (const segment of segments) {
       if (segment.block !== mark.block) continue;
-      pieces = pieces.flatMap(([start, end]): Array<[number, number]> => {
+      pieces = pieces.flatMap(([start, end]): [number, number][] => {
         if (segment.end < start || segment.start > end) return [[start, end]];
-        const left: Array<[number, number]> = segment.start > start ? [[start, segment.start - 1]] : [];
-        const right: Array<[number, number]> = segment.end < end ? [[segment.end + 1, end]] : [];
+        const left: [number, number][] = segment.start > start ? [[start, segment.start - 1]] : [];
+        const right: [number, number][] = segment.end < end ? [[segment.end + 1, end]] : [];
         return [...left, ...right];
       });
     }

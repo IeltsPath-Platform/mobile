@@ -105,9 +105,9 @@ const STAGE_OF: Record<string, number> = { UPLOADING: 0, QUEUED: 0, ANALYZING: 1
 
 function Waiting({ status }: { status: string | undefined }) {
   const [opened] = useState(Date.now);
-  const [, tick] = useState(0);
-  useEffect(() => { const timer = setInterval(() => tick((value) => value + 1), 5000); return () => clearInterval(timer); }, []);
-  const waited = (Date.now() - opened) / 1000;
+  const [now, setNow] = useState(opened);
+  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 5000); return () => clearInterval(timer); }, []);
+  const waited = (now - opened) / 1000;
   const stage = status === undefined ? 0 : STAGE_OF[status] ?? 0;
   const retrying = status === 'FAILED_RETRYABLE';
   const note = waited >= 120 ? 'Vẫn đang chấm, bài nói dài có thể mất vài phút · bạn không cần gửi lại.' : waited >= 30 ? 'Bài nói dài hoặc hệ thống đang đông nên cần thêm thời gian.' : 'Thời gian chấm tùy độ dài bài nói · kết quả sẽ tự hiện ra.';

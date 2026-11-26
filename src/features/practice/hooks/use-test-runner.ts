@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
 import { ApiError } from '@/src/lib/api-client';
@@ -39,7 +39,7 @@ export function useTestRunner({ attemptId, attempt, sections, saved, skill }: {
   const submittingRef = useRef(false);
   const spent = useRef<Record<string, number>>({});
   const activeSectionId = useRef(sections[activeIndex]?.id);
-  activeSectionId.current = sections[activeIndex]?.id;
+  useLayoutEffect(() => { activeSectionId.current = sections[activeIndex]?.id; });
 
   // The first open section is marked started on the server, as the web app does.
   useEffect(() => {
@@ -92,7 +92,7 @@ export function useTestRunner({ attemptId, attempt, sections, saved, skill }: {
   }, [answers, attemptId, client, skill, timed]);
 
   const submitRef = useRef(submit);
-  submitRef.current = submit;
+  useLayoutEffect(() => { submitRef.current = submit; });
 
   /** Read by the header clock, which ticks on its own so the passage and questions do not re-render every second. */
   const readClock = useCallback(() => clockSeconds(attempt, timed), [attempt, timed]);

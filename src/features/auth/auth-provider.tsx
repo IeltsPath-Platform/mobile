@@ -5,7 +5,7 @@ import { onSessionExpired } from '@/src/lib/api-client';
 import { AUTH_ENABLED } from '@/src/lib/env';
 import { tokenStorage } from '@/src/lib/token-storage';
 import * as Notifications from 'expo-notifications';
-import { signOutGoogle } from './components/google-sign-in-button';
+import { signOutGoogle } from './google';
 import { registerCurrentInstallation, unregisterCurrentInstallation } from '@/src/features/community/push-notifications';
 
 import { authApi } from './api';
@@ -59,10 +59,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!AUTH_ENABLED || status !== 'authenticated') return;
     // Permission and native token registration are best effort; inbox notifications remain available without push.
     void registerCurrentInstallation().catch(() => undefined);
-    const tokenSubscription = Notifications.addPushTokenListener((token) => {
-      void registerCurrentInstallation(token.data).catch(() => undefined);
-    });
-    return () => tokenSubscription.remove();
+    // Expo Go on Android throws here (remote push was removed from it); push is optional, so run without it.
+    let tokenSubscription: ReturnType<typeof Notifications.addPushTokenListener> | null = null;
+    try {
+      tokenSubscription = Notifications.addPushTokenListener((token) => {
+        void registerCurrentInstallation(token.data).catch(() => undefined);
+      });
+    } catch {
+      tokenSubscription = null;
+    }
+    return () => tokenSubscription?.remove();
   }, [status]);
 
   const startSession = useCallback(

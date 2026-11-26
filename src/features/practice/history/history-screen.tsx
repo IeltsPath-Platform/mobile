@@ -23,13 +23,13 @@ import { BandIcon, SkillBand } from '../components/skill-band';
 export type HistoryTab = 'practice' | 'course' | 'knowledge' | 'teacher';
 type Skill = 'listening' | 'reading' | 'writing' | 'speaking';
 
-const TABS: Array<{ key: HistoryTab; label: string }> = [
+const TABS: { key: HistoryTab; label: string }[] = [
   { key: 'practice', label: 'Luyện 4 kỹ năng' },
   { key: 'teacher', label: 'Giáo viên chấm' },
   { key: 'course', label: 'Trong khóa học' },
   { key: 'knowledge', label: 'Theo kiến thức' },
 ];
-const SKILLS: Array<{ key: Skill; label: string }> = [
+const SKILLS: { key: Skill; label: string }[] = [
   { key: 'listening', label: 'Listening' }, { key: 'reading', label: 'Reading' }, { key: 'writing', label: 'Writing' }, { key: 'speaking', label: 'Speaking' },
 ];
 const TONE = { done: colors.success, wait: colors.accentWarm, late: colors.danger } as const;
@@ -127,7 +127,7 @@ function HistoryRowCard({ row }: { row: HistoryRow }) {
   );
 }
 
-const FILTERS: Array<{ key: ReviewFilter; label: string }> = [{ key: 'ALL', label: 'Tất cả' }, { key: 'DONE', label: 'Đã chấm' }, { key: 'WAITING', label: 'Đang chờ' }];
+const FILTERS: { key: ReviewFilter; label: string }[] = [{ key: 'ALL', label: 'Tất cả' }, { key: 'DONE', label: 'Đã chấm' }, { key: 'WAITING', label: 'Đang chờ' }];
 
 /** Essays sent to a teacher, joined with how each grading job stands (waiting, late, done, cancelled). */
 function TeacherReviews() {

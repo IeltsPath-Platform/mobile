@@ -1,6 +1,6 @@
 import { router, usePreventRemove } from 'expo-router';
 import { Check, Send } from 'lucide-react-native';
-import { useRef, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { Alert, KeyboardAvoidingView, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -8,7 +8,7 @@ import { Text } from '@/src/components/ui/text';
 import { colors } from '@/src/theme';
 
 /** Horizontal section / passage switcher with per-section progress. */
-export function SectionTabs({ labels, progress, activeIndex, onSelect, tint, countLabel = 'đã làm' }: { labels: string[]; progress: Array<{ answered: number; total: number }>; activeIndex: number; onSelect: (index: number) => void; tint: string; /** What the count means, read by screen readers ("đã làm", "đúng"). */ countLabel?: string }) {
+export function SectionTabs({ labels, progress, activeIndex, onSelect, tint, countLabel = 'đã làm' }: { labels: string[]; progress: { answered: number; total: number }[]; activeIndex: number; onSelect: (index: number) => void; tint: string; /** What the count means, read by screen readers ("đã làm", "đúng"). */ countLabel?: string }) {
   if (labels.length <= 1) return null;
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-grow-0 border-b border-line bg-surface" contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8, gap: 8 }}>
@@ -73,14 +73,16 @@ export function KeyboardShell({ children }: { children: ReactNode }) {
  * Returns a function that lifts the guard (used before navigating to the result).
  */
 export function useLeaveTestGuard(active: boolean, message = 'Đáp án đã được lưu. Bạn có thể quay lại làm tiếp từ tab Luyện tập.', title = 'Tạm rời bài làm?') {
+  // The alert's button lifts the guard it belongs to, which only exists once the hook has returned: reach it through a ref.
   const disable = useRef<() => void>(() => undefined);
-  disable.current = usePreventRemove(active, ({ repeat }) => {
+  const liftGuard = usePreventRemove(active, ({ repeat }) => {
     Alert.alert(title, message, [
       { text: 'Làm tiếp', style: 'cancel' },
       { text: 'Rời bài', style: 'destructive', onPress: () => { disable.current(); repeat(); } },
     ]);
   });
-  return disable.current;
+  useLayoutEffect(() => { disable.current = liftGuard; });
+  return liftGuard;
 }
 
 export function closeTest(fallback: string) {

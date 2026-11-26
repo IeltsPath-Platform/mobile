@@ -11,68 +11,12 @@ import { Card } from '@/src/components/ui/card';
 import { FormAlert } from '@/src/components/ui/form-alert';
 import { Text } from '@/src/components/ui/text';
 import { TextField } from '@/src/components/ui/text-field';
-import { authApi } from '@/src/features/auth/api';
 import { useAuth, useCurrentUser } from '@/src/features/auth/auth-provider';
 import { profileApi } from '@/src/features/profile/api';
+import { SetPasswordCard } from '@/src/features/profile/components/set-password-card';
 import { ApiError } from '@/src/lib/api-client';
+import { PASSWORD_HINT, PASSWORD_MIN_LENGTH, newPasswordError } from '@/src/lib/password-rules';
 import { colors } from '@/src/theme';
-
-/** Google-created accounts have no password; the reset-email flow is the only way to set one. */
-function SetPasswordCard({ email }: { email: string }) {
-  const { signOut } = useAuth();
-  const [sent, setSent] = useState('');
-  const [token, setToken] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState<'send' | 'save' | null>(null);
-
-  const fail = (cause: unknown) => setError(cause instanceof ApiError ? cause.message : 'Có lỗi xảy ra, vui lòng thử lại.');
-
-  const send = async () => {
-    setBusy('send');
-    setError('');
-    try {
-      setSent((await authApi.forgotPassword(email)).message);
-    } catch (cause) {
-      fail(cause);
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const save = async () => {
-    if (password.length < 6 || password.length > 72) return setError('Mật khẩu phải có từ 6 đến 72 ký tự.');
-    setBusy('save');
-    setError('');
-    try {
-      await authApi.resetPassword({ token: token.trim(), newPassword: password });
-      // The reset revokes every refresh token, so the session cannot continue.
-      await signOut();
-    } catch (cause) {
-      fail(cause);
-      setBusy(null);
-    }
-  };
-
-  return (
-    <Card className="mt-4 gap-4 p-4">
-      <Text className="text-sm leading-5 text-muted">
-        Tài khoản này đăng nhập bằng Google nên chưa có mật khẩu. Chúng tôi sẽ gửi email chứa mã để bạn tạo mật khẩu.
-      </Text>
-      {error ? <FormAlert message={error} /> : null}
-      {sent ? <FormAlert tone="success" message={sent} /> : null}
-      <Button variant={sent ? 'secondary' : 'primary'} label={sent ? 'Gửi lại email' : 'Gửi email tạo mật khẩu'} loading={busy === 'send'} disabled={busy !== null} onPress={() => void send()} />
-      {sent ? (
-        <>
-          <TextField label="Mã trong email" value={token} onChangeText={setToken} autoCapitalize="none" autoCorrect={false} placeholder="Dán mã token" />
-          <TextField label="Mật khẩu mới" value={password} onChangeText={setPassword} secureToggle autoCapitalize="none" autoCorrect={false} textContentType="newPassword" placeholder="Từ 6 đến 72 ký tự" />
-          <Button label="Tạo mật khẩu" loadingLabel="Đang lưu…" loading={busy === 'save'} disabled={!token.trim() || !password || busy !== null} onPress={() => void save()} />
-          <Text className="text-xs text-muted">Sau khi tạo mật khẩu, bạn sẽ được đăng xuất để đăng nhập lại.</Text>
-        </>
-      ) : null}
-    </Card>
-  );
-}
 
 export default function ChangePasswordScreen() {
   const insets = useSafeAreaInsets();
@@ -89,7 +33,8 @@ export default function ChangePasswordScreen() {
   const mutation = useMutation({
     mutationFn: () => {
       if (!currentPassword) throw new Error('Vui lòng nhập mật khẩu hiện tại.');
-      if (newPassword.length < 6) throw new Error('Mật khẩu mới cần có ít nhất 6 ký tự.');
+      const problem = newPasswordError(newPassword);
+      if (problem) throw new Error(problem);
       if (newPassword !== confirmPassword) throw new Error('Mật khẩu xác nhận chưa khớp.');
       if (currentPassword === newPassword) throw new Error('Mật khẩu mới cần khác mật khẩu hiện tại.');
       return profileApi.changePassword({ currentPassword, newPassword });
@@ -132,7 +77,7 @@ export default function ChangePasswordScreen() {
               <View className="h-14 w-14 items-center justify-center rounded-2xl bg-white/15"><ShieldCheck size={27} color="#fff" /></View>
               <View className="flex-1">
                 <Text weight="extrabold" className="text-base text-white">Tạo mật khẩu an toàn</Text>
-                <Text className="mt-1 text-sm leading-5 text-white/75">Mật khẩu mới phải có ít nhất 6 ký tự.</Text>
+                <Text className="mt-1 text-sm leading-5 text-white/75">Mật khẩu mới phải có ít nhất {PASSWORD_MIN_LENGTH} ký tự.</Text>
               </View>
             </View>
           </View>
@@ -147,7 +92,7 @@ export default function ChangePasswordScreen() {
               </View>
             </View>
             <TextField label="Mật khẩu hiện tại" value={currentPassword} onChangeText={setCurrentPassword} secureToggle autoCapitalize="none" autoCorrect={false} textContentType="password" placeholder="Mật khẩu đang dùng" returnKeyType="next" />
-            <TextField label="Mật khẩu mới" value={newPassword} onChangeText={setNewPassword} secureToggle autoCapitalize="none" autoCorrect={false} textContentType="newPassword" placeholder="Ít nhất 6 ký tự" returnKeyType="next" />
+            <TextField label="Mật khẩu mới" value={newPassword} onChangeText={setNewPassword} secureToggle autoCapitalize="none" autoCorrect={false} textContentType="newPassword" placeholder={PASSWORD_HINT} returnKeyType="next" />
             <TextField label="Nhập lại mật khẩu mới" value={confirmPassword} onChangeText={setConfirmPassword} secureToggle autoCapitalize="none" autoCorrect={false} textContentType="newPassword" placeholder="Xác nhận mật khẩu mới" returnKeyType="done" onSubmitEditing={() => { if (currentPassword && newPassword && confirmPassword && !mutation.isPending) mutation.mutate(); }} />
             {formError ? <FormAlert message={formError} /> : null}
             {needsVerification ? <Button label="Xác minh email" variant="secondary" onPress={() => router.push('/profile/verify-email' as never)} /> : null}

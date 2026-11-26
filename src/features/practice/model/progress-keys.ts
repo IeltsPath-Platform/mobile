@@ -16,7 +16,7 @@ export function progressKey(packageId: string, partNo: number | null) {
  * The graded answer to open for each finished test. Speaking and Writing name it in their progress list; Reading and
  * Listening do not, and are looked up in the attempt history when the learner asks for the result.
  */
-export function submissionsByKey(completed: Array<{ packageId: string; partNo: number | null; submissionId?: string }>) {
+export function submissionsByKey(completed: { packageId: string; partNo: number | null; submissionId?: string }[]) {
   const found = new Map<string, string>()
   for (const item of completed) {
     if (item.submissionId) found.set(progressKey(item.packageId, item.partNo), item.submissionId)

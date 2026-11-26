@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Alert, AppState } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -86,10 +86,8 @@ export function useWordlyMatch(matchId: string) {
     refetchInterval: () => (multiplayer && !connectedRef.current ? 10_000 : false),
   });
 
-  const serverOffset = useMemo(
-    () => (ranking.data ? Date.parse(ranking.data.serverTime) - Date.now() : 0),
-    [ranking.data?.serverTime],
-  );
+  // Server time minus device time, taken when the answer arrived (`dataUpdatedAt` is the phone's clock at that moment).
+  const serverOffset = ranking.data ? Date.parse(ranking.data.serverTime) - ranking.dataUpdatedAt : 0;
 
   const onEvent = useCallback(
     (event: GameEvent) => {
@@ -115,7 +113,7 @@ export function useWordlyMatch(matchId: string) {
     [matchId, qc, showResult],
   );
   const connected = useGameSocket(match.data?.roomId ?? null, matchId, onEvent);
-  connectedRef.current = connected;
+  useLayoutEffect(() => { connectedRef.current = connected; });
 
   const word = current.data;
   const myTurn = match.data?.playerMode === 'SOLO' || Boolean(match.data?.ownPlayer);

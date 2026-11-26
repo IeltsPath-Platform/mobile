@@ -6,6 +6,7 @@ import {
   Link2Off,
   LogOut,
   MailCheck,
+  MonitorSmartphone,
   Settings2,
   Trash2,
   Trophy,
@@ -31,6 +32,7 @@ import { Card } from '@/src/components/ui/card';
 import { FormAlert } from '@/src/components/ui/form-alert';
 import { Text } from '@/src/components/ui/text';
 import { useAuth, useCurrentUser } from '@/src/features/auth/auth-provider';
+import { googleAvailable, requestFreshGoogleIdToken } from '@/src/features/auth/google';
 import { communityApi } from '@/src/features/community/api';
 import { useUnread } from '@/src/features/community/use-unread';
 import { profileApi, profileQueryKeys } from '@/src/features/profile/api';
@@ -45,6 +47,7 @@ import {
 } from '@/src/features/settings/components/settings-rows';
 import { clearAppSettingsStorage, useAppSettings } from '@/src/features/settings/use-app-settings';
 import { vocabApi } from '@/src/features/vocab/api';
+import { ApiError } from '@/src/lib/api-client';
 import { haptics } from '@/src/lib/haptics';
 import { colors } from '@/src/theme';
 import { useTabBarScrollHandler, useTabReselect } from '@/src/components/navigation/tab-reselect-context';
@@ -74,19 +77,28 @@ export default function AccountScreen() {
 
   const oauthQuery = useQuery({ queryKey: profileQueryKeys.oauth, queryFn: profileApi.getOAuthIdentities, enabled: signedIn });
   const googleIdentity = oauthQuery.data?.find((item) => item.provider.toLowerCase() === 'google');
+  const unlink = async () => {
+    const provider = googleIdentity?.provider ?? 'google';
+    try {
+      try {
+        await profileApi.unlinkOAuthIdentity(provider);
+      } catch (error) {
+        // The server may ask for proof first; picking the Google account again gives it.
+        if (!(error instanceof ApiError && error.code === 'REAUTH_REQUIRED') || !googleAvailable()) throw error;
+        const googleIdToken = await requestFreshGoogleIdToken();
+        if (!googleIdToken) return;
+        const { reauthToken } = await profileApi.reauthenticate({ googleIdToken });
+        await profileApi.unlinkOAuthIdentity(provider, reauthToken);
+      }
+      await queryClient.invalidateQueries({ queryKey: profileQueryKeys.oauth });
+    } catch (error) {
+      Alert.alert('Chưa huỷ được liên kết', errorMessage(error));
+    }
+  };
   const unlinkGoogle = () =>
     Alert.alert('Huỷ liên kết Google?', 'Bạn sẽ không đăng nhập bằng Google được nữa. Hãy chắc chắn đã có mật khẩu để đăng nhập.', [
       { text: 'Giữ lại', style: 'cancel' },
-      {
-        text: 'Huỷ liên kết',
-        style: 'destructive',
-        onPress: () => {
-          profileApi
-            .unlinkOAuthIdentity(googleIdentity?.provider ?? 'google')
-            .then(() => queryClient.invalidateQueries({ queryKey: profileQueryKeys.oauth }))
-            .catch((error) => Alert.alert('Chưa huỷ được liên kết', errorMessage(error)));
-        },
-      },
+      { text: 'Huỷ liên kết', style: 'destructive', onPress: () => void unlink() },
     ]);
 
   const relationshipsQuery = useQuery({
@@ -269,7 +281,7 @@ export default function AccountScreen() {
             Đăng nhập để xem hồ sơ
           </Text>
           <Text className="mt-1 text-center text-xs text-muted">
-            Theo dõi chuỗi học, XP và đồng bộ tiến độ học tập.
+            Đồng bộ bài làm và tiến độ học tập của bạn.
           </Text>
           <Button
             className="mt-4 w-full"
@@ -363,6 +375,7 @@ export default function AccountScreen() {
               title={user?.hasPassword === false ? 'Tạo mật khẩu' : 'Đổi mật khẩu'}
               onPress={() => router.push('/profile/change-password' as never)}
             />
+            <SettingsLinkRow icon={MonitorSmartphone} title="Thiết bị đăng nhập" onPress={() => router.push('/profile/sessions' as never)} />
             {googleIdentity ? <SettingsLinkRow icon={Link2Off} title="Huỷ liên kết Google" value="Đã liên kết" onPress={unlinkGoogle} /> : null}
             {user?.emailVerified === false ? (
               <SettingsLinkRow

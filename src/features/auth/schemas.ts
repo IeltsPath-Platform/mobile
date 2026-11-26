@@ -1,15 +1,17 @@
 import { z } from 'zod';
 
+import { newPasswordError } from '@/src/lib/password-rules';
+
 const email = z
   .string()
   .trim()
   .min(1, 'Email không được để trống')
   .pipe(z.email('Email không đúng định dạng'));
 
-const password = z
-  .string()
-  .min(6, 'Mật khẩu phải có từ 6 đến 72 ký tự')
-  .max(72, 'Mật khẩu phải có từ 6 đến 72 ký tự');
+const password = z.string().superRefine((value, context) => {
+  const problem = newPasswordError(value);
+  if (problem) context.addIssue({ code: 'custom', message: problem });
+});
 
 export const loginSchema = z.object({
   email,

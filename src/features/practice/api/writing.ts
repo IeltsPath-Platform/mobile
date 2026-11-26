@@ -21,7 +21,7 @@ export interface WritingTask {
   guide: string | null
   /** The model answer, one paragraph per part of the essay, with **phrases worth learning**; absent until one is written. */
   sampleAnswer?: string | null
-  images: Array<{ url: string; altText: string | null }>
+  images: { url: string; altText: string | null }[]
 }
 
 export interface GradingTerms {
@@ -102,7 +102,7 @@ export interface WritingPriority {
 
 /** Task 1: sentences the essay got wrong about the chart, with the statement that is right. A flag the model did not give is absent. */
 export interface WritingDataChecks {
-  wrong: Array<{ excerpt: string; expected: string }>
+  wrong: { excerpt: string; expected: string }[]
   correctCount: number
   hasOverview?: boolean
   overviewAccurate?: boolean
@@ -114,9 +114,9 @@ export type OutlineRole = 'INTRODUCTION' | 'BODY' | 'CONCLUSION'
 
 /** Task 2: which parts of the question the essay answered, its position and its outline, and the flags drawn from them. */
 export interface WritingTaskChecks {
-  questionParts?: Array<{ part: string; addressed: QuestionPartCoverage; excerpt?: string }>
+  questionParts?: { part: string; addressed: QuestionPartCoverage; excerpt?: string }[]
   position?: { required: boolean; stated: boolean; excerpt?: string; consistent?: boolean; conflictExcerpt?: string }
-  outline?: Array<{ role: OutlineRole; mainIdea: string; developed: boolean; excerpt?: string }>
+  outline?: { role: OutlineRole; mainIdea: string; developed: boolean; excerpt?: string }[]
   partialAnswer: boolean
   noPosition: boolean
   inconsistentPosition: boolean

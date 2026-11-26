@@ -1,6 +1,6 @@
 import { getRecordingPermissionsAsync, requestRecordingPermissionsAsync, setAudioModeAsync, useAudioStream, type AudioPlayer, type AudioStreamBuffer } from 'expo-audio';
 import { File } from 'expo-file-system';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AppState, Linking } from 'react-native';
 
 import type { SavedRecording } from '../model/speaking-session';
@@ -72,9 +72,9 @@ export function useRecorder({ saved, onSaved }: { saved?: SavedRecording | null;
   const fileUri = useRef<string | null>(null);
   const mounted = useRef(true);
   const statusRef = useRef(status);
-  statusRef.current = status;
+  useLayoutEffect(() => { statusRef.current = status; });
   const savedRef = useRef(onSaved);
-  savedRef.current = onSaved;
+  useLayoutEffect(() => { savedRef.current = onSaved; });
 
   const { stream } = useAudioStream({
     sampleRate: 16000,

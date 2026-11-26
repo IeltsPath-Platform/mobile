@@ -2,6 +2,7 @@
  * Export Duolingo-style mascot icon set from AI master.
  * Flood-fills background from edges (preserves orange frill spots).
  */
+const { Buffer } = require('node:buffer');
 const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs');

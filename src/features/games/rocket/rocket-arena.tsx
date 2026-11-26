@@ -17,10 +17,10 @@ import { Star } from 'lucide-react-native';
 import { colors } from '@/src/theme';
 
 const OWL_FRAMES = [
-  require('@/assets/images/owl/nav-owl-step-left.png'),
-  require('@/assets/images/owl/nav-owl-step-right.png'),
+  require('@/assets/images/owl/nav-owl-step-left-raster.png'),
+  require('@/assets/images/owl/nav-owl-step-right-raster.png'),
 ];
-const OWL_STAND = require('@/assets/images/owl/nav-owl-stand.png');
+const OWL_STAND = require('@/assets/images/owl/nav-owl-stand-raster.png');
 
 const ARENA_HEIGHT = 176;
 const OWL_SIZE = 64;

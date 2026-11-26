@@ -12,11 +12,11 @@ const options = (balance: number | null, subscription: Subscription | null | und
   gradeOptions({ balance, cost: 3, subscription, now: NOW })
 
 describe('gradeOptions', () => {
-  it('opens the teacher for an active Premium with credits left and the AI for enough points', () => {
+  it('opens the teacher for an active Premium with credits left and the AI for free', () => {
     const result = options(10, premium())
 
     expect(result.teacher).toEqual({ enabled: true, credits: 3, reason: null })
-    expect(result.ai).toEqual({ enabled: true, cost: 3, balance: 10, shortBy: 0 })
+    expect(result.ai).toEqual({ enabled: true, cost: 0, balance: 10, shortBy: 0 })
   })
 
   it('keeps the teacher closed without Premium, and says why', () => {
@@ -35,11 +35,10 @@ describe('gradeOptions', () => {
     expect(options(0, premium({ endsAt: null })).teacher.enabled).toBe(true)
   })
 
-  it('closes the AI when the points fall short and says by how much, independently of Premium', () => {
-    const result = options(1, premium())
-
-    expect(result.ai).toEqual({ enabled: false, cost: 3, balance: 1, shortBy: 2 })
-    expect(result.teacher.enabled).toBe(true)
+  it('closes the AI when a learner without Premium is short of points, and says by how much', () => {
+    expect(options(1, null).ai).toEqual({ enabled: false, cost: 3, balance: 1, shortBy: 2 })
+    expect(options(1, premium({ endsAt: '2026-10-25T00:00:00Z' })).ai.cost).toBe(3)
+    expect(options(1, premium()).ai.enabled).toBe(true)
     expect(options(3, null).ai.enabled).toBe(true)
     expect(options(0, null).ai.shortBy).toBe(3)
   })

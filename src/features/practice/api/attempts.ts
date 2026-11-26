@@ -37,7 +37,7 @@ export interface ReadingTestPage {
 
 export interface ReadingProgress {
   /** `submissionId` is the graded answer to open; only Speaking and Writing name it. */
-  completed: Array<{ packageId: string; partNo: number | null; submissionId?: string }>
+  completed: { packageId: string; partNo: number | null; submissionId?: string }[]
 }
 
 export interface AttemptSection {
@@ -53,11 +53,11 @@ export interface AttemptSection {
     skill: string | null
     instructions: string | null
     partNo: number | null
-    groups: Array<{ groupId: string; sortOrder: number; formatCode: string; instructions: string | null }>
+    groups: { groupId: string; sortOrder: number; formatCode: string; instructions: string | null }[]
     passage?: string | null
     audio?: { url: string; durationSeconds: number | null } | null
   }
-  items: Array<{ id: string; questionVersionId: string; sortOrder: number; questionSnapshot: string }>
+  items: { id: string; questionVersionId: string; sortOrder: number; questionSnapshot: string }[]
 }
 
 export interface AttemptStructure {
@@ -92,9 +92,9 @@ export interface ReadingResult {
   score: number
   maxScore: number
   percent: number
-  items: Array<{ attemptItemId: string; questionVersionId: string; correct: boolean | null }>
-  solutions?: Array<{ attemptItemId: string; questionVersionId: string; correctAnswer: string | null; explanation: string | null }>
-  sectionSolutions?: Array<{ attemptSectionId: string; transcript: string | null }>
+  items: { attemptItemId: string; questionVersionId: string; correct: boolean | null }[]
+  solutions?: { attemptItemId: string; questionVersionId: string; correctAnswer: string | null; explanation: string | null }[]
+  sectionSolutions?: { attemptSectionId: string; transcript: string | null }[]
   /** Only a practice test result has it: timing, the estimated band (full Reading/Listening) and the time per section. */
   practice?: {
     scope: 'FULL' | 'PART'
@@ -104,7 +104,7 @@ export interface ReadingResult {
     submittedAt: string | null
     timeLimitSeconds: number | null
     band: number | null
-    sections: Array<{ attemptSectionId: string; partNo: number | null; title: string | null; questionCount: number; timeSpentSeconds: number | null; timeLimitSeconds: number | null }>
+    sections: { attemptSectionId: string; partNo: number | null; title: string | null; questionCount: number; timeSpentSeconds: number | null; timeLimitSeconds: number | null }[]
   } | null
 }
 
@@ -134,8 +134,8 @@ export interface ReadingSearchInput {
   partNo?: number
   sources?: string[]
   query?: string
-  only?: Array<{ packageId: string; partNo: number | null }>
-  exclude?: Array<{ packageId: string; partNo: number | null }>
+  only?: { packageId: string; partNo: number | null }[]
+  exclude?: { packageId: string; partNo: number | null }[]
   page?: number
   size?: number
 }

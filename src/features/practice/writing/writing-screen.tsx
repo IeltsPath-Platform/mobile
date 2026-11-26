@@ -72,7 +72,8 @@ export function WritingScreen({ task, mode }: { task: WritingTask; mode: Writing
   const [lookupQuery, setLookupQuery] = useState('');
   const [lookupWord, setLookupWord] = useState<string | null>(null);
   // The clock is read from these refs, never from state, so saving and grading always see the current time.
-  const opened = useRef(Date.now());
+  // Set when the draft has loaded (the clock does not run before that), so no clock is read while rendering.
+  const opened = useRef(0);
   const baseSeconds = useRef(0);
   // The latest essay parts: the autosave, the background save and the time-up handler read it outside render.
   const latest = useRef(texts);
@@ -112,7 +113,12 @@ export function WritingScreen({ task, mode }: { task: WritingTask; mode: Writing
   const sample = useMemo(() => (!exam && task.sampleAnswer?.trim() ? sampleParts(task.sampleAnswer, parts.length) : null), [exam, task.sampleAnswer, parts.length]);
   const hasText = texts.some((part) => part.trim());
   const study = useStudySession('WRITING', practiceSessionId ?? '', !timeUp);
-  const guardOff = useLeaveTestGuard(hasText, 'Bài viết đã được lưu nháp trên thiết bị này. Bạn có thể quay lại viết tiếp.', 'Tạm rời bài viết?');
+  // Practice only asks once there is something to lose; the exam always asks, like the Reading and Listening exams.
+  const guardOff = useLeaveTestGuard(
+    hasText || exam,
+    hasText ? 'Bài viết đã được lưu nháp trên thiết bị này. Bạn có thể quay lại viết tiếp.' : 'Bạn chưa viết gì trong bài thi này. Bạn có thể quay lại để làm bài.',
+    exam && !hasText ? 'Rời bài thi?' : 'Tạm rời bài viết?',
+  );
   const grade = useWritingGrade({ task, mode, draftKey, essay, seconds: spent, label: exam ? 'Thi thật' : 'Luyện tập', beforeLeave: () => { keepDraft.current = false; guardOff(); } });
 
   useEffect(() => {
@@ -143,7 +149,7 @@ export function WritingScreen({ task, mode }: { task: WritingTask; mode: Writing
   const saveNow = () => { void saveDraft(draftKey, snapshot()); setSavedNotice(true); };
   const finish = () => { if (showSample) return; void saveDraft(draftKey, snapshot()); grade.start(); };
 
-  const tabs: Array<{ key: Tab; label: string }> = [
+  const tabs: { key: Tab; label: string }[] = [
     { key: 'task', label: 'Đề bài' },
     { key: 'answer', label: `Bài viết · ${words} từ` },
     ...(!exam ? [{ key: 'dictionary' as const, label: 'Tra từ' }] : []),

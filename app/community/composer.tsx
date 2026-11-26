@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, usePreventRemove, useRouter } from 'expo-router';
 import { Check, ChevronDown, Hash, ImagePlus, Palette, RefreshCw, SlidersHorizontal, X } from 'lucide-react-native';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -27,6 +27,7 @@ import { communityCategoryColor } from '@/src/features/community/community-color
 import { CommunityAvatar, CommunityImage } from '@/src/features/community/components/community-image';
 import { CATEGORY_LABELS } from '@/src/features/community/format';
 import { postBackgroundColor } from '@/src/features/community/post-background';
+import { ApiError } from '@/src/lib/api-client';
 import { haptics } from '@/src/lib/haptics';
 import { colors } from '@/src/theme';
 import { useTheme } from '@/src/theme/app-theme';
@@ -91,7 +92,9 @@ export default function ComposerScreen() {
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const scrollRef = useRef<ScrollViewInstance>(null);
   const hydrated = useRef(false);
+  // The ref answers the hydration effect below; the state is what the leave guard reads while rendering.
   const dirty = useRef(false);
+  const [isDirty, setIsDirty] = useState(false);
 
   useEffect(() => {
     if (Platform.OS === 'web') return;
@@ -130,7 +133,7 @@ export default function ComposerScreen() {
     })));
   }, [existing.data]);
 
-  const markDirty = () => { dirty.current = true; };
+  const markDirty = () => { dirty.current = true; setIsDirty(true); };
   const goBack = () => {
     if (router.canGoBack()) router.back();
     else router.replace('/(tabs)/community' as never);
@@ -138,13 +141,16 @@ export default function ComposerScreen() {
 
   // Every way out (X button, Android back, swipe-back) goes through this guard.
   const hasDraft = Boolean(body.trim() || title.trim() || images.length || videoUrl.trim());
-  const disablePrevention = usePreventRemove(busy || (dirty.current && hasDraft), ({ repeat }) => {
+  // The alert's button lifts the guard it belongs to, which only exists once the hook has returned: reach it through a ref.
+  const liftGuard = useRef<() => void>(() => undefined);
+  const disablePrevention = usePreventRemove(busy || (isDirty && hasDraft), ({ repeat }) => {
     if (busy) return;
     Alert.alert('Bỏ bài viết đang soạn?', 'Nội dung bạn vừa nhập sẽ bị xoá.', [
       { text: 'Tiếp tục soạn', style: 'cancel' },
-      { text: 'Bỏ bài viết', style: 'destructive', onPress: () => { disablePrevention(); repeat(); } },
+      { text: 'Bỏ bài viết', style: 'destructive', onPress: () => { liftGuard.current(); repeat(); } },
     ]);
   });
+  useLayoutEffect(() => { liftGuard.current = disablePrevention; });
 
   const close = () => {
     if (busy) return;
@@ -195,8 +201,8 @@ export default function ComposerScreen() {
         requestAnimationFrame(() => requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true })));
       }
       setError(rejected.join('\n'));
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Không mở được thư viện ảnh. Hãy thử lại.');
+    } catch {
+      setError('Không mở được thư viện ảnh. Hãy thử lại.');
     } finally {
       setPicking(false);
     }
@@ -259,7 +265,7 @@ export default function ComposerScreen() {
       haptics.success();
     } catch (cause) {
       setFailedUris((current) => [...current, image.uri]);
-      setError(cause instanceof Error ? `Không tải được ảnh: ${cause.message}` : 'Không tải được ảnh. Hãy thử lại.');
+      setError(cause instanceof ApiError ? cause.message : 'Không tải được ảnh. Hãy thử lại.');
       haptics.error();
     } finally {
       setUploadingUris((current) => current.filter((uri) => uri !== image.uri));
@@ -478,7 +484,7 @@ export default function ComposerScreen() {
           </View>
         ) : null}
 
-        <View className="min-h-14 flex-row items-center border-t border-line bg-surface px-2" style={{ paddingBottom: Platform.OS === 'ios' && !keyboardVisible ? Math.max(insets.bottom, 12) : 4 }}>
+        <View className="min-h-14 flex-row items-center border-t border-line bg-surface px-2" style={{ paddingBottom: !keyboardVisible ? Math.max(insets.bottom, 12) : 4 }}>
           <ToolButton label={picking ? 'Đang mở thư viện ảnh' : `Thêm ảnh, ${images.length}/${MAX_IMAGE_COUNT}`} disabled={busy || picking || images.length >= MAX_IMAGE_COUNT} onPress={() => void pickImages()}>
             {picking ? <ActivityIndicator color={colors.success} /> : <ImagePlus size={23} color={colors.success} />}
           </ToolButton>

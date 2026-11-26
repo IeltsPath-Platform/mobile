@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Alert, AppState } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -23,14 +23,12 @@ export function useRocketMatch(matchId: string) {
   const router = useRouter();
   const qc = useQueryClient();
   const connectedRef = useRef(false);
-  const serverOffset = useRef(0);
   const pendingAnswer = useRef<PendingAnswer | null>(null);
 
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [error, setError] = useState('');
-  const [offset, setOffset] = useState(0);
   const [reward, setReward] = useState<Reward | null>(null);
   const [burst, setBurst] = useState({ n: 0, large: false });
   const [damage, setDamage] = useState(0);
@@ -104,14 +102,11 @@ export function useRocketMatch(matchId: string) {
     [matchId, qc, showResult],
   );
   const connected = useGameSocket(match.data?.roomId ?? null, matchId, onEvent);
-  connectedRef.current = connected;
+  useLayoutEffect(() => { connectedRef.current = connected; });
 
   const round = current.data?.round;
-  useEffect(() => {
-    if (!current.data?.serverTime) return;
-    serverOffset.current = Date.parse(current.data.serverTime) - Date.now();
-    setOffset(serverOffset.current);
-  }, [current.data?.serverTime]);
+  // Server time minus device time, taken when the answer arrived (`dataUpdatedAt` is the phone's clock at that moment).
+  const offset = current.data?.serverTime ? Date.parse(current.data.serverTime) - current.dataUpdatedAt : 0;
 
   // The server sets deadlineAt only when a round is open: keep answers locked until then.
   const awaitingOpen = Boolean(round && !round.deadlineAt);

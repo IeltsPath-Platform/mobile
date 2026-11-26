@@ -23,7 +23,7 @@ export type VocabularyAchievement = { code: string; achieved: boolean; progress:
 const RETIRED_ACHIEVEMENTS: ReadonlySet<string> = new Set(['TOPIC_COMPLETED']);
 export type VocabularyCatalogWord = {
   id: string; lemma: string; ipa: string | null; pronunciationAudioReference: string | null;
-  senses: Array<Pick<VocabularySense, 'id' | 'partOfSpeech' | 'englishDefinition' | 'vietnameseMeaning' | 'exampleSentence'>>;
+  senses: Pick<VocabularySense, 'id' | 'partOfSpeech' | 'englishDefinition' | 'vietnameseMeaning' | 'exampleSentence'>[];
 };
 export type VocabularyPronunciation = { lemma: string; normalizedLemma: string; ipa: string | null; audioUk: string | null; audioUs: string | null };
 export type LibraryStatus = 'ACTIVE' | 'ARCHIVED' | 'DELETED';

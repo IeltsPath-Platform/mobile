@@ -14,6 +14,15 @@ const BY_STATUS: Record<number, string> = {
 };
 const SERVER_ERROR = 'Máy chủ đang gặp sự cố. Vui lòng thử lại sau.';
 const GENERIC = 'Có lỗi xảy ra, vui lòng thử lại.';
+const TECHNICAL_CODE = /\b[A-Z][A-Z0-9_]{3,}\b/;
+const TECHNICAL_UUID = /\b[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}\b/i;
+const TECHNICAL_NAME = /\b[\w.]*exception\b|java\.|org\.springframework|stack trace/i;
+const ENGLISH_ERROR = /\b(?:failed|failure|error|invalid|denied|unauthorized|forbidden|not found|please|request|server|network|timeout|expired|already|could not|unable|unknown|service|internal)\b/i;
+
+function isSafeVietnamese(text: string) {
+  return VIETNAMESE_LETTER.test(text) && !TECHNICAL_CODE.test(text) && !TECHNICAL_UUID.test(text)
+    && !TECHNICAL_NAME.test(text) && !ENGLISH_ERROR.test(text);
+}
 
 /**
  * The text of a server error for the learner. Messages with Vietnamese letters are written for people and pass through;
@@ -22,6 +31,12 @@ const GENERIC = 'Có lỗi xảy ra, vui lòng thử lại.';
  */
 export function userFacingMessage(status: number, message: string | undefined | null): string {
   const text = message?.trim();
-  if (text && VIETNAMESE_LETTER.test(text)) return text;
+  if (text && isSafeVietnamese(text)) return text;
   return BY_STATUS[status] ?? (status >= 500 ? SERVER_ERROR : GENERIC);
+}
+
+/** Keeps native/library exceptions and other non-API failures from leaking technical English into the UI. */
+export function safeErrorMessage(error: unknown, fallback = GENERIC): string {
+  const text = error instanceof Error ? error.message.trim() : '';
+  return text && isSafeVietnamese(text) ? text : fallback;
 }

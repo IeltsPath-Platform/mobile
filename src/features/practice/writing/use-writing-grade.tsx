@@ -15,6 +15,7 @@ import { ActivateKeySheet, ExaminerPickSheet, GradeConfirmSheet, GradeMethodShee
 import { POINT_PRODUCTS, type ActivationProduct } from '../grading/products';
 import { useWallet } from '../grading/use-wallet';
 import { gradeOptions } from '../model/grade-options';
+import { isPremiumRequired } from '../api/premium-error';
 import { clearDraft, countWords, storeResultContext } from '../model/writing-text';
 
 const AI_ERRORS: Record<string, string> = {
@@ -90,7 +91,8 @@ export function useWritingGrade({ task, mode, draftKey, essay, seconds, label, b
   const pending = useQuery({ queryKey: ['practice', 'writing-pending', task.questionVersionId], queryFn: ({ signal }) => getPendingExaminerSubmission(task.questionVersionId, signal), staleTime: 30_000, retry: false });
   const pendingId = pendingFromError ?? pending.data ?? null;
   const words = countWords(essay);
-  const minWords = task.minWords ?? terms.data?.minWords ?? 0;
+  // The server decides the least words an AI grade takes; the sheet shows that same number.
+  const minWords = terms.data?.minWords ?? task.minWords ?? 0;
   const canGrade = terms.data != null && words >= terms.data.minWords;
   const options = terms.data ? gradeOptions({ balance: wallet.access.balance, cost: terms.data.pointCost, subscription: wallet.access.subscription, teacherPending: pendingId !== null }) : null;
   const context = `Writing ${task.task === 'TASK_2' ? 'Task 2' : 'Task 1'} · ${task.title} · ${label}`;
@@ -115,7 +117,8 @@ export function useWritingGrade({ task, mode, draftKey, essay, seconds, label, b
       const result = await submitFreeWriting({ requestId: aiRequest.current.id, packageVersionId: task.packageVersionId, questionVersionId: task.questionVersionId, essayText: essay });
       await finish(result.submissionId);
     } catch (cause) {
-      if (cause instanceof ApiError && (cause.status === 402 || cause.code === 'INSUFFICIENT_POINTS')) setPopup('short');
+      if (isPremiumRequired(cause)) { setPopup(null); setPremiumOpen(true); }
+      else if (cause instanceof ApiError && (cause.status === 402 || cause.code === 'INSUFFICIENT_POINTS')) setPopup('short');
       else setAiError(cause instanceof ApiError ? AI_ERRORS[cause.code ?? ''] ?? cause.message : 'Chưa chấm được bài. Hãy thử lại.');
       setGrading(false);
     } finally {
@@ -133,6 +136,7 @@ export function useWritingGrade({ task, mode, draftKey, essay, seconds, label, b
       const result = await submitToExaminer({ requestId: examinerRequest.current.id, packageVersionId: task.packageVersionId, questionVersionId: task.questionVersionId, essayText: essay, examinerId });
       await finish(result.submissionId);
     } catch (cause) {
+      if (isPremiumRequired(cause)) { setPopup(null); setPremiumOpen(true); }
       setPendingFromError(pendingOf(cause));
       setExaminerError(examinerMessage(cause));
       setSending(false);
@@ -176,7 +180,7 @@ export function useWritingGrade({ task, mode, draftKey, essay, seconds, label, b
         canGrade={canGrade}
         onGrade={() => void gradeWithAi()}
         onClose={() => { setAiError(''); setPopup(null); }}
-        figures={terms.data ? { cost: terms.data.pointCost, balance: wallet.access.balance, context, benefits: BENEFITS, checks: [{ text: `Số từ: ${words} (tối thiểu ${minWords})`, ok: words >= minWords }] } : null}
+        figures={terms.data && options ? { cost: options.ai.cost, balance: wallet.access.balance, context, benefits: BENEFITS, checks: [{ text: `Số từ: ${words} (tối thiểu ${minWords})`, ok: words >= minWords }] } : null}
       />
       <NotEnoughPointsSheet
         visible={popup === 'short' && Boolean(terms.data)}

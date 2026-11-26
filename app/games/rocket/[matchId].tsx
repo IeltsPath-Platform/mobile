@@ -164,7 +164,7 @@ export default function RocketMatchScreen() {
             {round.me.answered && !game.busy && !roundResultForThis ? (
               <Text className="text-center text-sm text-muted">Đã chọn đáp án. Đang chờ kết quả…</Text>
             ) : null}
-            {!alive ? <Text className="text-center text-sm text-danger">Bạn đã hết mạng. Đang chờ ván kết thúc.</Text> : null}
+            {!alive && round ? <Text className="text-center text-sm text-danger">{inactiveNotice(round.player.status, round.player.livesRemaining)}</Text> : null}
           </>
         ) : current.data?.matchFinished ? (
           <View className="items-center rounded-3xl p-6" style={{ backgroundColor: colors.successSoft }}>
@@ -197,4 +197,12 @@ export default function RocketMatchScreen() {
       <RewardToast reward={game.reward} onDone={game.clearReward} top={60} />
     </View>
   );
+}
+
+/** What to tell a player who cannot answer: only an eliminated player (no lives left) is told the lives ran out. */
+function inactiveNotice(status: string, lives: number) {
+  if (status === 'ELIMINATED' || lives <= 0) return 'Bạn đã hết mạng. Đang chờ ván kết thúc.';
+  if (status === 'DISCONNECTED') return 'Mất kết nối với ván. Đang kết nối lại…';
+  if (status === 'FORFEITED') return 'Bạn đã rời ván này.';
+  return 'Bạn đã hoàn thành ván. Đang chờ ván kết thúc.';
 }

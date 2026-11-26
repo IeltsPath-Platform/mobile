@@ -25,7 +25,7 @@ export default function WelcomeScreen() {
     <SafeAreaView className="flex-1" style={{ backgroundColor: BRAND }} edges={['top', 'bottom']}>
       <View className="flex-1 items-center justify-center px-8">
         <Image
-          source={require('@/assets/images/owl/hero-wave.png')}
+          source={require('@/assets/images/owl/hero-wave-raster.png')}
           style={{ width: 300, height: 300, backgroundColor: 'transparent' }}
           contentFit="contain"
           accessibilityIgnoresInvertColors

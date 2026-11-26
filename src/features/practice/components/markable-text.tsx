@@ -28,7 +28,7 @@ const MARK = '#ffe58f';
 const MARK_TEXT = '#2b2200';
 
 const pointOf = (event: GestureResponderEvent): Point => ({ x: event.nativeEvent.pageX, y: event.nativeEvent.pageY });
-const parseRanges = (key: string): Array<[number, number]> => (key ? key.split(',').map((range) => range.split('-').map(Number) as [number, number]) : []);
+const parseRanges = (key: string): [number, number][] => (key ? key.split(',').map((range) => range.split('-').map(Number) as [number, number]) : []);
 
 /**
  * Text whose words answer touches: tap a word, long-press to start a selection. Marked and selected words get a

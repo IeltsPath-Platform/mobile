@@ -2,10 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
 
-import { BackHeader } from '@/src/components/navigation/back-header';
-import { Button } from '@/src/components/ui/button';
-import { EmptyState } from '@/src/components/ui/empty-state';
 import { getSpeakingTask } from '@/src/features/practice/api/speaking-task';
+import { TaskLoadError } from '@/src/features/practice/components/task-load-error';
 import { SpeakingRoom } from '@/src/features/practice/speaking/speaking-room';
 import { colors } from '@/src/theme';
 
@@ -20,12 +18,7 @@ export default function SpeakingTaskRoute() {
   const question = Number(params.q);
   if (task.isPending) return <View className="flex-1 items-center justify-center bg-canvas"><ActivityIndicator color={colors.accent} /></View>;
   if (task.isError) {
-    return (
-      <View className="flex-1 bg-canvas">
-        <BackHeader title="Speaking" fallbackHref="/practice/catalog/speaking" />
-        <EmptyState title="Chưa tải được đề Speaking" message={task.error.message} mood="oops" action={<Button label="Thử lại" variant="secondary" onPress={() => void task.refetch()} />} />
-      </View>
-    );
+    return <TaskLoadError title="Speaking" heading="Chưa tải được đề Speaking" error={task.error} fallbackHref="/practice/catalog/speaking" onRetry={() => void task.refetch()} />;
   }
   return (
     <SpeakingRoom

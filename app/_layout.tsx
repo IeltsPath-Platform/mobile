@@ -4,15 +4,14 @@ import { BeVietnamPro_600SemiBold } from "@expo-google-fonts/be-vietnam-pro/600S
 import { BeVietnamPro_700Bold } from "@expo-google-fonts/be-vietnam-pro/700Bold";
 import { BeVietnamPro_800ExtraBold } from "@expo-google-fonts/be-vietnam-pro/800ExtraBold";
 import { BeVietnamPro_900Black } from "@expo-google-fonts/be-vietnam-pro/900Black";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider , focusManager } from "@tanstack/react-query";
 import { Stack, type ErrorBoundaryProps, useRouter } from "expo-router";
 import * as Notifications from "expo-notifications";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { AppState, Image, View } from "react-native";
-import { focusManager } from "@tanstack/react-query";
 import "react-native-reanimated";
 import "../global.css";
 
@@ -25,6 +24,7 @@ import { queryClient } from "@/src/lib/query-client";
 import { AppThemeProvider, rootScreenLayout, useTheme } from "@/src/theme/app-theme";
 import { colors } from "@/src/theme";
 import { getNotificationRoute } from "@/src/features/community/push-notifications";
+import { unreadQueryKey } from "@/src/features/community/use-unread";
 
 const SPLASH = colors.accent;
 
@@ -66,17 +66,18 @@ export default function RootLayout() {
     BeVietnamPro_900Black,
   });
 
+  // The app is drawn only once the fonts are in: text measured with the fallback font keeps that narrower width after the
+  // real font arrives, and single-line labels come out clipped ("Bắt" for "Bắt đầu"). The splash stays up meanwhile.
+  const [fontWaitOver, setFontWaitOver] = useState(false);
+  const ready = fontsLoaded || Boolean(fontError) || fontWaitOver;
+
   useEffect(() => {
-    if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync().catch(() => undefined);
-    }
-  }, [fontsLoaded, fontError]);
+    if (ready) SplashScreen.hideAsync().catch(() => undefined);
+  }, [ready]);
 
   // Fail-safe: never leave the splash up if font loading stalls.
   useEffect(() => {
-    const timer = setTimeout(() => {
-      SplashScreen.hideAsync().catch(() => undefined);
-    }, 2500);
+    const timer = setTimeout(() => setFontWaitOver(true), 4000);
     return () => clearTimeout(timer);
   }, []);
 
@@ -87,6 +88,8 @@ export default function RootLayout() {
     });
     return () => subscription.remove();
   }, []);
+
+  if (!ready) return null;
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -118,10 +121,15 @@ function RootNavigator() {
       void Notifications.clearLastNotificationResponseAsync().catch(() => undefined);
     };
     const subscription = Notifications.addNotificationResponseReceivedListener(openNotification);
+    // A push that arrives with the app open refreshes the badge and the list at once, so the count needs no fast polling.
+    const received = Notifications.addNotificationReceivedListener(() => {
+      void queryClient.invalidateQueries({ queryKey: unreadQueryKey });
+      void queryClient.invalidateQueries({ queryKey: ["community", "notifications"] });
+    });
     void Notifications.getLastNotificationResponseAsync().then((response) => {
       if (response) openNotification(response);
     }).catch(() => undefined);
-    return () => subscription.remove();
+    return () => { subscription.remove(); received.remove(); };
   }, [isAuthenticated, router]);
 
   if (!ready || (AUTH_ENABLED && status === "loading")) {
@@ -132,7 +140,7 @@ function RootNavigator() {
       >
         <StatusBar style="light" />
         <Image
-          source={require("@/assets/images/owl/hero-cheer.png")}
+          source={require("@/assets/images/owl/hero-cheer-raster.png")}
           style={{ width: 220, height: 220 }}
           resizeMode="contain"
           accessibilityIgnoresInvertColors
@@ -173,6 +181,7 @@ function RootNavigator() {
           <Stack.Screen name="profile/edit" options={{ headerShown: false }} />
           <Stack.Screen name="profile/change-password" options={{ headerShown: false }} />
           <Stack.Screen name="profile/verify-email" options={{ headerShown: false }} />
+          <Stack.Screen name="profile/sessions" options={{ headerShown: false }} />
           <Stack.Screen name="games" />
           <Stack.Screen name="practice" options={{ headerShown: false }} />
           <Stack.Screen name="flashcards" options={{ headerShown: false }} />

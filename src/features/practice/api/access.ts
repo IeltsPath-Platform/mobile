@@ -65,7 +65,7 @@ export function activationErrorMessage(cause: unknown): string {
     if (cause.status >= 500) return 'Dịch vụ tạm thời gián đoạn. Vui lòng thử lại sau.';
     return KEY_ERROR_MESSAGES[cause.message] ?? (cause.message || 'Chưa thể kích hoạt mã. Vui lòng kiểm tra mã và thử lại.');
   }
-  return cause instanceof Error ? cause.message : 'Chưa thể kích hoạt mã. Vui lòng kiểm tra mã và thử lại.';
+  return 'Chưa thể kích hoạt mã. Vui lòng kiểm tra mã và thử lại.';
 }
 
 export const accessApi = {

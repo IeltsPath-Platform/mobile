@@ -8,7 +8,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BackHeader } from '@/src/components/navigation/back-header';
 import { Button } from '@/src/components/ui/button';
-import { EmptyState } from '@/src/components/ui/empty-state';
 import { Text } from '@/src/components/ui/text';
 import { ApiError } from '@/src/lib/api-client';
 import { createRequestId } from '@/src/lib/request-id';
@@ -16,12 +15,15 @@ import { colors } from '@/src/theme';
 
 import { getSpeakingTerms, type SpeakingTerms } from '../api/speaking';
 import { getSpeakingTask, type SpeakingTask } from '../api/speaking-task';
+import { TaskLoadError } from '../components/task-load-error';
 import { leaveToCatalog, useLeaveTestGuard } from '../components/test-shell';
 import { ActivateKeySheet, GradeConfirmSheet, GradeMethodSheet, NotEnoughPointsSheet, TermsSheet } from '../grading/grading-sheets';
 import { POINT_PRODUCTS, type ActivationProduct } from '../grading/products';
+import { usePremiumUpgrade } from '../grading/use-premium-upgrade';
 import { useWallet, type GradingAccess } from '../grading/use-wallet';
 import { formatClock } from '../model/clock';
 import { gradeOptions, type GradeOptions } from '../model/grade-options';
+import { isPremiumRequired } from '../api/premium-error';
 import { parseCueCard } from '../model/speaking-cue';
 import { clearSession, readPendingSend, useSessionRecordings, writePendingSend } from '../model/speaking-session';
 import { sendSpeakingSubmission, type RecordingToSend, type SendProgress } from './send-submission';
@@ -79,6 +81,7 @@ export function SpeakingReview({ packageVersionId, parts }: { packageVersionId: 
   const tasks = useQuery({ queryKey: ['practice', 'speaking-review', packageVersionId, parts.join(',')], queryFn: ({ signal }) => Promise.all(parts.map((id) => getSpeakingTask(packageVersionId, id, signal))) });
   const recordings = useSessionRecordings(packageVersionId);
   const wallet = useWallet();
+  const upgrade = usePremiumUpgrade();
   const [popup, setPopup] = useState<Popup>(null);
   const [terms, setTerms] = useState<SpeakingTerms | null>(null);
   const [termsLoading, setTermsLoading] = useState(false);
@@ -151,7 +154,8 @@ export function SpeakingReview({ packageVersionId, parts }: { packageVersionId: 
       setPopup(null);
       router.replace(`/practice/speaking-result/${submission.id}` as never);
     } catch (cause) {
-      if (cause instanceof ApiError && cause.status === 402) { void wallet.checkAccess(); setPopup('short'); }
+      if (isPremiumRequired(cause)) { setPopup(null); upgrade.open(); }
+      else if (cause instanceof ApiError && cause.status === 402) { void wallet.checkAccess(); setPopup('short'); }
       else if (cause instanceof ApiError && (cause.code === 'SPEAKING_SUBMISSION_NOT_UPLOADING' || cause.code === 'SPEAKING_SUBMISSION_ABANDONED')) {
         // The server gave up the upload this send was continuing (left unfinished too long): the next send opens a new one.
         requestId.current = null;
@@ -175,7 +179,7 @@ export function SpeakingReview({ packageVersionId, parts }: { packageVersionId: 
   ]);
 
   if (tasks.isPending) return <View className="flex-1 items-center justify-center bg-canvas"><ActivityIndicator color={colors.accent} /><Text className="mt-2 text-sm text-muted">Đang tải bài của bạn…</Text></View>;
-  if (tasks.isError) return <View className="flex-1 bg-canvas"><BackHeader title="Xem lại bài Speaking" fallbackHref={CATALOG} /><EmptyState title="Chưa tải được bài" message={tasks.error.message} mood="oops" action={<Button label="Thử lại" variant="secondary" onPress={() => void tasks.refetch()} />} /></View>;
+  if (tasks.isError) return <TaskLoadError title="Xem lại bài Speaking" heading="Chưa tải được bài" error={tasks.error} fallbackHref={CATALOG} onRetry={() => void tasks.refetch()} />;
 
   return (
     <View className="flex-1 bg-canvas">
@@ -231,10 +235,11 @@ export function SpeakingReview({ packageVersionId, parts }: { packageVersionId: 
         progress={progress ? `Đang gửi bản ghi ${Math.min(progress.done + 1, progress.total)}/${progress.total}…` : 'Đang gửi bài…'}
         onGrade={() => void send()}
         onClose={() => { setError(''); setPopup(null); }}
-        figures={terms ? { cost: terms.pointCost, balance: wallet.access.balance, context, benefits: ['Band từng tiêu chí và band tổng (điểm ước lượng để luyện tập)', 'Lỗi cần sửa, kèm gợi ý cải thiện', 'Bài luyện tiếp theo cho điểm yếu của bạn'], checks: [{ text: `${toSend.length} bản ghi · tổng ${formatClock(seconds)}`, ok: true }] } : null}
+        figures={terms && options ? { cost: options.ai.cost, balance: wallet.access.balance, context, benefits: ['Band từng tiêu chí và band tổng (điểm ước lượng để luyện tập)', 'Lỗi cần sửa, kèm gợi ý cải thiện', 'Bài luyện tiếp theo cho điểm yếu của bạn'], checks: [{ text: `${toSend.length} bản ghi · tổng ${formatClock(seconds)}`, ok: true }] } : null}
       />
       <NotEnoughPointsSheet visible={popup === 'short' && Boolean(terms)} cost={terms?.pointCost ?? 0} balance={wallet.access.balance} copy={METHOD_COPY} onClose={() => setPopup(null)} onActivate={() => { setPopup(null); setActivation(POINT_PRODUCTS[0]); }} />
       <ActivateKeySheet visible={activation !== null} product={activation} onActivated={wallet.onActivated} onClose={() => setActivation(null)} />
+      {upgrade.sheets}
     </View>
   );
 }

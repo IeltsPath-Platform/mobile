@@ -14,14 +14,14 @@ import { communityApi, notificationHasNext, type Notification } from '@/src/feat
 import { CommunityAvatar } from '@/src/features/community/components/community-image';
 import { timeAgo } from '@/src/features/community/format';
 import { isReadNotification, removeNotifications } from '@/src/features/community/notification-cache';
-import { useUnread } from '@/src/features/community/use-unread';
+import { unreadQueryKey, useUnread } from '@/src/features/community/use-unread';
 import { ApiError } from '@/src/lib/api-client';
 import { haptics } from '@/src/lib/haptics';
 import { colors } from '@/src/theme';
 import { useTheme } from '@/src/theme/app-theme';
 
 const notificationsKey = ['community', 'notifications'] as const;
-const unreadKey = ['community', 'unread'] as const;
+const unreadKey = unreadQueryKey;
 /** The list is only re-requested on focus once it is older than this, so tab switches never flash a spinner. */
 const FOCUS_REFRESH_AFTER_MS = 30_000;
 

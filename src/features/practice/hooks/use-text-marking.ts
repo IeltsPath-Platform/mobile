@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { haptics } from '@/src/lib/haptics';
 
@@ -48,7 +48,7 @@ export function useTextMarking({ annotations, sectionId, textOf, blockOrder, loo
 
   // The touch handlers keep one identity, so choosing a word does not rebuild every paragraph of the passage.
   const latest = useRef({ selection, highlights, lookupEnabled, blockOrder, lengthOf });
-  latest.current = { selection, highlights, lookupEnabled, blockOrder, lengthOf };
+  useLayoutEffect(() => { latest.current = { selection, highlights, lookupEnabled, blockOrder, lengthOf }; });
 
   // A selection belongs to the part it was made in.
   useEffect(() => { setSelection(null); }, [sectionId]);

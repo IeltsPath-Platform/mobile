@@ -42,7 +42,7 @@ export function clockSeconds(attempt: ReadingAttempt, timed: boolean, now = serv
 /** Every answerable item of the test, in paper order, with its question number (1-based across sections). */
 export function numberItems(sections: TestSection[]) {
   const numberByItem = new Map<string, number>();
-  const items: Array<{ item: TestItem; sectionIndex: number; number: number }> = [];
+  const items: { item: TestItem; sectionIndex: number; number: number }[] = [];
   sections.forEach((section, sectionIndex) => {
     for (const item of section.items) {
       if (!item.question) continue;

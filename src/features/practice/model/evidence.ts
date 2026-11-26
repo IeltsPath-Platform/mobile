@@ -56,7 +56,7 @@ function findQuote(text: string, quote: string): { start: number; end: number } 
  * Where the evidence is: in the paragraph with the named letter (the whole paragraph when the quote is not found
  * there), otherwise the first paragraph that contains the quote. Null when nothing matches.
  */
-export function locateEvidence(paragraphs: ReadonlyArray<{ label?: string | null; text: string }>, evidence: EvidenceRef): EvidenceSpot | null {
+export function locateEvidence(paragraphs: readonly { label?: string | null; text: string }[], evidence: EvidenceRef): EvidenceSpot | null {
   const named = evidence.label ? paragraphs.findIndex((paragraph) => paragraph.label === evidence.label) : -1
   if (named >= 0) {
     const text = paragraphs[named]!.text

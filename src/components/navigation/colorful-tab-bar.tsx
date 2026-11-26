@@ -1,6 +1,6 @@
 import { Bell, BookOpenCheck, Gamepad2, House, UserRound, Users } from 'lucide-react-native';
 import { Animated, Pressable, View } from 'react-native';
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarProps } from 'expo-router/build/react-navigation/bottom-tabs/types';
 
@@ -25,7 +25,7 @@ export function ColorfulTabBar({ state, emitter, navigateToTab }: BottomTabBarPr
   const { tabBarVisible, resetTabBar } = useTabBarControls();
   const insets = useSafeAreaInsets();
   const activeRouteKey = state.routes[state.index]?.key;
-  const visibility = useRef(new Animated.Value(0)).current;
+  const [visibility] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     resetTabBar();

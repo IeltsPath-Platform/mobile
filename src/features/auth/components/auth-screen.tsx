@@ -36,7 +36,7 @@ export function AuthScreen({ title, description, children, actions, footer }: Au
                 {description ? <Text className="mt-1 text-base leading-6 text-muted">{description}</Text> : null}
               </View>
               <Image
-                source={require('@/assets/images/owl/hero-wave.png')}
+                source={require('@/assets/images/owl/hero-wave-raster.png')}
                 style={{ width: 96, height: 96 }}
                 contentFit="contain"
                 accessibilityIgnoresInvertColors
