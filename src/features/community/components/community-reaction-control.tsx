@@ -29,7 +29,7 @@ export function CommunityReactionControl({ selected, disabled = false, onSelect,
   const reactionRefs = useRef(new Map<ReactionType, ViewInstance>());
   const reactionBounds = useRef(new Map<ReactionType, { left: number; top: number; right: number; bottom: number }>());
   const reactions = getReactions();
-  const scales = useRef(new Map(reactions.map(({ type }) => [type, new Animated.Value(1)]))).current;
+  const [scales] = useState(() => new Map(getReactions().map(({ type }) => [type, new Animated.Value(1)])));
   const active = reactions.find((item) => item.type === selected);
   const ActiveIcon = active?.Icon ?? ThumbsUp;
 

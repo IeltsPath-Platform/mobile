@@ -1,4 +1,4 @@
-import { Volume2, VolumeX } from 'lucide-react-native';
+import { Music2, VolumeX } from 'lucide-react-native';
 import { useEffect } from 'react';
 import { Pressable } from 'react-native';
 
@@ -11,7 +11,8 @@ import { colors } from '@/src/theme';
 export function SoundToggle() {
   const { settings, update } = useAppSettings();
   const on = settings.soundEnabled || settings.musicEnabled;
-  const Icon = on ? Volume2 : VolumeX;
+  // Not the speaker icon: this sits next to the "hear the word" button, which already uses it.
+  const Icon = on ? Music2 : VolumeX;
   return (
     <Pressable
       accessibilityRole="button"

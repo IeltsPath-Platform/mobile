@@ -1,14 +1,15 @@
 import { keepPreviousData, useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Image as CachedImage } from 'expo-image';
-import { PenLine, Search, Users, X } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { PenLine, Search, X } from 'lucide-react-native';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, TextInput, View, type FlatList as NativeFlatList, type LayoutChangeEvent, type ListViewToken } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { interpolate, runOnJS, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 
 import { Button } from '@/src/components/ui/button';
-import { FormAlert } from '@/src/components/ui/form-alert';
+import { EmptyState as SharedEmptyState } from '@/src/components/ui/empty-state';
+import type { OwlMood } from '@/src/components/ui/owl-mascot';
 import { Skeleton } from '@/src/components/ui/skeleton';
 import { Text } from '@/src/components/ui/text';
 import { useAuth, useCurrentUser } from '@/src/features/auth/auth-provider';
@@ -65,19 +66,19 @@ export default function CommunityScreen() {
     if (nextHeight <= 0) return;
     setHeaderHeight((current) => current === nextHeight ? current : nextHeight);
     const wasVisible = headerReveal.value >= headerHeightShared.value - 1;
-    headerHeightShared.value = nextHeight;
-    headerReveal.value = wasVisible ? nextHeight : Math.min(headerReveal.value, nextHeight);
+    headerHeightShared.set(nextHeight);
+    headerReveal.set(wasVisible ? nextHeight : Math.min(headerReveal.value, nextHeight));
   }, [headerHeightShared, headerReveal]);
 
   const onFeedScroll = useAnimatedScrollHandler({
     onScroll: (event) => {
       const offset = Math.max(0, event.contentOffset.y);
       const delta = offset - previousScrollOffset.value;
-      previousScrollOffset.value = offset;
+      previousScrollOffset.set(offset);
       if (searching || offset <= 0) {
-        headerReveal.value = headerHeightShared.value;
+        headerReveal.set(headerHeightShared.value);
       } else if (Math.abs(delta) > 0.2) {
-        headerReveal.value = Math.max(0, Math.min(headerHeightShared.value, headerReveal.value - delta));
+        headerReveal.set(Math.max(0, Math.min(headerHeightShared.value, headerReveal.value - delta)));
       }
       runOnJS(handleTabBarOffset)(offset);
     },
@@ -131,7 +132,7 @@ export default function CommunityScreen() {
   useFocusEffect(
     useCallback(() => {
       refreshPrimed.current = false;
-      headerReveal.value = headerHeightShared.value;
+      headerReveal.set(headerHeightShared.value);
       if (!signedIn) return;
       // Refresh only the first page of stale active feeds; refetchQueries would re-request every loaded page.
       for (const cached of queryClient.getQueryCache().findAll({ queryKey: ['community', 'feed'], type: 'active', stale: true })) {
@@ -161,9 +162,10 @@ export default function CommunityScreen() {
   // Keep only a few upcoming post images warm in the disk/memory cache. FlatList
   // still mounts rows on demand, while the image request starts just before they appear.
   const postsRef = useRef(posts);
-  postsRef.current = posts;
+  useLayoutEffect(() => { postsRef.current = posts; });
   const prefetchedImages = useRef(new Set<string>());
-  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ListViewToken[] }) => {
+  // Stable for the life of the list: FlatList does not accept a new viewability callback after it has mounted.
+  const [onViewableItemsChanged] = useState(() => ({ viewableItems }: { viewableItems: ListViewToken[] }) => {
     const visibleIndexes = viewableItems
       .map((token) => token.index)
       .filter((index): index is number => index != null);
@@ -184,7 +186,7 @@ export default function CommunityScreen() {
     void CachedImage.prefetch(urls, 'disk').then((ok) => {
       if (!ok) urls.forEach((url) => prefetchedImages.current.delete(url));
     }).catch(() => urls.forEach((url) => prefetchedImages.current.delete(url)));
-  }).current;
+  });
 
   const menu = usePostMenu(user.data?.id);
   const openPost = useCallback((id: string) => router.push(`/community/${id}` as never), [router]);
@@ -227,7 +229,6 @@ export default function CommunityScreen() {
       ? <FeedSkeleton />
       : (
         <EmptyState
-          icon={<Users size={30} color={colors.accent} />}
           title="Học cùng người khác sẽ vui hơn"
           body="Đăng nhập để hỏi đáp, chia sẻ bài Writing và tìm bạn luyện Speaking."
           action={<Button label="Đăng nhập" onPress={() => router.push('/(auth)/login' as never)} />}
@@ -237,17 +238,18 @@ export default function CommunityScreen() {
     empty = <FeedSkeleton />;
   } else if (feed.isError) {
     empty = (
-      <View className="px-4 pt-6">
-        <FormAlert tone="error" message={feed.error instanceof Error ? feed.error.message : 'Không tải được bảng tin.'} />
-        <View className="mt-3"><Button label="Thử lại" onPress={() => void feed.refetch()} /></View>
-      </View>
+      <EmptyState
+        mood="oops"
+        title="Ối, chưa tải được bảng tin"
+        body={feed.error instanceof Error ? feed.error.message : 'Hãy kiểm tra kết nối rồi thử lại.'}
+        action={<Button label="Thử lại" onPress={() => void feed.refetch()} />}
+      />
     );
   } else if (query) {
-    empty = <EmptyState icon={<Search size={28} color={colors.accent} />} title="Không thấy kết quả" body={`Chưa có bài nào khớp với “${query}”. Thử từ khóa ngắn hơn nhé.`} />;
+    empty = <EmptyState title="Không thấy kết quả" body={`Chưa có bài nào khớp với “${query}”. Thử từ khóa ngắn hơn nhé.`} />;
   } else if (scope === 'FOLLOWING') {
     empty = (
       <EmptyState
-        icon={<Users size={30} color={colors.accent} />}
         title="Chưa có bài từ người bạn theo dõi"
         body="Theo dõi vài người học giỏi để bài của họ hiện ở đây."
         action={<Button variant="secondary" label="Khám phá bài viết" onPress={() => setScope('ALL')} />}
@@ -256,7 +258,6 @@ export default function CommunityScreen() {
   } else {
     empty = (
       <EmptyState
-        icon={<PenLine size={28} color={colors.accent} />}
         title="Chưa có bài viết nào"
         body="Hãy là người đầu tiên chia sẻ điều bạn đang học."
         action={<Button label="Viết bài đầu tiên" onPress={compose} />}
@@ -294,7 +295,7 @@ export default function CommunityScreen() {
                 {(manualRefreshing || (feed.isRefetching && !feed.isFetchingNextPage)) ? <ActivityIndicator size="small" color={colors.accent} /> : null}
                 {signedIn ? (
                   <>
-                    <Pressable onPress={() => { haptics.tap(); setSearching(true); headerReveal.value = headerHeightShared.value; }} accessibilityRole="button" accessibilityLabel="Tìm bài viết" className="h-12 w-12 items-center justify-center rounded-full active:opacity-70">
+                    <Pressable onPress={() => { haptics.tap(); setSearching(true); headerReveal.set(headerHeightShared.value); }} accessibilityRole="button" accessibilityLabel="Tìm bài viết" className="h-12 w-12 items-center justify-center rounded-full active:opacity-70">
                       <Search size={22} color={colors.ink} />
                     </Pressable>
                     <Pressable onPress={openOwnProfile} disabled={!user.data?.id} accessibilityRole="button" accessibilityLabel="Hồ sơ cộng đồng của tôi" className="h-12 w-12 items-center justify-center rounded-full active:opacity-80">
@@ -372,15 +373,8 @@ function Chip({ label, active, onPress, accent = colors.accentDeep, tint = color
   );
 }
 
-function EmptyState({ title, body, action }: { icon?: React.ReactNode; title: string; body: string; action?: React.ReactNode }) {
-  return (
-    <View className="items-center px-8 pt-10">
-      <CachedImage source={require('@/assets/images/owl/nav-owl-stand.webp')} contentFit="contain" style={{ width: 120, height: 120 }} accessibilityIgnoresInvertColors />
-      <Text weight="extrabold" className="mt-4 text-center text-lg">{title}</Text>
-      <Text className="mt-2 text-center text-sm leading-5 text-muted">{body}</Text>
-      {action ? <View className="mt-5 self-stretch">{action}</View> : null}
-    </View>
-  );
+function EmptyState({ title, body, action, mood = 'wave' }: { title: string; body: string; action?: React.ReactNode; mood?: OwlMood }) {
+  return <SharedEmptyState framed={false} mood={mood} title={title} message={body} action={action} />;
 }
 
 function FeedSkeleton() {

@@ -66,3 +66,5 @@ Thumbs.db
 # Local Expo export output and task notes
 .expo-*/
 CODEX_TASK_*.md
+# Firebase config (provided to cloud builds through an EAS file secret)
+google-services.json

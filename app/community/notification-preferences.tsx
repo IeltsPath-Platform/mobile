@@ -3,11 +3,16 @@ import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Switch, View } from 'react-native';
 import { BackHeader } from '@/src/components/navigation/back-header';
 import { Text } from '@/src/components/ui/text';
+import { useCurrentUser } from '@/src/features/auth/auth-provider';
 import { communityApi } from '@/src/features/community/api';
+import { PushPermissionNotice } from '@/src/features/community/components/push-permission-notice';
+import { safeErrorMessage } from '@/src/lib/error-message';
 import { colors } from '@/src/theme';
 import { useTheme } from '@/src/theme/app-theme';
 
-const PREFERENCE_COPY: Record<string, { title: string; detail: string; group: 'activity' | 'connections' | 'other' }> = {
+type PreferenceGroup = 'activity' | 'connections' | 'learning' | 'premium' | 'examiner' | 'other';
+
+const PREFERENCE_COPY: Record<string, { title: string; detail: string; group: PreferenceGroup }> = {
   'community.post-commented.v1': {
     title: 'Bình luận bài viết',
     detail: 'Khi có người bình luận bài viết bạn đăng.',
@@ -33,28 +38,78 @@ const PREFERENCE_COPY: Record<string, { title: string; detail: string; group: 'a
     detail: 'Khi có người mới bắt đầu theo dõi bạn.',
     group: 'connections',
   },
+  'assessment.grading-completed.v1': {
+    title: 'Đã có kết quả chấm',
+    detail: 'Khi bài viết của bạn được chấm xong.',
+    group: 'learning',
+  },
+  'assessment.result-ready.v1': {
+    title: 'Đã có kết quả bài thi',
+    detail: 'Khi kết quả bài thi của bạn đã sẵn sàng.',
+    group: 'learning',
+  },
+  'access.subscription-granted.v1': {
+    title: 'Đã kích hoạt Premium',
+    detail: 'Khi quyền Premium được cấp cho tài khoản.',
+    group: 'premium',
+  },
+  'access.subscription-expiry-notice.v1': {
+    title: 'Premium sắp hết hạn',
+    detail: 'Nhắc khi quyền Premium sắp hết hạn hoặc đã hết hạn.',
+    group: 'premium',
+  },
+  'library.vocabulary-review-due.v1': {
+    title: 'Từ vựng đến hạn ôn',
+    detail: 'Nhắc mỗi sáng khi bạn có từ vựng đến hạn ôn tập.',
+    group: 'learning',
+  },
+  'assessment.grading-requested.v1': {
+    title: 'Bài viết cần chấm',
+    detail: 'Khi học viên chọn bạn chấm bài.',
+    group: 'examiner',
+  },
+  'assessment.grading-due-soon.v1': {
+    title: 'Sắp đến hạn chấm',
+    detail: 'Nhắc khi bài được giao sắp đến hạn.',
+    group: 'examiner',
+  },
+  'assessment.grading-overdue.v1': {
+    title: 'Bài chấm quá hạn',
+    detail: 'Khi bài viết bạn nhận chấm bị quá hạn.',
+    group: 'examiner',
+  },
 };
 
+// A type this version does not know gets a plain label: the raw event code means nothing to the learner.
 const preferenceCopy = (type: string) =>
-  PREFERENCE_COPY[type] ?? {
-    title: 'Hoạt động cộng đồng khác',
-    detail: 'Thông báo về hoạt động khác trong cộng đồng.',
-    group: 'other' as const,
-  };
+  PREFERENCE_COPY[type] ?? { title: 'Thông báo khác', detail: 'Loại thông báo mới. Cập nhật ứng dụng để xem chi tiết.', group: 'other' as const };
+
+const SECTIONS: { key: PreferenceGroup; title: string }[] = [
+  { key: 'activity', title: 'BÀI VIẾT & BÌNH LUẬN' },
+  { key: 'connections', title: 'NGƯỜI THEO DÕI' },
+  { key: 'learning', title: 'HỌC TẬP' },
+  { key: 'premium', title: 'TÀI KHOẢN PREMIUM' },
+  { key: 'examiner', title: 'GIÁM KHẢO' },
+  { key: 'other', title: 'KHÁC' },
+];
 
 export default function NotificationPreferencesScreen() {
   useTheme();
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: ['community', 'notification-preferences'], queryFn: communityApi.preferences });
+  const user = useCurrentUser();
+  // The server lists every type for every account; grading-queue reminders only concern examiners.
+  const isExaminer = user.data?.roles.some((role) => role.name === 'EXAMINER') ?? false;
+  const mail = useQuery({ queryKey: ['community', 'mail-preferences'], queryFn: communityApi.mailPreferences });
   const [busy, setBusy] = useState<string>();
-  const sections = [
-    { key: 'activity', title: 'BÀI VIẾT & BÌNH LUẬN' },
-    { key: 'connections', title: 'NGƯỜI THEO DÕI' },
-    { key: 'other', title: 'HOẠT ĐỘNG KHÁC' },
-  ].map((section) => ({
-    ...section,
-    items: (query.data ?? []).filter((item) => preferenceCopy(item.eventType).group === section.key),
-  })).filter((section) => section.items.length > 0);
+  const [mailBusy, setMailBusy] = useState(false);
+  const sections = SECTIONS
+    .filter((section) => section.key !== 'examiner' || isExaminer)
+    .map((section) => ({
+      ...section,
+      items: (query.data ?? []).filter((item) => preferenceCopy(item.eventType).group === section.key),
+    }))
+    .filter((section) => section.items.length > 0);
 
   const update = async (eventType: string, enabled: boolean) => {
     setBusy(eventType);
@@ -62,17 +117,37 @@ export default function NotificationPreferencesScreen() {
       await communityApi.updatePreference(eventType, enabled);
       await queryClient.invalidateQueries({ queryKey: ['community', 'notification-preferences'] });
     } catch (error) {
-      Alert.alert('Chưa thể lưu tuỳ chọn', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+      Alert.alert('Chưa thể lưu tuỳ chọn', safeErrorMessage(error, 'Vui lòng thử lại.'));
     } finally { setBusy(undefined); }
+  };
+
+  const updateMail = async (learning: boolean) => {
+    setMailBusy(true);
+    try {
+      queryClient.setQueryData(['community', 'mail-preferences'], await communityApi.updateMailPreferences(learning));
+    } catch (error) {
+      Alert.alert('Chưa thể lưu tuỳ chọn email', safeErrorMessage(error, 'Vui lòng thử lại.'));
+    } finally { setMailBusy(false); }
   };
 
   return <View className="flex-1 bg-canvas">
     <BackHeader title="Tuỳ chọn thông báo" fallbackHref="/(tabs)/community" />
     <ScrollView contentContainerClassName="px-4 pb-10 pt-4">
       <Text className="mb-4 text-sm text-muted">Chọn hoạt động bạn muốn nhận thông báo.</Text>
+      <PushPermissionNotice />
       {query.isPending ? <View className="items-center py-16"><ActivityIndicator color={colors.accent} /><Text className="mt-3 text-sm text-muted">Đang tải tuỳ chọn…</Text></View>
         : query.isError ? <Pressable onPress={() => void query.refetch()} className="items-center rounded-3xl border border-line bg-surface p-6"><Text weight="bold">Không tải được tuỳ chọn</Text><Text className="mt-2 text-sm text-accent">Chạm để thử lại</Text></Pressable>
         : sections.length ? <View className="gap-4">
+          {mail.data ? <View>
+            <Text weight="bold" className="mb-2 ml-1 text-[11px] tracking-wide text-muted">EMAIL</Text>
+            <View className="min-h-[76px] flex-row items-center overflow-hidden rounded-3xl border border-line bg-surface px-4 py-3">
+              <View className="flex-1 pr-3">
+                <Text weight="semibold" className="text-sm text-ink">Email học tập</Text>
+                <Text className="mt-1 text-xs leading-4 text-muted">Nhận email khi bài được chấm hoặc có kết quả. Email bảo mật và thanh toán luôn được gửi.</Text>
+              </View>
+              {mailBusy ? <ActivityIndicator color={colors.accent} className="mx-2" /> : <Switch value={mail.data.learning} disabled={busy !== undefined} accessibilityLabel="Email học tập" trackColor={{ false: colors.line, true: colors.accent }} thumbColor={colors.canvas} onValueChange={(learning) => void updateMail(learning)} />}
+            </View>
+          </View> : null}
           {sections.map((section) => <View key={section.key}>
             <Text weight="bold" className="mb-2 ml-1 text-[11px] tracking-wide text-muted">{section.title}</Text>
             <View className="overflow-hidden rounded-3xl border border-line bg-surface">

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Alert, AppState } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -9,9 +9,11 @@ import { createRequestId } from '@/src/lib/request-id';
 import { sound } from '@/src/lib/sound';
 
 import { gameApi } from '../api';
+import { isGone } from '../errors';
 import { PRACTICE_HOME, resultRoute } from '../game-meta';
 import { useCountdown } from '../use-countdown';
 import { useGameSocket } from '../use-game-socket';
+import { useHardwareBack } from '../use-hardware-back';
 import type { GameEvent, GameRanking, RocketCurrent, RocketRound, RocketRoundResult } from '../types';
 import { mergeRanking } from '../types';
 import { recordReview } from '../review-log';
@@ -23,14 +25,12 @@ export function useRocketMatch(matchId: string) {
   const router = useRouter();
   const qc = useQueryClient();
   const connectedRef = useRef(false);
-  const serverOffset = useRef(0);
   const pendingAnswer = useRef<PendingAnswer | null>(null);
 
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [error, setError] = useState('');
-  const [offset, setOffset] = useState(0);
   const [reward, setReward] = useState<Reward | null>(null);
   const [burst, setBurst] = useState({ n: 0, large: false });
   const [damage, setDamage] = useState(0);
@@ -59,7 +59,7 @@ export function useRocketMatch(matchId: string) {
     enabled: Boolean(matchId),
     refetchInterval: (query) => {
       const data = query.state.data;
-      if (data?.matchFinished) return false;
+      if (data?.matchFinished || isGone(query.state.error)) return false;
       const round = data?.round;
       if (round && !round.deadlineAt) {
         // The server opens the round at opensAt; poll right around that moment.
@@ -91,7 +91,9 @@ export function useRocketMatch(matchId: string) {
         return;
       }
       if (event.type === 'ROOM_CLOSED' || event.type === 'PLAYER_KICKED') setError(event.message ?? 'Phòng chơi đã kết thúc.');
-      if (['ROCKET_ROUND_STARTED', 'ROCKET_ROUND_RESULT', 'MATCH_STATE', 'MATCH_STARTED'].includes(event.type)) {
+      // CONNECTED: the server makes a disconnected player active again before sending it; until the round is read
+      // again the answers stay locked.
+      if (['CONNECTED', 'ROCKET_ROUND_STARTED', 'ROCKET_ROUND_RESULT', 'MATCH_STATE', 'MATCH_STARTED'].includes(event.type)) {
         void qc.invalidateQueries({ queryKey: ['games', 'rocket-current', matchId] });
       }
       if (['MATCH_STATE', 'MATCH_STARTED'].includes(event.type) && !event.match) {
@@ -104,14 +106,11 @@ export function useRocketMatch(matchId: string) {
     [matchId, qc, showResult],
   );
   const connected = useGameSocket(match.data?.roomId ?? null, matchId, onEvent);
-  connectedRef.current = connected;
+  useLayoutEffect(() => { connectedRef.current = connected; });
 
   const round = current.data?.round;
-  useEffect(() => {
-    if (!current.data?.serverTime) return;
-    serverOffset.current = Date.parse(current.data.serverTime) - Date.now();
-    setOffset(serverOffset.current);
-  }, [current.data?.serverTime]);
+  // Server time minus device time, taken when the answer arrived (`dataUpdatedAt` is the phone's clock at that moment).
+  const offset = current.data?.serverTime ? Date.parse(current.data.serverTime) - current.dataUpdatedAt : 0;
 
   // The server sets deadlineAt only when a round is open: keep answers locked until then.
   const awaitingOpen = Boolean(round && !round.deadlineAt);
@@ -255,12 +254,13 @@ export function useRocketMatch(matchId: string) {
 
   const confirmLeave = useCallback(
     () =>
-      Alert.alert('Rời ván Rocket?', 'Bạn sẽ giữ điểm đã có nhưng rời khỏi lượt chơi.', [
+      Alert.alert('Rời ván Tên lửa?', 'Bạn sẽ giữ điểm đã có nhưng rời khỏi lượt chơi.', [
         { text: 'Ở lại', style: 'cancel' },
         { text: 'Rời ván', style: 'destructive', onPress: () => void leave() },
       ]),
     [leave],
   );
+  useHardwareBack(confirmLeave, Boolean(current.data) && !current.data?.matchFinished && !isGone(current.error));
 
   return {
     match,

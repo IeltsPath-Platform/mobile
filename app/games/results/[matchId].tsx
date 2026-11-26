@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ConfettiBurst } from '@/src/components/effects/confetti-burst';
 import { CountUp } from '@/src/components/effects/count-up';
 import { StarRating } from '@/src/components/effects/star-rating';
+import { StatusBarStrip } from '@/src/components/ui/band-status-bar';
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
 import { StatCard } from '@/src/components/ui/stat-card';
@@ -44,6 +45,8 @@ export default function GameResultScreen() {
     queryKey: ['games', 'ranking', matchId],
     queryFn: () => gameApi.ranking(matchId),
     enabled: Boolean(matchId) && rocket,
+    // The match screen cached live standings under this key; the result needs the final ones.
+    staleTime: 0,
     retry: 1,
   });
 
@@ -62,7 +65,7 @@ export default function GameResultScreen() {
         title="Chưa tải được kết quả"
         actions={[
           { label: 'Thử lại', onPress: () => void result.refetch() },
-          { label: 'Về luyện tập', variant: 'secondary', onPress: () => router.replace(PRACTICE_HOME) },
+          { label: 'Về trò chơi', variant: 'secondary', onPress: () => router.replace(PRACTICE_HOME) },
         ]}
         onBack={() => router.replace(PRACTICE_HOME)}
       />
@@ -157,10 +160,11 @@ export default function GameResultScreen() {
           </Card>
         ) : null}
       </ScrollView>
+      <StatusBarStrip color={colors.canvas} />
 
       <View className="gap-3 border-t-2 border-line bg-canvas px-5 pt-3" style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
         <Button label="Chơi lại" onPress={() => router.replace({ pathname: '/games', params: { gameType: kind } } as never)} />
-        <Button label="Về luyện tập" variant="secondary" onPress={() => router.replace(PRACTICE_HOME)} />
+        <Button label="Về trò chơi" variant="secondary" onPress={() => router.replace(PRACTICE_HOME)} />
       </View>
       <ConfettiBurst trigger={stars >= 2 || won ? 1 : 0} size="large" originY={0.22} />
     </View>

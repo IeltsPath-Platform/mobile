@@ -10,7 +10,8 @@ import { TextField } from '@/src/components/ui/text-field';
 import { authApi } from '@/src/features/auth/api';
 import { AuthLink } from '@/src/features/auth/components/auth-link';
 import { AuthScreen } from '@/src/features/auth/components/auth-screen';
-import { applyApiError, FEATURE_COMING_SOON, isFeatureUnavailable } from '@/src/features/auth/form-errors';
+import { applyApiError } from '@/src/features/auth/form-errors';
+import { ApiError } from '@/src/lib/api-client';
 import { resetPasswordSchema, type ResetPasswordInput } from '@/src/features/auth/schemas';
 
 export default function ResetPasswordScreen() {
@@ -37,7 +38,9 @@ export default function ResetPasswordScreen() {
       setDoneMessage(response.message);
     } catch (error) {
       setFormError(
-        isFeatureUnavailable(error) ? FEATURE_COMING_SOON : applyApiError(error, setError, ['token', 'newPassword']),
+        error instanceof ApiError && error.status === 404
+          ? 'Mã đặt lại không đúng hoặc đã hết hạn. Hãy yêu cầu mã mới.'
+          : applyApiError(error, setError, ['token', 'newPassword']),
       );
     }
   });
@@ -76,7 +79,7 @@ export default function ResetPasswordScreen() {
           <TextField
             ref={passwordRef}
             label="Mật khẩu mới"
-            placeholder="Tối thiểu 6 ký tự"
+            placeholder="Tối thiểu 8 ký tự"
             value={value}
             onChangeText={onChange}
             onBlur={onBlur}

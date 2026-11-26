@@ -17,6 +17,3 @@ export function getReactions(): ReactionMeta[] {
   return definitions.map(({ token, ...rest }) => ({ ...rest, color: colors.reaction[token] }));
 }
 
-export function getReaction(type: string | null | undefined): ReactionMeta | undefined {
-  return getReactions().find((item) => item.type === type);
-}

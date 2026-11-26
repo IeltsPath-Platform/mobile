@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
+import { ApiError } from '@/src/lib/api-client';
 import { API_BASE_URL } from '@/src/lib/env';
 
 import { gameApi } from './api';
@@ -17,7 +18,7 @@ export function useGameSocket(
   const [connected, setConnected] = useState(false);
   // Handlers change identity between renders; a ref keeps the socket from reconnecting for that.
   const onEventRef = useRef(onEvent);
-  onEventRef.current = onEvent;
+  useLayoutEffect(() => { onEventRef.current = onEvent; });
 
   useEffect(() => {
     if (!roomId) return;
@@ -30,10 +31,11 @@ export function useGameSocket(
     let connecting = false;
     let failures = 0;
 
-    const scheduleRetry = () => {
+    const scheduleRetry = (waitSeconds = 0) => {
       if (disposed || terminal || AppState.currentState !== 'active') return;
       clearTimeout(retry);
-      const delay = Math.min(1_000 * 2 ** failures, MAX_RETRY_DELAY_MS);
+      // A rate-limited ticket request names how long to wait; asking sooner only extends the limit.
+      const delay = Math.max(Math.min(1_000 * 2 ** failures, MAX_RETRY_DELAY_MS), waitSeconds * 1_000);
       failures += 1;
       retry = setTimeout(() => void connect(), delay);
     };
@@ -62,7 +64,8 @@ export function useGameSocket(
 
         const url = new URL('/ws/games', API_BASE_URL);
         url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-        const candidate = new WebSocket(url, ticket.subprotocols);
+        // React Native's native WebSocket accepts only a string URL (the browser also takes a URL object).
+        const candidate = new WebSocket(url.toString(), ticket.subprotocols);
         socket = candidate;
         connecting = false;
 
@@ -130,7 +133,7 @@ export function useGameSocket(
       } catch (error) {
         connecting = false;
         if (__DEV__ && failures === 0) console.warn('[game] WebSocket setup failed', error);
-        scheduleRetry();
+        scheduleRetry(error instanceof ApiError ? error.retryAfterSeconds : 0);
       }
     };
 

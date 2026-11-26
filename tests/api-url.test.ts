@@ -21,3 +21,15 @@ describe('API URL resolution', () => {
     expect(resolveApiUrl({ platform: 'web', webHost: 'preview.example.com' }).error).toBeTruthy();
   });
 });
+
+describe('API URL resolution in a release build', () => {
+  it('accepts only an explicit https address', () => {
+    expect(resolveApiUrl({ platform: 'android', explicit: 'https://api.example.com', release: true }).url).toBe('https://api.example.com');
+    expect(resolveApiUrl({ platform: 'android', explicit: 'http://192.168.1.5:8080', release: true }).url).toBe('');
+  });
+  it('never guesses a LAN host and hides developer commands', () => {
+    const result = resolveApiUrl({ platform: 'android', metroHost: '192.168.2.10:8081', release: true });
+    expect(result.url).toBe('');
+    expect(result.error).not.toMatch(/npm|EXPO_PUBLIC/);
+  });
+});

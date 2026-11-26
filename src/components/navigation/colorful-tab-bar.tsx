@@ -1,6 +1,6 @@
-import { Bell, BookOpenCheck, House, Layers, UserRound, Users } from 'lucide-react-native';
+import { Bell, BookOpenCheck, Gamepad2, House, UserRound, Users } from 'lucide-react-native';
 import { Animated, Pressable, View } from 'react-native';
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarProps } from 'expo-router/build/react-navigation/bottom-tabs/types';
 
@@ -8,12 +8,13 @@ import { haptics } from '@/src/lib/haptics';
 import { colors } from '@/src/theme';
 import { useTheme } from '@/src/theme/app-theme';
 import { useNotifyTabReselect, useTabBarControls } from './tab-reselect-context';
+import { UnreadTabBadge } from './unread-tab-badge';
 
 const tabs = {
   index: { label: 'Hôm nay', Icon: House },
   flashcards: { label: 'Thẻ từ', Icon: BookOpenCheck },
+  practice: { label: 'Trò chơi', Icon: Gamepad2 },
   community: { label: 'Cộng đồng', Icon: Users },
-  practice: { label: 'Luyện', Icon: Layers },
   notifications: { label: 'Thông báo', Icon: Bell },
   account: { label: 'Hồ sơ', Icon: UserRound },
 };
@@ -24,7 +25,7 @@ export function ColorfulTabBar({ state, emitter, navigateToTab }: BottomTabBarPr
   const { tabBarVisible, resetTabBar } = useTabBarControls();
   const insets = useSafeAreaInsets();
   const activeRouteKey = state.routes[state.index]?.key;
-  const visibility = useRef(new Animated.Value(0)).current;
+  const [visibility] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     resetTabBar();
@@ -102,23 +103,27 @@ export function ColorfulTabBar({ state, emitter, navigateToTab }: BottomTabBarPr
                   height: 54,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  borderRadius: 30,
                 }}>
-                <View
-                  style={{
-                    width: '100%',
-                    maxWidth: 58,
-                    height: 54,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderRadius: 30,
-                    backgroundColor: focused ? (isDark ? '#41474c' : '#e9edf1') : 'transparent',
-                  }}>
-                  <Icon
-                    size={25}
-                    color={focused ? colors.ink : colors.muted}
-                    strokeWidth={focused ? 2.6 : 2.1}
-                  />
+                {/* The badge sits outside the clipped circle so it can overlap its edge. */}
+                <View style={{ width: 52, height: 52 }}>
+                  {/* Radius must be exactly half the size: Android draws a square when it is larger. */}
+                  <View
+                    style={{
+                      width: 52,
+                      height: 52,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: 26,
+                      overflow: 'hidden',
+                      backgroundColor: focused ? (isDark ? '#41474c' : '#e9edf1') : 'transparent',
+                    }}>
+                    <Icon
+                      size={25}
+                      color={focused ? colors.ink : colors.muted}
+                      strokeWidth={focused ? 2.6 : 2.1}
+                    />
+                  </View>
+                  {route.name === 'notifications' ? <UnreadTabBadge borderColor={isDark ? '#25292d' : '#ffffff'} /> : null}
                 </View>
               </Pressable>
             );

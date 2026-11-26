@@ -21,6 +21,7 @@ import { Text } from '@/src/components/ui/text';
 import { CardWordPicker, type PickedSense } from '@/src/features/flashcards/components/card-word-picker';
 import { vocabApi } from '@/src/features/vocab/api';
 import { invalidateFlashcards } from '@/src/features/flashcards/queries';
+import { safeErrorMessage } from '@/src/lib/error-message';
 import { colors } from '@/src/theme';
 
 const field =
@@ -99,7 +100,7 @@ export default function EditCardScreen() {
         );
       router.back();
     },
-    onError: (e: Error) => setError(e.message),
+    onError: (e: Error) => setError(safeErrorMessage(e, 'Không lưu được thẻ. Vui lòng thử lại.')),
   });
   const pickImage = async () => {
     try {
@@ -141,7 +142,7 @@ export default function EditCardScreen() {
       setImageKey(uploaded.key);
       setImageUrl(uploaded.url);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không tải được ảnh.');
+      setError(safeErrorMessage(e, 'Không tải được ảnh. Vui lòng thử lại.'));
     } finally {
       setUploadingImage(false);
     }
@@ -175,7 +176,7 @@ export default function EditCardScreen() {
       />
       <KeyboardAvoidingView
         className="flex-1"
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'web' ? undefined : 'padding'}
       >
         <ScrollView
           className="flex-1"

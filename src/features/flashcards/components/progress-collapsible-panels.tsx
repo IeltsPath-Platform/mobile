@@ -11,7 +11,6 @@ import { CollapseHeader, Panel, ProgressBar } from './progress-ui';
 
 const ACHIEVEMENT_LABELS: Record<string, string> = {
   REVIEW_STREAK_7: 'Ôn từ 7 ngày liên tiếp',
-  TOPIC_COMPLETED: 'Học hết từ trong một chủ đề',
   MASTERED_300: 'Ghi nhớ 300 từ',
 };
 

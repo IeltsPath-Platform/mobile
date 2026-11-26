@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 
 type TabActions = {
@@ -65,7 +65,7 @@ export function TabReselectProvider({ children }: { children: ReactNode }) {
 export function useTabReselect(routeName: string, onReselect: () => void) {
   const context = useContext(TabActionsContext);
   const callback = useRef(onReselect);
-  callback.current = onReselect;
+  useLayoutEffect(() => { callback.current = onReselect; });
 
   useEffect(() => {
     if (!context) return;

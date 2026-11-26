@@ -1,4 +1,3 @@
-import { Image } from 'expo-image';
 import { useEffect, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import Animated, {
@@ -14,6 +13,7 @@ import { Award, Flame, Heart, Timer, X, type LucideIcon } from 'lucide-react-nat
 
 import { BackButton } from '@/src/components/navigation/back-header';
 import { Button } from '@/src/components/ui/button';
+import { OwlMascot } from '@/src/components/ui/owl-mascot';
 import { Text } from '@/src/components/ui/text';
 import { colors } from '@/src/theme';
 
@@ -257,7 +257,7 @@ export function GameStateScreen({
           </View>
         ) : (
           <View className="items-center">
-            <Image source={require('@/assets/images/owl/nav-owl-stand.webp')} contentFit="contain" style={{ width: 120, height: 120 }} accessibilityIgnoresInvertColors />
+            <OwlMascot mood="oops" size={124} />
           </View>
         )}
         <Text accessibilityRole="header" weight="black" className="mt-5 text-center text-xl">

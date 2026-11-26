@@ -15,7 +15,7 @@ vi.mock('expo-file-system', () => ({
   },
 }));
 
-import { listActiveDecks, normalizeDeckList, vocabApi, type FlashcardDeck } from '@/src/features/vocab/api';
+import { vocabApi } from '@/src/features/vocab/api';
 
 class FormDataStub {
   readonly fields: unknown[][] = [];
@@ -47,29 +47,6 @@ describe('vocabulary topic catalog API', () => {
     expect(apiRequestMock).toHaveBeenCalledWith('/api/learning-support/decks/deck-1/items/card-1', { method: 'DELETE', auth: true });
   });
 
-  it('keeps loading deck pages past the first 50 records', async () => {
-    const first = Array.from({ length: 50 }, (_, index) => ({ id: `deck-${index}` }));
-    apiRequestMock.mockResolvedValueOnce({ items: first, page: 0, size: 50, total: 51 })
-      .mockResolvedValueOnce({ items: [{ id: 'deck-50' }], page: 1, size: 50, total: 51 });
-    const decks = await listActiveDecks();
-    expect(decks).toHaveLength(51);
-    expect(decks[50].id).toBe('deck-50');
-    expect(apiRequestMock.mock.calls[1][0]).toContain('page=1');
-  });
-
-  it('stops paging if deletion makes a later page empty', async () => {
-    apiRequestMock.mockResolvedValueOnce({ items: [{ id: 'deck-1' }], page: 0, size: 50, total: 80 })
-      .mockResolvedValueOnce({ items: [], page: 1, size: 50, total: 80 });
-    expect(await listActiveDecks()).toEqual([{ id: 'deck-1' }]);
-    expect(apiRequestMock).toHaveBeenCalledTimes(2);
-  });
-
-  it('propagates a later page failure rather than showing a truncated library as complete', async () => {
-    apiRequestMock.mockResolvedValueOnce({ items: [{ id: 'deck-1' }], page: 0, size: 50, total: 80 })
-      .mockRejectedValueOnce(new Error('Network unavailable'));
-    await expect(listActiveDecks()).rejects.toThrow('Network unavailable');
-  });
-
   it('preserves the session and submission IDs when a review request is retried', async () => {
     apiRequestMock.mockRejectedValueOnce(new Error('Timeout')).mockResolvedValueOnce({ id: 'card-1' });
     await expect(vocabApi.reviewCard('card-1', false, 'request-1', 'session-1')).rejects.toThrow();
@@ -78,21 +55,10 @@ describe('vocabulary topic catalog API', () => {
     expect(apiRequestMock.mock.calls[1][1].body).toEqual({ correct: false, requestId: 'request-1', sessionId: 'session-1' });
   });
 
-  it('loads the public vocabulary topic list', async () => {
-    const signal = new AbortController().signal;
-    await vocabApi.listTopics(signal);
+  it('asks for every word set unless a kind is chosen', async () => {
+    await vocabApi.listSets(undefined, 0, 30);
 
-    expect(apiRequestMock).toHaveBeenCalledWith('/api/content/vocabulary/topics', { auth: false, signal });
-  });
-
-  it('loads public vocabulary words filtered by topic and paginated', async () => {
-    const signal = new AbortController().signal;
-    await vocabApi.listTopicWords('topic id/1', 2, 30, signal);
-
-    expect(apiRequestMock).toHaveBeenCalledWith(
-      '/api/content/vocabulary?topicId=topic%20id%2F1&page=2&size=30',
-      { auth: false, signal },
-    );
+    expect(apiRequestMock).toHaveBeenCalledWith('/api/content/vocabulary/sets?page=0&size=30', { auth: false, signal: undefined });
   });
 
   it('sends uploaded images through the shared multipart builder', async () => {
@@ -109,10 +75,16 @@ describe('vocabulary topic catalog API', () => {
     expect(await part.bytes()).toEqual(new Uint8Array([74, 80, 69, 71]));
   });
 
-  it('normalizes legacy paged deck cache entries before list consumers reduce or map them', () => {
-    const deck = { id: 'deck-1' } as FlashcardDeck;
-    expect(normalizeDeckList([deck])).toEqual([deck]);
-    expect(normalizeDeckList({ items: [deck], page: 0, size: 50, total: 1 })).toEqual([deck]);
-    expect(normalizeDeckList({ items: null })).toEqual([]);
+});
+
+describe('vocabApi.achievements', () => {
+  it('drops the badge for finishing a vocabulary topic, which the app can no longer earn', async () => {
+    apiRequestMock.mockResolvedValueOnce({ items: [
+      { code: 'REVIEW_STREAK_7', achieved: false, progress: 2, target: 7 },
+      { code: 'TOPIC_COMPLETED', achieved: false, progress: 0, target: 1 },
+      { code: 'MASTERED_300', achieved: false, progress: 10, target: 300 },
+    ] });
+    const result = await vocabApi.achievements();
+    expect(result.items.map((item) => item.code)).toEqual(['REVIEW_STREAK_7', 'MASTERED_300']);
   });
 });

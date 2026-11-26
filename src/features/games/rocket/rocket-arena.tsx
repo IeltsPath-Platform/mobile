@@ -10,7 +10,6 @@ import Animated, {
   withDelay,
   withRepeat,
   withSequence,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import { Star } from 'lucide-react-native';
@@ -18,10 +17,10 @@ import { Star } from 'lucide-react-native';
 import { colors } from '@/src/theme';
 
 const OWL_FRAMES = [
-  require('@/assets/images/owl/nav-owl-step-left.png'),
-  require('@/assets/images/owl/nav-owl-step-right.png'),
+  require('@/assets/images/owl/nav-owl-step-left-raster.png'),
+  require('@/assets/images/owl/nav-owl-step-right-raster.png'),
 ];
-const OWL_STAND = require('@/assets/images/owl/nav-owl-stand.png');
+const OWL_STAND = require('@/assets/images/owl/nav-owl-stand-raster.png');
 
 const ARENA_HEIGHT = 176;
 const OWL_SIZE = 64;
@@ -29,10 +28,18 @@ const OBSTACLE_WIDTH = 52;
 const GROUND = 26;
 const JUMP_HEIGHT = 74;
 const JUMP_MS = 620;
-const WALK_IN_MS = 380;
 const STRIDE_MS = 170;
+/** Track pixels per millisecond when the obstacle rushes in after an answer. */
+const RUSH_SPEED = 0.5;
+/** Track pixels per millisecond while no round is open, so the owl never stops running. */
+const CRUISE_SPEED = 0.06;
+const HIT_PASS_MS = 1100;
+const DASH_PERIOD = 44;
+/** How far before contact the owl takes off, and how far the obstacle travels under it. */
+const TAKEOFF_LEAD = 14;
+const JUMP_TRAVEL = OWL_SIZE * 0.5 + OBSTACLE_WIDTH + TAKEOFF_LEAD;
 
-type Pose = 'stand' | 'walk' | 'jump' | 'fall';
+type Pose = 'walk' | 'jump';
 
 const Obstacle = memo(function Obstacle({ variant }: { variant: number }) {
   const tone = colors.accentWarm;
@@ -90,9 +97,12 @@ const OwlSprite = memo(function OwlSprite({ walking }: { walking: boolean }) {
 });
 
 /**
- * The obstacle stands still on the track. The owl walks toward it as the round clock runs
- * down and reaches it on the deadline. A correct answer makes it hop over and walk on;
- * a miss makes it trip over the obstacle and sit there dizzy.
+ * Endless-runner track: the owl keeps running in place while the ground scrolls under it.
+ * Each round an obstacle slides in from the right and reaches the owl on the deadline.
+ * A correct answer makes the owl jump over it; a miss makes the obstacle pass straight
+ * through a blinking owl, which loses a life but keeps running.
+ *
+ * Everything on the track moves with one `travel` distance, so ground and obstacle never drift apart.
  */
 export const RocketArena = memo(function RocketArena({
   roundId,
@@ -110,31 +120,32 @@ export const RocketArena = memo(function RocketArena({
   /** Result of the most recently resolved round; animates once per `roundId`. */
   outcome: { roundId: string; correct: boolean } | null;
 }) {
-  const reduceMotion = useReducedMotion();
   const [width, setWidth] = useState(320);
-  const [pose, setPose] = useState<Pose>('stand');
-  const x = useSharedValue(-OWL_SIZE);
+  const [pose, setPose] = useState<Pose>('walk');
+  const [variant, setVariant] = useState(0);
+  const travel = useSharedValue(0);
+  const spawnX = useSharedValue(0);
+  const spawnTravel = useSharedValue(0);
+  const obstacleVisible = useSharedValue(0);
+  const obstacleWobble = useSharedValue(0);
   const lift = useSharedValue(0);
   const tilt = useSharedValue(0);
+  const blink = useSharedValue(1);
   const dizzy = useSharedValue(0);
   const spin = useSharedValue(0);
-  const obstacleScale = useSharedValue(0);
-  const obstacleWobble = useSharedValue(0);
   const cloud = useSharedValue(0);
+  const reduceMotion = useReducedMotion();
   const played = useRef(new Set<string>());
   const busyUntil = useRef(0);
   const roundTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const outcomeTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  const obstacleX = width * 0.64;
-  const startX = width * 0.06;
-  const stopX = obstacleX - OWL_SIZE * 0.62;
-  const takeoffX = stopX - OWL_SIZE * 0.5;
-  const landX = obstacleX + OBSTACLE_WIDTH - OWL_SIZE * 0.2;
+  const owlX = width * 0.16;
+  const contactX = owlX + OWL_SIZE * 0.7;
 
-  // Effects read live geometry and clock offset through this ref so a re-sync never restarts the walk.
-  const live = useRef({ width, startX, stopX, takeoffX, landX, offset: serverOffsetMs });
-  live.current = { width, startX, stopX, takeoffX, landX, offset: serverOffsetMs };
+  // Effects read live geometry and clock offset through this ref so a re-sync never restarts the run.
+  const live = useRef({ width, contactX, offset: serverOffsetMs, roundNumber, roundOpen: false });
+  live.current = { ...live.current, width, contactX, offset: serverOffsetMs, roundNumber };
 
   const later = (list: { current: ReturnType<typeof setTimeout>[] }, ms: number, run: () => void) => {
     list.current.push(setTimeout(run, ms));
@@ -149,119 +160,151 @@ export const RocketArena = memo(function RocketArena({
 
   const onLayout = (event: LayoutChangeEvent) => setWidth(event.nativeEvent.layout.width);
 
+  /** Keeps the ground moving at a gentle pace while waiting for the next round. */
+  const cruise = () => {
+    cancelAnimation(travel);
+    travel.value = withTiming(travel.value + CRUISE_SPEED * 600_000, { duration: 600_000, easing: Easing.linear });
+  };
+
   useEffect(() => {
     if (reduceMotion) return;
     cloud.value = withRepeat(withTiming(1, { duration: 26_000, easing: Easing.linear }), -1);
   }, [reduceMotion, cloud]);
 
-  // New round: the obstacle pops up and the owl walks in from the left, then toward it.
+  // New round: a fresh obstacle enters from the right edge and arrives at the owl on the deadline.
   useEffect(() => {
     roundTimers.current.forEach(clearTimeout);
     roundTimers.current = [];
     const begin = () => {
-      const { startX, stopX, offset } = live.current;
-      cancelAnimation(x);
+      const { width, contactX, offset, roundNumber } = live.current;
       lift.value = 0;
       tilt.value = 0;
+      blink.value = 1;
       dizzy.value = 0;
       obstacleWobble.value = 0;
+      setPose('walk');
       if (!roundId || !deadlineAt || !opensAt) {
-        // Round not open yet: owl waits at the start, obstacle hidden.
-        obstacleScale.value = withTiming(0, { duration: 120 });
-        x.value = withTiming(startX, { duration: 200 });
-        setPose('stand');
+        live.current.roundOpen = false;
+        obstacleVisible.value = withTiming(0, { duration: 120 });
+        cruise();
         return;
       }
+      live.current.roundOpen = true;
       const total = Math.max(1, Date.parse(deadlineAt) - Date.parse(opensAt));
       const remaining = Math.max(0, Date.parse(deadlineAt) - (Date.now() + offset));
-      const elapsed = 1 - remaining / total;
-      obstacleScale.value = withSpring(1, { damping: 11, stiffness: 220 });
-      setPose('walk');
-      if (elapsed > 0.08) {
-        // Joined mid-round: place the owl where the clock says it should be.
-        x.value = startX + (stopX - startX) * Math.min(1, elapsed);
-        x.value = withTiming(stopX, { duration: remaining, easing: Easing.linear });
-      } else {
-        x.value = -OWL_SIZE;
-        x.value = withSequence(
-          withTiming(startX, { duration: WALK_IN_MS, easing: Easing.out(Easing.quad) }),
-          withTiming(stopX, { duration: Math.max(0, remaining - WALK_IN_MS), easing: Easing.linear }),
-        );
-      }
+      const elapsed = Math.min(1, Math.max(0, 1 - remaining / total));
+      const entryX = width + 4;
+      // Joining mid-round places the obstacle where the clock says it should be.
+      const startX = entryX - (entryX - contactX) * elapsed;
+      cancelAnimation(travel);
+      spawnX.value = startX;
+      spawnTravel.value = travel.value;
+      setVariant((Math.max(1, roundNumber) - 1) % 3);
+      obstacleVisible.value = 1;
+      travel.value = withTiming(travel.value + (startX - contactX), { duration: remaining, easing: Easing.linear });
     };
-    // The round just resolved is animated by the outcome effect, which owns the stage until it ends.
+    // The round just resolved is animated by the outcome effect, which owns the track until it ends.
     const resolving = !roundId && outcome !== null && !played.current.has(outcome.roundId);
     if (resolving) return;
     const wait = busyUntil.current - Date.now();
     if (wait > 0) later(roundTimers, wait, begin);
     else begin();
-    // Only a new round (or its deadline) restarts the walk; offset and size are read from `live`.
+    // Only a new round (or its deadline) restarts the obstacle; offset and size are read from `live`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roundId, deadlineAt, opensAt]);
 
   useEffect(() => {
     if (!outcome || played.current.has(outcome.roundId)) return;
     played.current.add(outcome.roundId);
+
+    const flinch = () => {
+      blink.value = withSequence(
+        ...Array.from({ length: 5 }, () => withSequence(withTiming(0.2, { duration: 90 }), withTiming(1, { duration: 110 }))),
+      );
+      tilt.value = withSequence(withTiming(-14, { duration: 90 }), withTiming(10, { duration: 120 }), withTiming(0, { duration: 140 }));
+    };
+
     // The result may arrive together with the next round; then the old obstacle is already gone.
     const obstacleGone = roundId !== null && roundId !== outcome.roundId;
     if (obstacleGone) {
-      // Only a small cheer/flinch; the new round owns the stage.
       if (outcome.correct) lift.value = withSequence(withTiming(0.35, { duration: 160 }), withTiming(0, { duration: 200 }));
-      else tilt.value = withSequence(withTiming(-8, { duration: 90 }), withTiming(8, { duration: 110 }), withTiming(0, { duration: 90 }));
+      else flinch();
       return;
     }
 
     outcomeTimers.current.forEach(clearTimeout);
     outcomeTimers.current = [];
-    const { width, stopX, takeoffX, landX } = live.current;
-    cancelAnimation(x);
-    const reach = Math.max(0, takeoffX - x.value);
-    const walkMs = Math.min(520, Math.max(120, reach * 2.4));
+    live.current.roundOpen = false;
+    const { contactX } = live.current;
+    cancelAnimation(travel);
+    const obstacleNow = spawnX.value - (travel.value - spawnTravel.value);
+    const start = travel.value;
 
     if (outcome.correct) {
-      const exitMs = 520;
-      busyUntil.current = Date.now() + walkMs + JUMP_MS + exitMs;
-      setPose('walk');
-      x.value = withSequence(
-        withTiming(takeoffX, { duration: walkMs, easing: Easing.linear }),
-        withTiming(landX, { duration: JUMP_MS, easing: Easing.linear }),
-        withTiming(width + OWL_SIZE, { duration: exitMs, easing: Easing.in(Easing.quad) }),
+      // Rush the obstacle to the take-off point, jump while it slides underneath, then let it leave.
+      const approach = Math.max(0, obstacleNow - (contactX + TAKEOFF_LEAD));
+      const approachMs = approach / RUSH_SPEED;
+      const afterJumpX = obstacleNow - approach - JUMP_TRAVEL;
+      const exit = afterJumpX + OBSTACLE_WIDTH + 10;
+      const exitMs = 480;
+      busyUntil.current = Date.now() + approachMs + JUMP_MS + exitMs;
+      travel.value = withSequence(
+        withTiming(start + approach, { duration: approachMs, easing: Easing.linear }),
+        withTiming(start + approach + JUMP_TRAVEL, { duration: JUMP_MS, easing: Easing.linear }),
+        withTiming(start + approach + JUMP_TRAVEL + exit, { duration: exitMs, easing: Easing.out(Easing.quad) }),
       );
-      later(outcomeTimers, walkMs, () => setPose('jump'));
-      lift.value = withDelay(walkMs, withSequence(withTiming(1, { duration: JUMP_MS / 2, easing: Easing.out(Easing.quad) }), withTiming(0, { duration: JUMP_MS / 2, easing: Easing.in(Easing.quad) })));
-      later(outcomeTimers, walkMs + JUMP_MS, () => setPose('walk'));
+      later(outcomeTimers, approachMs, () => setPose('jump'));
+      lift.value = withDelay(
+        approachMs,
+        withSequence(
+          withTiming(1, { duration: JUMP_MS / 2, easing: Easing.out(Easing.quad) }),
+          withTiming(0, { duration: JUMP_MS / 2, easing: Easing.in(Easing.quad) }),
+        ),
+      );
+      later(outcomeTimers, approachMs + JUMP_MS, () => setPose('walk'));
     } else {
-      const toStop = Math.max(0, stopX - x.value);
-      const closeMs = Math.min(480, Math.max(0, toStop * 2.4));
-      busyUntil.current = Date.now() + closeMs + 1500;
-      setPose('walk');
-      x.value = withSequence(withTiming(stopX, { duration: closeMs, easing: Easing.linear }), withDelay(120, withTiming(stopX + 16, { duration: 260, easing: Easing.out(Easing.quad) })));
-      later(outcomeTimers, closeMs + 40, () => setPose('fall'));
-      // Trip: pitch forward over the obstacle, bounce, then lie dizzy before getting up.
-      tilt.value = withDelay(closeMs, withSequence(withTiming(78, { duration: 220, easing: Easing.in(Easing.quad) }), withTiming(70, { duration: 120 }), withDelay(900, withTiming(0, { duration: 320 }))));
-      lift.value = withDelay(closeMs, withSequence(withTiming(0.18, { duration: 130 }), withTiming(0, { duration: 130 })));
-      obstacleWobble.value = withDelay(closeMs, withSequence(withTiming(1, { duration: 90 }), withTiming(-1, { duration: 110 }), withTiming(0.5, { duration: 90 }), withTiming(0, { duration: 120 })));
-      dizzy.value = withDelay(closeMs + 200, withSequence(withTiming(1, { duration: 120 }), withDelay(900, withTiming(0, { duration: 260 }))));
+      // Rush to the owl, then the obstacle passes straight through while the owl blinks and keeps running.
+      const approach = Math.max(0, obstacleNow - contactX);
+      const approachMs = approach / RUSH_SPEED;
+      const pass = obstacleNow - approach + OBSTACLE_WIDTH + 10;
+      busyUntil.current = Date.now() + approachMs + HIT_PASS_MS;
+      travel.value = withSequence(
+        withTiming(start + approach, { duration: approachMs, easing: Easing.linear }),
+        withTiming(start + approach + pass, { duration: HIT_PASS_MS, easing: Easing.linear }),
+      );
+      later(outcomeTimers, approachMs, flinch);
+      lift.value = withDelay(approachMs, withSequence(withTiming(0.15, { duration: 110 }), withTiming(0, { duration: 130 })));
+      obstacleWobble.value = withDelay(
+        approachMs,
+        withSequence(withTiming(1, { duration: 90 }), withTiming(-1, { duration: 110 }), withTiming(0, { duration: 120 })),
+      );
+      dizzy.value = withDelay(approachMs, withSequence(withTiming(1, { duration: 120 }), withDelay(600, withTiming(0, { duration: 240 }))));
       spin.value = 0;
-      spin.value = withDelay(closeMs + 200, withRepeat(withTiming(360, { duration: 700, easing: Easing.linear }), 2));
-      later(outcomeTimers, closeMs + 1300, () => setPose('stand'));
+      spin.value = withDelay(approachMs, withTiming(360, { duration: 900, easing: Easing.linear }));
     }
-  }, [outcome, roundId, x, lift, tilt, dizzy, spin, obstacleWobble]);
+    // If no new round has opened by the time the obstacle is gone, keep the owl running.
+    later(outcomeTimers, Math.max(0, busyUntil.current - Date.now()), () => {
+      if (!live.current.roundOpen) cruise();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outcome, roundId]);
 
   const owlStyle = useAnimatedStyle(() => ({
-    left: x.value,
+    opacity: blink.value,
     transform: [{ translateY: -lift.value * JUMP_HEIGHT }, { rotate: `${tilt.value}deg` }, { scaleY: 1 - lift.value * 0.05 }],
   }));
   const obstacleStyle = useAnimatedStyle(() => ({
-    opacity: obstacleScale.value,
-    transform: [{ scale: obstacleScale.value }, { rotate: `${obstacleWobble.value * 6}deg` }],
+    opacity: obstacleVisible.value,
+    transform: [
+      { translateX: spawnX.value - (travel.value - spawnTravel.value) },
+      { rotate: `${obstacleWobble.value * 6}deg` },
+    ],
   }));
-  const starsStyle = useAnimatedStyle(() => ({
-    left: x.value + OWL_SIZE / 2 - 24,
-    opacity: dizzy.value,
-    transform: [{ rotate: `${spin.value}deg` }],
-  }));
+  const groundStyle = useAnimatedStyle(() => ({ transform: [{ translateX: -(travel.value % DASH_PERIOD) }] }));
+  const starsStyle = useAnimatedStyle(() => ({ opacity: dizzy.value, transform: [{ rotate: `${spin.value}deg` }] }));
   const cloudStyle = useAnimatedStyle(() => ({ transform: [{ translateX: width - cloud.value * (width + 120) }] }));
+
+  const dashCount = Math.ceil(width / DASH_PERIOD) + 2;
 
   return (
     <View
@@ -274,20 +317,32 @@ export const RocketArena = memo(function RocketArena({
       <Animated.View style={[{ position: 'absolute', top: 16, width: 56, height: 20, borderRadius: 10, backgroundColor: colors.surface, opacity: 0.8 }, cloudStyle]} />
       <Animated.View style={[{ position: 'absolute', top: 48, width: 40, height: 16, borderRadius: 8, backgroundColor: colors.surface, opacity: 0.55, left: 50 }, cloudStyle]} />
 
-      <View className="absolute bottom-0 left-0 right-0" style={{ height: GROUND, backgroundColor: colors.accentSoft, borderTopWidth: 2, borderTopColor: colors.accentEdge }} />
+      <View
+        className="absolute bottom-0 left-0 right-0 overflow-hidden"
+        style={{ height: GROUND, backgroundColor: colors.accentSoft, borderTopWidth: 2, borderTopColor: colors.accentEdge }}
+      >
+        <Animated.View style={[{ flexDirection: 'row', paddingTop: 8 }, groundStyle]}>
+          {Array.from({ length: dashCount }, (_, index) => (
+            <View key={index} style={{ width: DASH_PERIOD, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <View style={{ width: 16, height: 3, borderRadius: 2, backgroundColor: colors.accentEdge }} />
+              <View style={{ width: 4, height: 4, marginTop: 6, borderRadius: 2, backgroundColor: colors.accentEdge, opacity: 0.7 }} />
+            </View>
+          ))}
+        </Animated.View>
+      </View>
 
-      <Animated.View style={[{ position: 'absolute', alignItems: 'center', justifyContent: 'flex-end', bottom: GROUND - 2, left: obstacleX }, obstacleStyle]}>
-        <Obstacle variant={(Math.max(1, roundNumber) - 1) % 3} />
+      <Animated.View style={[{ position: 'absolute', alignItems: 'center', justifyContent: 'flex-end', bottom: GROUND - 2, left: 0 }, obstacleStyle]}>
+        <Obstacle variant={variant} />
       </Animated.View>
 
-      <Animated.View style={[{ position: 'absolute', bottom: GROUND - 3, width: OWL_SIZE, height: OWL_SIZE }, owlStyle]}>
+      <Animated.View style={[{ position: 'absolute', bottom: GROUND - 3, left: owlX, width: OWL_SIZE, height: OWL_SIZE }, owlStyle]}>
         <OwlSprite walking={pose === 'walk'} />
       </Animated.View>
 
       <Animated.View
         pointerEvents="none"
         className="absolute h-6 w-12 items-center justify-between"
-        style={[{ bottom: GROUND + OWL_SIZE - 4 }, starsStyle]}
+        style={[{ bottom: GROUND + OWL_SIZE - 4, left: owlX + OWL_SIZE / 2 - 24 }, starsStyle]}
       >
         <Star size={13} color={colors.xp} fill={colors.xp} style={{ position: 'absolute', left: 0, top: 6 }} />
         <Star size={13} color={colors.xp} fill={colors.xp} style={{ position: 'absolute', left: 17, top: 0 }} />

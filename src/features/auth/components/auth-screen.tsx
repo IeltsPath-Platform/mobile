@@ -19,7 +19,7 @@ type AuthScreenProps = {
 export function AuthScreen({ title, description, children, actions, footer }: AuthScreenProps) {
   return (
     <SafeAreaView className="flex-1 bg-canvas" edges={['top', 'bottom']}>
-      <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'web' ? undefined : 'padding'}>
         <View className="px-4 pt-1">
           <BackButton fallbackHref="/welcome" className="border-0" />
         </View>
@@ -36,7 +36,7 @@ export function AuthScreen({ title, description, children, actions, footer }: Au
                 {description ? <Text className="mt-1 text-base leading-6 text-muted">{description}</Text> : null}
               </View>
               <Image
-                source={require('@/assets/images/owl/hero-wave.png')}
+                source={require('@/assets/images/owl/hero-wave-raster.png')}
                 style={{ width: 96, height: 96 }}
                 contentFit="contain"
                 accessibilityIgnoresInvertColors

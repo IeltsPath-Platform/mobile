@@ -4,7 +4,7 @@ import { imageUploadForm } from '@/src/lib/image-upload-form';
 export type PostCategory = 'GENERAL' | 'QUESTION' | 'DISCUSSION' | 'WRITING_SHARING' | 'SPEAKING_PARTNER' | 'RESOURCE_TIPS';
 export type PostBackground = 'VIOLET' | 'CRIMSON' | 'MIDNIGHT' | 'SUNSET' | 'OCEAN' | 'FOREST' | 'ROSE' | 'AURORA';
 export type ReactionType = 'LIKE' | 'LOVE' | 'HELPFUL' | 'ACCURATE';
-export type PublicProfile = { id: string; displayName: string; avatarUrl?: string | null; bio?: string | null; targetBand?: number | null; streak?: number };
+export type PublicProfile = { id: string; displayName: string; avatarUrl?: string | null; bio?: string | null; targetBand?: number | null };
 export type CommunityPost = {
   id: string; authorId: string; category: PostCategory; title: string | null; body: string;
   createdAt: string; updatedAt?: string; imageUrls: string[]; videoUrl?: string | null;
@@ -16,6 +16,8 @@ export type CursorPage<T> = { content: T[]; nextCursor: string | null; hasNext: 
 export type OffsetPage<T> = { content: T[]; page: number; size: number; totalElements: number; totalPages: number; last: boolean };
 export type Comment = { id: string; authorId: string; parentCommentId: string | null; body: string; createdAt?: string; updatedAt?: string; replyCount: number; author?: PublicProfile | null; myComment?: boolean; reactionCounts: Record<ReactionType, number>; myReaction: ReactionType | null };
 export type Notification = { id: string; actorId: string; actor?: PublicProfile | null; eventType: string; postId?: string | null; commentId?: string | null; createdAt: string; readAt?: string | null };
+/** Whether learning emails (essay graded, result ready, examiner queue) are sent; security and billing emails always are. */
+export type MailPreferences = { learning: boolean };
 export type NotificationPreference = { eventType: string; enabled: boolean };
 export type NotificationDeviceRegistration = {
   provider: 'FCM';
@@ -35,13 +37,12 @@ const page = <T,>(value: unknown): CursorPage<T> => {
   const result = (value ?? {}) as Partial<CursorPage<T>>;
   return { content: Array.isArray(result.content) ? result.content : [], nextCursor: result.nextCursor ?? null, hasNext: Boolean(result.hasNext), size: result.size ?? result.content?.length ?? 0 };
 };
-const profilePage = async (path: string) => page<PublicProfile>(await apiRequest(path, { auth: true }));
 export function parseOffsetPage<T>(value: unknown, pageNumber: number, size: number): OffsetPage<T> {
   const data = (value ?? {}) as Partial<OffsetPage<T>>;
   const content = Array.isArray(data.content) ? data.content : [];
   return { content: content as T[], page: data.page ?? pageNumber, size: data.size ?? size,
     totalElements: data.totalElements ?? content.length, totalPages: data.totalPages ?? (content.length < size ? pageNumber + 1 : pageNumber + 2),
-    last: data.last ?? content.length < size };
+    last: data.last ?? (data.totalPages != null ? pageNumber + 1 >= data.totalPages : content.length < size) };
 }
 export function notificationHasNext(items: unknown[], size: number) { return items.length === size; }
 export function parseMentionMarkup(body: string) {
@@ -61,6 +62,7 @@ export function insertMention(body: string, mention: PublicProfile) {
   if (parseMentionMarkup(body).filter((part) => part.userId).length >= 5) return null;
   return body.replace(/@[^\s@]*$/u, `@[${mention.displayName}](${mention.id}) `);
 }
+const profilePage = async (path: string) => page<PublicProfile>(await apiRequest(path, { auth: true }));
 const offsetPage = async <T,>(path: string, pageNumber: number, size = 20) => parseOffsetPage<T>(await apiRequest(path, { auth: true }), pageNumber, size);
 
 export const communityApi = {
@@ -92,7 +94,11 @@ export const communityApi = {
   unread: () => apiRequest<{ count: number }>('/api/notifications/unread-count', { auth: true }),
   markRead: (id: string) => apiRequest<void>(`/api/notifications/${id}/read`, { method: 'PUT', auth: true }),
   markAll: () => apiRequest<void>('/api/notifications/read-all', { method: 'PUT', auth: true }),
+  deleteNotification: (id: string) => apiRequest<void>(`/api/notifications/${encodeURIComponent(id)}`, { method: 'DELETE', auth: true }),
+  deleteReadNotifications: () => apiRequest<{ count: number }>('/api/notifications/read', { method: 'DELETE', auth: true }),
   preferences: () => apiRequest<NotificationPreference[]>('/api/notifications/preferences', { auth: true }),
+  mailPreferences: () => apiRequest<MailPreferences>('/api/notifications/mail-preferences', { auth: true }),
+  updateMailPreferences: (learning: boolean) => apiRequest<MailPreferences>('/api/notifications/mail-preferences', { method: 'PUT', body: { learning }, auth: true }),
   updatePreference: (eventType: string, enabled: boolean) => apiRequest<NotificationPreference>(`/api/notifications/preferences/${encodeURIComponent(eventType)}`, { method: 'PUT', body: { enabled }, auth: true }),
   registerNotificationDevice: (installationId: string, body: NotificationDeviceRegistration) =>
     apiRequest<void>(`/api/notifications/devices/${installationId}`, { method: 'PUT', body, auth: true }),

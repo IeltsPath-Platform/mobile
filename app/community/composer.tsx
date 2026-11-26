@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, usePreventRemove, useRouter } from 'expo-router';
 import { Check, ChevronDown, Hash, ImagePlus, Palette, RefreshCw, SlidersHorizontal, X } from 'lucide-react-native';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -27,7 +27,10 @@ import { communityCategoryColor } from '@/src/features/community/community-color
 import { CommunityAvatar, CommunityImage } from '@/src/features/community/components/community-image';
 import { CATEGORY_LABELS } from '@/src/features/community/format';
 import { postBackgroundColor } from '@/src/features/community/post-background';
+import { ApiError } from '@/src/lib/api-client';
+import { safeErrorMessage } from '@/src/lib/error-message';
 import { haptics } from '@/src/lib/haptics';
+import { useSingleFlight } from '@/src/lib/use-single-flight';
 import { colors } from '@/src/theme';
 import { useTheme } from '@/src/theme/app-theme';
 
@@ -48,7 +51,7 @@ const BACKGROUNDS: { key: PostBackground; label: string }[] = [
 
 const MAX_IMAGE_COUNT = 4;
 const MAX_SOURCE_IMAGE_SIZE = 20 * 1024 * 1024;
-const MAX_BODY_LENGTH = 5_000;
+const MAX_BODY_LENGTH = 20_000;
 const MAX_BACKGROUND_LENGTH = 280;
 const ALLOWED_IMAGE_HOSTS = ['images.unsplash.com', 'i.imgur.com', 'supabase.co'];
 const ALLOWED_VIDEO_HOSTS = ['youtube.com', 'www.youtube.com', 'youtu.be', 'loom.com', 'www.loom.com', 'drive.google.com'];
@@ -84,6 +87,7 @@ export default function ComposerScreen() {
   const [sheet, setSheet] = useState<'none' | 'category' | 'options'>('none');
   const [showBackgrounds, setShowBackgrounds] = useState(false);
   const [busy, setBusy] = useState(false);
+  const singleFlight = useSingleFlight();
   const [picking, setPicking] = useState(false);
   const [uploadingUris, setUploadingUris] = useState<string[]>([]);
   const [failedUris, setFailedUris] = useState<string[]>([]);
@@ -91,7 +95,9 @@ export default function ComposerScreen() {
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const scrollRef = useRef<ScrollViewInstance>(null);
   const hydrated = useRef(false);
+  // The ref answers the hydration effect below; the state is what the leave guard reads while rendering.
   const dirty = useRef(false);
+  const [isDirty, setIsDirty] = useState(false);
 
   useEffect(() => {
     if (Platform.OS === 'web') return;
@@ -130,7 +136,7 @@ export default function ComposerScreen() {
     })));
   }, [existing.data]);
 
-  const markDirty = () => { dirty.current = true; };
+  const markDirty = () => { dirty.current = true; setIsDirty(true); };
   const goBack = () => {
     if (router.canGoBack()) router.back();
     else router.replace('/(tabs)/community' as never);
@@ -138,13 +144,16 @@ export default function ComposerScreen() {
 
   // Every way out (X button, Android back, swipe-back) goes through this guard.
   const hasDraft = Boolean(body.trim() || title.trim() || images.length || videoUrl.trim());
-  const disablePrevention = usePreventRemove(busy || (dirty.current && hasDraft), ({ repeat }) => {
+  // The alert's button lifts the guard it belongs to, which only exists once the hook has returned: reach it through a ref.
+  const liftGuard = useRef<() => void>(() => undefined);
+  const disablePrevention = usePreventRemove(busy || (isDirty && hasDraft), ({ repeat }) => {
     if (busy) return;
-    Alert.alert('Bỏ bài viết đang soạn?', 'Nội dung bạn vừa nhập sẽ bị xoá.', [
+    Alert.alert('Bỏ bài viết đang soạn?', 'Nội dung bạn vừa nhập sẽ bị xóa.', [
       { text: 'Tiếp tục soạn', style: 'cancel' },
-      { text: 'Bỏ bài viết', style: 'destructive', onPress: () => { disablePrevention(); repeat(); } },
+      { text: 'Bỏ bài viết', style: 'destructive', onPress: () => { liftGuard.current(); repeat(); } },
     ]);
   });
+  useLayoutEffect(() => { liftGuard.current = disablePrevention; });
 
   const close = () => {
     if (busy) return;
@@ -195,8 +204,8 @@ export default function ComposerScreen() {
         requestAnimationFrame(() => requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true })));
       }
       setError(rejected.join('\n'));
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Không mở được thư viện ảnh. Hãy thử lại.');
+    } catch {
+      setError('Không mở được thư viện ảnh. Hãy thử lại.');
     } finally {
       setPicking(false);
     }
@@ -259,7 +268,7 @@ export default function ComposerScreen() {
       haptics.success();
     } catch (cause) {
       setFailedUris((current) => [...current, image.uri]);
-      setError(cause instanceof Error ? `Không tải được ảnh: ${cause.message}` : 'Không tải được ảnh. Hãy thử lại.');
+      setError(cause instanceof ApiError ? cause.message : 'Không tải được ảnh. Hãy thử lại.');
       haptics.error();
     } finally {
       setUploadingUris((current) => current.filter((uri) => uri !== image.uri));
@@ -271,7 +280,7 @@ export default function ComposerScreen() {
     const band = targetBand.trim() ? Number(targetBand.replace(',', '.')) : undefined;
     const normalizedVideoUrl = videoUrl.trim();
     if (!normalizedBody) return setError('Hãy viết nội dung trước khi đăng.');
-    if (normalizedBody.length > MAX_BODY_LENGTH) return setError('Nội dung tối đa 5.000 ký tự.');
+    if (normalizedBody.length > MAX_BODY_LENGTH) return setError('Nội dung tối đa 20.000 ký tự.');
     if (title.trim().length > 200) return setError('Tiêu đề tối đa 200 ký tự.');
     if (band !== undefined && (!Number.isFinite(band) || band < 0 || band > 9 || (band * 2) % 1 !== 0)) {
       return setError('Band mục tiêu phải từ 0 đến 9, theo bước 0,5.');
@@ -283,6 +292,7 @@ export default function ComposerScreen() {
       return setError('Bài nền màu chỉ hỗ trợ nội dung chữ tối đa 280 ký tự.');
     }
 
+    await singleFlight(async () => {
     setBusy(true);
     setError('');
     try {
@@ -310,11 +320,12 @@ export default function ComposerScreen() {
       ]);
     } catch (cause) {
       haptics.error();
-      setError(cause instanceof Error ? cause.message : 'Không thể đăng bài. Hãy kiểm tra kết nối rồi thử lại.');
+      setError(safeErrorMessage(cause, 'Không thể đăng bài. Hãy kiểm tra kết nối rồi thử lại.'));
       requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: 0, animated: true }));
     } finally {
       setBusy(false);
     }
+    });
   };
 
   const canUseBackground = images.length === 0 && !videoUrl.trim() && body.trim().length <= MAX_BACKGROUND_LENGTH;
@@ -372,6 +383,7 @@ export default function ComposerScreen() {
                   <Pressable
                     onPress={() => { Keyboard.dismiss(); setSheet('category'); }}
                     disabled={busy}
+                    hitSlop={8}
                     className="mt-1 min-h-8 flex-row items-center gap-1 rounded-full border px-3 active:opacity-70"
                     style={{ backgroundColor: palette.background, borderColor: palette.border }}
                     accessibilityRole="button"
@@ -421,7 +433,7 @@ export default function ComposerScreen() {
               )}
 
               {images.length ? (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-4" contentContainerClassName="gap-3 pr-2">
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-4" style={{ flexGrow: 0 }} contentContainerClassName="items-start gap-3 pr-2">
                   {images.map((image, index) => (
                     <View key={`${image.uri}-${index}`} className="relative">
                       <CommunityImage uri={image.uri} label={`Ảnh đính kèm ${index + 1}`} className="h-32 w-32 rounded-2xl" />
@@ -432,7 +444,7 @@ export default function ComposerScreen() {
                         </Pressable>
                       ) : null}
                       {image.url && image.size > 0 && !uploadingUris.includes(image.uri) ? <View className="absolute bottom-1.5 left-1.5 h-5 w-5 items-center justify-center rounded-full" style={{ backgroundColor: colors.success }}><Check size={12} color="white" strokeWidth={3} /></View> : null}
-                      <Pressable disabled={busy} onPress={() => { markDirty(); setFailedUris((current) => current.filter((uri) => uri !== image.uri)); setImages((current) => current.filter((_, itemIndex) => itemIndex !== index)); }} className="absolute right-1 top-1 h-9 w-9 items-center justify-center rounded-full bg-black/55" accessibilityRole="button" accessibilityLabel={`Xóa ảnh ${index + 1}`}>
+                      <Pressable disabled={busy} onPress={() => { markDirty(); setFailedUris((current) => current.filter((uri) => uri !== image.uri)); setImages((current) => current.filter((_, itemIndex) => itemIndex !== index)); }} hitSlop={6} className="absolute right-1 top-1 h-9 w-9 items-center justify-center rounded-full bg-black/55" accessibilityRole="button" accessibilityLabel={`Xóa ảnh ${index + 1}`}>
                         <X size={17} color="white" />
                       </Pressable>
                     </View>
@@ -478,7 +490,7 @@ export default function ComposerScreen() {
           </View>
         ) : null}
 
-        <View className="min-h-14 flex-row items-center border-t border-line bg-surface px-2" style={{ paddingBottom: Platform.OS === 'ios' && !keyboardVisible ? Math.max(insets.bottom, 12) : 4 }}>
+        <View className="min-h-14 flex-row items-center border-t border-line bg-surface px-2" style={{ paddingBottom: !keyboardVisible ? Math.max(insets.bottom, 12) : 4 }}>
           <ToolButton label={picking ? 'Đang mở thư viện ảnh' : `Thêm ảnh, ${images.length}/${MAX_IMAGE_COUNT}`} disabled={busy || picking || images.length >= MAX_IMAGE_COUNT} onPress={() => void pickImages()}>
             {picking ? <ActivityIndicator color={colors.success} /> : <ImagePlus size={23} color={colors.success} />}
           </ToolButton>
@@ -491,7 +503,11 @@ export default function ComposerScreen() {
           </ToolButton>
           <View className="flex-1" />
           <Text className="mr-3 text-xs" style={{ color: body.length > MAX_BODY_LENGTH - 500 ? colors.danger : colors.muted }}>
-            {images.length ? `${images.length}/${MAX_IMAGE_COUNT} ảnh · ` : ''}{body.length > 3_500 ? `${body.length}/${MAX_BODY_LENGTH}` : ''}
+            {[
+              images.length ? `${images.length}/${MAX_IMAGE_COUNT} ảnh` : '',
+              body.length > 3_500 ? `${body.length}/${MAX_BODY_LENGTH}` : '',
+              hasDraft && !body.trim() ? 'Viết nội dung để đăng' : '',
+            ].filter(Boolean).join(' · ')}
           </Text>
         </View>
       </KeyboardAvoidingView>

@@ -32,4 +32,7 @@ export type UserResponse = {
   roles: RoleResponse[];
   createdAt: string;
   updatedAt: string;
+  /** False for accounts created through Google sign-in until the user sets one via the reset flow. */
+  hasPassword?: boolean;
+  emailVerified?: boolean;
 };

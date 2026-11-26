@@ -1,13 +1,7 @@
 import type { FieldValues, Path, UseFormSetError } from 'react-hook-form';
 
 import { ApiError } from '@/src/lib/api-client';
-
-export const FEATURE_COMING_SOON = 'Tính năng sắp có.';
-
-/** Forgot/reset endpoints that the gateway has not shipped yet. */
-export function isFeatureUnavailable(error: unknown): boolean {
-  return error instanceof ApiError && (error.status === 404 || error.status === 501);
-}
+import { safeErrorMessage } from '@/src/lib/error-message';
 
 /**
  * Pushes backend field errors (ErrorResponse.details) into the form and
@@ -18,7 +12,7 @@ export function applyApiError<T extends FieldValues>(
   setError: UseFormSetError<T>,
   fields: readonly Path<T>[],
 ): string {
-  if (!(error instanceof ApiError)) return 'Có lỗi xảy ra, vui lòng thử lại.';
+  if (!(error instanceof ApiError)) return safeErrorMessage(error);
 
   let matchedField = false;
   for (const [field, message] of Object.entries(error.details)) {

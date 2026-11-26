@@ -1,13 +1,71 @@
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 
 import { Button } from '@/src/components/ui/button';
+import { FormAlert } from '@/src/components/ui/form-alert';
 import { Text } from '@/src/components/ui/text';
+import { ApiError } from '@/src/lib/api-client';
+import { GOOGLE_WEB_CLIENT_ID } from '@/src/lib/env';
+import { haptics } from '@/src/lib/haptics';
 
-const GOOGLE_MESSAGE = 'Đăng nhập Google sẽ mở khi BE sẵn sàng.';
+import { useAuth } from '../auth-provider';
+import { configureGoogle, loadGoogleSignin } from '../google';
+
+const GOOGLE_ERRORS: Record<string, string> = {
+  GOOGLE_SIGNIN_NOT_ALLOWED: 'Tài khoản này không đăng nhập bằng Google được. Hãy dùng email và mật khẩu.',
+  GOOGLE_EMAIL_NOT_SUPPORTED: 'Chỉ hỗ trợ tài khoản @gmail.com hoặc Google Workspace.',
+  GOOGLE_ACCOUNT_CONFLICT: 'Tài khoản đã liên kết với một tài khoản Google khác.',
+  GOOGLE_SIGNIN_UNAVAILABLE: 'Đăng nhập Google tạm chưa sẵn sàng. Vui lòng thử lại sau.',
+};
+
+const EXPO_GO_MESSAGE = 'Bản ứng dụng này chưa hỗ trợ đăng nhập Google. Hãy cập nhật ứng dụng, hoặc dùng email và mật khẩu.';
+
+function describe(error: unknown, google: ReturnType<typeof loadGoogleSignin>): string | null {
+  if (error instanceof ApiError) return (error.code && GOOGLE_ERRORS[error.code]) || error.message;
+  if (google?.isErrorWithCode(error)) {
+    const { statusCodes } = google;
+    if (error.code === statusCodes.SIGN_IN_CANCELLED || error.code === statusCodes.IN_PROGRESS) return null;
+    if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) return 'Thiết bị chưa có Google Play Services.';
+  }
+  return 'Không đăng nhập được bằng Google. Vui lòng thử lại.';
+}
 
 export function GoogleSignInButton() {
-  const [note, setNote] = useState<string | null>(null);
+  const { signInWithGoogle } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // The native module does not exist on web, and without a client ID the backend would reject the token.
+  const available = Platform.OS !== 'web' && !!GOOGLE_WEB_CLIENT_ID;
+
+  const onPress = async () => {
+    if (!available || loading) return;
+    setError(null);
+    const google = loadGoogleSignin();
+    if (!google) {
+      setError(EXPO_GO_MESSAGE);
+      return;
+    }
+    setLoading(true);
+    try {
+      configureGoogle(google);
+      await google.GoogleSignin.hasPlayServices();
+      const response = await google.GoogleSignin.signIn();
+      if (!google.isSuccessResponse(response)) return;
+      const idToken = response.data.idToken;
+      if (!idToken) throw new Error('Missing Google ID token');
+      await signInWithGoogle(idToken);
+    } catch (cause) {
+      const message = describe(cause, google);
+      if (message) {
+        haptics.error();
+        setError(message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (Platform.OS === 'web') return null;
 
   return (
     <View className="gap-3">
@@ -16,8 +74,18 @@ export function GoogleSignInButton() {
         <Text className="text-xs text-muted">hoặc</Text>
         <View className="h-px flex-1 bg-line" />
       </View>
-      <Button variant="secondary" label="Đăng nhập với Google" onPress={() => setNote(GOOGLE_MESSAGE)} />
-      {note ? <Text className="text-center text-sm leading-5 text-muted">{note}</Text> : null}
+      {error ? <FormAlert message={error} /> : null}
+      <Button
+        variant="secondary"
+        label="Đăng nhập với Google"
+        loadingLabel="Đang mở Google…"
+        loading={loading}
+        disabled={!available}
+        onPress={() => void onPress()}
+      />
+      {!available ? (
+        <Text className="text-center text-sm leading-5 text-muted">Đăng nhập Google chưa được cấu hình trên bản build này.</Text>
+      ) : null}
     </View>
   );
 }

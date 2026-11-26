@@ -8,6 +8,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BackButton } from '@/src/components/navigation/back-header';
+import { StatusBarStrip } from '@/src/components/ui/band-status-bar';
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
 import { FormAlert } from '@/src/components/ui/form-alert';
@@ -16,8 +17,10 @@ import { TextField } from '@/src/components/ui/text-field';
 import { useCurrentUser } from '@/src/features/auth/auth-provider';
 import { profileApi, profileQueryKeys } from '@/src/features/profile/api';
 import { gamificationApi } from '@/src/features/progress/gamification-api';
-import { studyKeys } from '@/src/features/vocab/study-api';
 import { colors, fonts } from '@/src/theme';
+import { ApiError } from '@/src/lib/api-client';
+import { safeErrorMessage } from '@/src/lib/error-message';
+import { useDiscardGuard } from '@/src/lib/use-discard-guard';
 
 const MAX_SOURCE_AVATAR_BYTES = 20 * 1024 * 1024;
 
@@ -89,8 +92,20 @@ export default function EditProfileScreen() {
       setAvatarError('');
       await refreshCommunityAvatar();
     },
-    onError: (error: Error) => setAvatarError(error.message),
+    onError: (error: Error) => setAvatarError(safeErrorMessage(error, 'Không thể cập nhật ảnh đại diện.')),
   });
+
+  // Compared with what was loaded, so typing something and undoing it does not ask.
+  const dirty = Boolean(user.data && learner.data) && (
+    fullName !== user.data!.fullName
+    || phoneNumber !== (user.data!.phoneNumber ?? '')
+    || displayName !== (learner.data!.displayName ?? user.data!.fullName ?? '')
+    || bio !== (learner.data!.bio ?? '')
+    || band !== (learner.data!.selfReportedBand == null ? '' : String(learner.data!.selfReportedBand))
+    || timezone !== (gamificationSettings.data?.timezone || learner.data!.timezone || 'Asia/Ho_Chi_Minh')
+    || visibility !== (learner.data!.visibility === 'PRIVATE' ? 'PRIVATE' : 'PUBLIC')
+  );
+  const allowLeave = useDiscardGuard(dirty);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -113,7 +128,7 @@ export default function EditProfileScreen() {
       try {
         await gamificationApi.updateSettings(timezone.trim());
       } catch (error) {
-        throw new Error(`Hồ sơ đã lưu nhưng múi giờ XP và chuỗi học chưa đồng bộ: ${error instanceof Error ? error.message : 'Vui lòng thử lại.'}`);
+        throw new Error(`Hồ sơ đã lưu nhưng múi giờ học chưa đồng bộ: ${error instanceof Error ? error.message : 'Vui lòng thử lại.'}`);
       }
       return profile;
     },
@@ -123,13 +138,16 @@ export default function EditProfileScreen() {
         queryClient.invalidateQueries({ queryKey: profileQueryKeys.user }),
         queryClient.invalidateQueries({ queryKey: profileQueryKeys.learner }),
         queryClient.invalidateQueries({ queryKey: ['gamification', 'settings'] }),
-        queryClient.invalidateQueries({ queryKey: studyKeys.summary }),
         refreshCommunityAvatar(),
       ]);
+      allowLeave();
       router.back();
     },
-    onError: (error: Error) => setFormError(error.message),
-    onSettled: () => {
+    // The server names the field that is wrong ("Số điện thoại không hợp lệ"); its general message does not.
+    onError: (error: Error) => {
+      const field = error instanceof ApiError ? error.details.fullName ?? error.details.phoneNumber : undefined;
+      setFormError(safeErrorMessage(field ? new Error(field) : error));
+      // The account part may have been stored before a later step failed.
       void queryClient.invalidateQueries({ queryKey: profileQueryKeys.user });
     },
   });
@@ -176,7 +194,7 @@ export default function EditProfileScreen() {
       await queryClient.invalidateQueries({ queryKey: profileQueryKeys.learner });
       await refreshCommunityAvatar();
     } catch (error) {
-      setAvatarError(error instanceof Error ? error.message : 'Không tải được ảnh đại diện.');
+      setAvatarError(safeErrorMessage(error, 'Không tải được ảnh đại diện.'));
     } finally {
       setAvatarUploading(false);
     }
@@ -195,7 +213,7 @@ export default function EditProfileScreen() {
   };
 
   return (
-    <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'web' ? undefined : 'padding'}>
       <View className="flex-1 bg-canvas">
         <ScrollView
           keyboardShouldPersistTaps="handled"
@@ -211,14 +229,14 @@ export default function EditProfileScreen() {
           </View>
 
           {loading ? <View className="mt-14 items-center gap-3"><ActivityIndicator color={colors.accent} /><Text className="text-sm text-muted">Đang tải hồ sơ…</Text></View> : null}
-          {user.isError || learner.isError ? (
+          {!loading && (!user.data || !learner.data) ? (
             <View className="mt-5 gap-3">
               <FormAlert message={(user.error ?? learner.error)?.message ?? 'Không tải được hồ sơ.'} />
               <Button label="Thử tải lại" variant="secondary" onPress={() => { void user.refetch(); void learner.refetch(); }} />
             </View>
           ) : null}
 
-          {!loading && !user.isError && !learner.isError ? <>
+          {!loading && user.data && learner.data ? <>
             <View className="overflow-hidden rounded-3xl p-5" style={{ backgroundColor: colors.heroStart }}>
               <View className="flex-row items-center gap-4">
                 <Pressable onPress={() => void pickAvatar()} accessibilityRole="button" accessibilityLabel="Thay ảnh đại diện" className="relative">
@@ -281,14 +299,15 @@ export default function EditProfileScreen() {
             </Card>
 
             <Card className="mt-4 gap-3 p-4">
-              <SectionHeading icon={<Clock3 size={18} color={colors.accentDeep} />} title="Thiết lập học tập" subtitle="Múi giờ dùng để tính ngày học và streak" />
+              <SectionHeading icon={<Clock3 size={18} color={colors.accentDeep} />} title="Thiết lập học tập" subtitle="Múi giờ dùng để tính ngày học" />
               <TextField label="Múi giờ" value={timezone} onChangeText={setTimezone} autoCapitalize="none" maxLength={50} placeholder="Asia/Ho_Chi_Minh" hint="Dùng tên múi giờ IANA, ví dụ Asia/Ho_Chi_Minh" />
             </Card>
-            {formError ? <View className="mt-4"><FormAlert message={formError} /></View> : null}
           </> : null}
         </ScrollView>
+        <StatusBarStrip color={colors.canvas} />
 
         {!loading && !user.isError && !learner.isError ? <View className="border-t border-line bg-surface px-5 pt-3" style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
+          {formError ? <View className="mb-3"><FormAlert message={formError} /></View> : null}
           <Button label="Lưu thay đổi" loading={saveMutation.isPending} loadingLabel="Đang lưu hồ sơ" disabled={!fullName.trim() || !displayName.trim() || avatarUploading || avatarMutation.isPending} onPress={() => { setFormError(''); saveMutation.mutate(); }} />
         </View> : null}
       </View>

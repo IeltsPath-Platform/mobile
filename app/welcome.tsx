@@ -3,7 +3,9 @@ import { Image } from 'expo-image';
 import { Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { FormAlert } from '@/src/components/ui/form-alert';
 import { Text } from '@/src/components/ui/text';
+import { useAuth } from '@/src/features/auth/auth-provider';
 import { useOnboarding } from '@/src/features/onboarding/use-onboarding';
 import { AUTH_ENABLED } from '@/src/lib/env';
 import { colors } from '@/src/theme';
@@ -12,6 +14,7 @@ const BRAND = colors.accent;
 
 export default function WelcomeScreen() {
   const { onboarded } = useOnboarding();
+  const { sessionExpired } = useAuth();
 
   const start = () => {
     if (!onboarded) {
@@ -25,7 +28,7 @@ export default function WelcomeScreen() {
     <SafeAreaView className="flex-1" style={{ backgroundColor: BRAND }} edges={['top', 'bottom']}>
       <View className="flex-1 items-center justify-center px-8">
         <Image
-          source={require('@/assets/images/owl/hero-wave.png')}
+          source={require('@/assets/images/owl/hero-wave-raster.png')}
           style={{ width: 300, height: 300, backgroundColor: 'transparent' }}
           contentFit="contain"
           accessibilityIgnoresInvertColors
@@ -39,6 +42,7 @@ export default function WelcomeScreen() {
       </View>
 
       <View className="gap-3 px-6 pb-4">
+        {sessionExpired ? <FormAlert message="Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại." /> : null}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Bắt đầu"

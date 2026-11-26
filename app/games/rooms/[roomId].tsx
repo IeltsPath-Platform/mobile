@@ -1,4 +1,4 @@
-﻿import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -10,7 +10,7 @@ import { Button } from '@/src/components/ui/button';
 import { Text } from '@/src/components/ui/text';
 import { useCurrentUser } from '@/src/features/auth/auth-provider';
 import { gameApi } from '@/src/features/games/api';
-import { gameErrorMessage } from '@/src/features/games/errors';
+import { gameErrorMessage, isGone } from '@/src/features/games/errors';
 import { GAME_META, GAMES_HOME, gameTone, matchRoute, resultRoute, toGameKind } from '@/src/features/games/game-meta';
 import { MemberRow, RoomCodeCard, RoomSettingsCard } from '@/src/features/games/room/room-parts';
 import type { GameEvent, GameRoom } from '@/src/features/games/types';
@@ -144,11 +144,21 @@ export default function GameRoomScreen() {
     [qc, roomId, roomKey],
   );
 
+  // The server closes a waiting room when its host leaves it, so the host is closing it for everyone.
+  const closesRoom = isHost === true && waiting;
   const askLeave = () =>
-    Alert.alert('Rời phòng?', room?.status === 'IN_MATCH' ? 'Bạn sẽ rời ván đang chơi và giữ lại điểm đã đạt.' : 'Bạn có thể vào lại bằng mã phòng nếu phòng còn chỗ.', [
-      { text: 'Ở lại', style: 'cancel' },
-      { text: 'Rời phòng', style: 'destructive', onPress: () => leave.mutate() },
-    ]);
+    Alert.alert(
+      closesRoom ? 'Đóng phòng?' : 'Rời phòng?',
+      room?.status === 'IN_MATCH'
+        ? 'Bạn sẽ rời ván đang chơi và giữ lại điểm đã đạt.'
+        : closesRoom
+          ? 'Bạn là chủ phòng nên phòng sẽ đóng lại và mọi người trong phòng phải thoát.'
+          : 'Bạn có thể vào lại bằng mã phòng nếu phòng còn chỗ.',
+      [
+        { text: 'Ở lại', style: 'cancel' },
+        { text: closesRoom ? 'Đóng phòng' : 'Rời phòng', style: 'destructive', onPress: () => leave.mutate() },
+      ],
+    );
 
   const tone = gameTone(kind);
   const inMatch = room?.status === 'IN_MATCH' && room.activeMatchId;
@@ -168,7 +178,7 @@ export default function GameRoomScreen() {
           <ActivityIndicator color={colors.accent} />
           <Text className="mt-3 text-sm text-muted">Đang tải phòng…</Text>
         </View>
-      ) : query.isError || !room ? (
+      ) : !room || isGone(query.error) ? (
         <View className="m-4 rounded-3xl border border-line bg-surface p-5">
           <Text weight="bold">Không tải được phòng chơi.</Text>
           <Text className="mt-2 text-sm text-muted">{query.error?.message ?? 'Có thể phòng đã đóng hoặc mã không hợp lệ.'}</Text>
@@ -249,7 +259,7 @@ export default function GameRoomScreen() {
               className="min-h-11 flex-row items-center justify-center gap-2"
             >
               <LogOut size={16} color={colors.danger} />
-              <Text weight="bold" className="text-sm text-danger">Rời {room.status === 'IN_MATCH' ? 'ván' : 'phòng'}</Text>
+              <Text weight="bold" className="text-sm text-danger">{room.status === 'IN_MATCH' ? 'Rời ván' : closesRoom ? 'Đóng phòng' : 'Rời phòng'}</Text>
             </Pressable>
           </View>
         </>

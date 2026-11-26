@@ -29,6 +29,8 @@ For an iPhone on the same Wi-Fi, run `npm run ios` on Windows and scan the Expo 
 - `EXPO_PUBLIC_API_PORT`: optional gateway port, default `8080`.
 - `MOBILE_LAN_HOST`: optional override for the PC's Wi-Fi/Ethernet IPv4 address. The startup script automatically prefers Wi-Fi, then Ethernet, and skips common virtual adapters; set this only if automatic selection picks the wrong network.
 - `EXPO_PUBLIC_AUTH_ENABLED`: backend authentication toggle, default `true`.
+- `EXPO_PUBLIC_WEB_APP_URL`: optional learner website origin. Learning-path links of the practice results ("Luyện lỗi này", course and knowledge history) open there; leave empty to hide them.
+- `EXPO_PUBLIC_HIDE_IOS_KEY_ACTIVATION`: set `true` for an App Store build to hide activation-key entry on iOS.
 
 A physical phone and PC must share Wi-Fi. The bridge binds the selected PC LAN address and forwards HTTP uploads and WebSocket traffic to the local backend. Do not use Expo's tunnel host as the API host.
 
@@ -44,4 +46,4 @@ npx expo-doctor
 
 ## Mobile features
 
-The tab bar provides Today, Practice, Community, Notifications, and Profile. Community includes paged feed, image attachments, post and comment actions, mentions, public profiles, bookmarks, reports, notification preferences, and unread counts. Wordly includes room setup, multiplayer lobby, server synchronized play, hints, ranking, and match results.
+The tab bar provides Today, Flashcards, Games, Community, Notifications, and Profile. Today is the IELTS practice home: the test in progress, the four skills with their latest result, quick part-sized practice, work waiting for grading and a daily tip. Listening plays each section with practice controls or once in exam mode; Reading shows the passage full screen with the questions in a draggable panel; long-press a word and a menu opens next to it (Highlight, Note, Translate), tap further words to stretch the selection over a whole paragraph or several, and tap a highlight to remove it as a whole; Translate shows the meaning of the words and saves them to the Flashcards notebook; Writing has practice (parts, guide, model answer, dictionary) and exam (countdown) modes, AI or teacher grading, and the marked results; Speaking reads the questions aloud, records 16 kHz WAV answers kept on the device until sent, and shows the AI grade with pronunciation per word and sound. Results, reviews with explanations, submission history and teacher review status match the web app. The microphone permission text lives in the `expo-audio` plugin of `app.json`, so a new development build is needed after changing it. Community includes paged feed, image attachments, post and comment actions, mentions, public profiles, bookmarks, reports, notification preferences, and unread counts. Wordly includes room setup, multiplayer lobby, server synchronized play, hints, ranking, and match results.

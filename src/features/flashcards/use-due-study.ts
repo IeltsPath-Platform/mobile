@@ -4,7 +4,6 @@ import { vocabApi, type Flashcard } from '@/src/features/vocab/api';
 import { createRequestId } from '@/src/lib/request-id';
 import { invalidateFlashcards, useFlashcardAccess } from './queries';
 import type { StudyCard } from './types';
-import { studyKeys } from '@/src/features/vocab/study-api';
 
 export function toStudyCards(items: Flashcard[]): StudyCard[] {
   return items
@@ -51,8 +50,6 @@ export function useDueStudy(deckId?: string) {
     requestId: string,
   ) => {
     await vocabApi.reviewCard(cardId, correct, requestId, sessionId);
-    // Refresh account stats without delaying the next card on a summary request.
-    void client.invalidateQueries({ queryKey: studyKeys.summary });
     await Promise.all([
       client.invalidateQueries({
         queryKey: ['flashcards'],

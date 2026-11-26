@@ -21,7 +21,10 @@ import { usePostMenu } from '@/src/features/community/components/post-menu';
 import { CATEGORY_LABELS, totalReactions } from '@/src/features/community/format';
 import { REPORT_REASONS, reactToPost, reportContent, toggleBookmark, toggleFollowAuthor } from '@/src/features/community/post-actions';
 import { updateCommunityPostCache } from '@/src/features/community/post-cache';
+import { ApiError } from '@/src/lib/api-client';
+import { safeErrorMessage } from '@/src/lib/error-message';
 import { haptics } from '@/src/lib/haptics';
+import { useSingleFlight } from '@/src/lib/use-single-flight';
 import { colors } from '@/src/theme';
 import { useTheme } from '@/src/theme/app-theme';
 
@@ -53,6 +56,8 @@ export default function PostDetailScreen() {
   const [draft, setDraft] = useState('');
   const [replyTo, setReplyTo] = useState<Comment>();
   const [sending, setSending] = useState(false);
+  const sendOnce = useSingleFlight();
+  const editOnce = useSingleFlight();
   const [suggestions, setSuggestions] = useState<{ id: string; displayName: string }[]>([]);
   const [editing, setEditing] = useState<Comment>();
   const [editDraft, setEditDraft] = useState('');
@@ -93,6 +98,7 @@ export default function PostDetailScreen() {
   const send = async () => {
     const body = draft.trim();
     if (!body || sending) return;
+    await sendOnce(async () => {
     setSending(true);
     try {
       const parentId = replyTo?.parentCommentId ?? replyTo?.id;
@@ -104,14 +110,16 @@ export default function PostDetailScreen() {
       await sync(parentId, 1);
     } catch (error) {
       haptics.error();
-      Alert.alert('Không gửi được bình luận', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+      Alert.alert('Không gửi được bình luận', safeErrorMessage(error, 'Vui lòng thử lại.'));
     } finally {
       setSending(false);
     }
+    });
   };
 
   const saveEdit = async () => {
     if (!editing || !editDraft.trim()) return;
+    await editOnce(async () => {
     try {
       await communityApi.updateComment(editing.id, editDraft.trim());
       setEditing(undefined);
@@ -119,8 +127,9 @@ export default function PostDetailScreen() {
       await sync(editing.parentCommentId ?? undefined);
     } catch (error) {
       haptics.error();
-      Alert.alert('Không thể sửa bình luận', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+      Alert.alert('Không thể sửa bình luận', safeErrorMessage(error, 'Vui lòng thử lại.'));
     }
+    });
   };
 
   const removeComment = (comment: Comment) => Alert.alert('Xóa bình luận?', 'Bình luận này sẽ bị xóa vĩnh viễn.', [
@@ -130,7 +139,7 @@ export default function PostDetailScreen() {
       style: 'destructive',
       onPress: () => void communityApi.deleteComment(comment.id)
         .then(() => sync(comment.parentCommentId ?? undefined, -1))
-        .catch((error) => Alert.alert('Không thể xóa', error instanceof Error ? error.message : 'Vui lòng thử lại.')),
+        .catch((error) => Alert.alert('Không thể xóa', safeErrorMessage(error, 'Vui lòng thử lại.'))),
     },
   ]);
 
@@ -185,14 +194,20 @@ export default function PostDetailScreen() {
       </View>
     );
   }
-  if (!post.data) {
+  // A 404 on refresh means the post was removed: the copy in the cache must not be shown as if it still exists.
+  const removed = post.error instanceof ApiError && post.error.status === 404;
+  if (!post.data || removed) {
     return (
       <View className="flex-1 bg-canvas">
         <BackHeader title="Bài viết" fallbackHref="/(tabs)/community" />
         <View className="px-5 pt-8">
-          <Text weight="bold">Không tải được bài viết.</Text>
-          <Text className="mt-1 text-sm text-muted">{post.error instanceof Error ? post.error.message : 'Bài viết có thể đã bị xóa hoặc bạn đang mất kết nối.'}</Text>
-          <View className="mt-4"><Button label="Thử lại" onPress={() => void post.refetch()} /></View>
+          <Text weight="bold">{removed ? 'Bài viết không còn nữa.' : 'Không tải được bài viết.'}</Text>
+          <Text className="mt-1 text-sm text-muted">{removed ? 'Bài viết đã bị xóa hoặc đã được gỡ khỏi cộng đồng.' : safeErrorMessage(post.error, 'Bài viết có thể đã bị xóa hoặc bạn đang mất kết nối.')}</Text>
+          <View className="mt-4">
+            {removed
+              ? <Button label="Về Cộng đồng" onPress={() => router.replace('/(tabs)/community')} />
+              : <Button label="Thử lại" onPress={() => void post.refetch()} />}
+          </View>
         </View>
       </View>
     );
@@ -301,7 +316,7 @@ export default function PostDetailScreen() {
   );
 
   return (
-    <KeyboardAvoidingView className="flex-1 bg-canvas" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView className="flex-1 bg-canvas" behavior={Platform.OS === 'web' ? undefined : 'padding'}>
       <BackHeader
         title="Bài viết"
         fallbackHref="/(tabs)/community"
@@ -394,7 +409,7 @@ export default function PostDetailScreen() {
       {postMenu.element}
 
       <Modal visible={Boolean(editing)} transparent animationType="fade" onRequestClose={() => setEditing(undefined)}>
-        <KeyboardAvoidingView className="flex-1 justify-center bg-black/50 px-5" style={vars} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView className="flex-1 justify-center bg-black/50 px-5" style={vars} behavior={Platform.OS === 'web' ? undefined : 'padding'}>
           <View className="rounded-3xl bg-surface p-5">
             <Text weight="extrabold" className="text-lg">Sửa bình luận</Text>
             <TextInput

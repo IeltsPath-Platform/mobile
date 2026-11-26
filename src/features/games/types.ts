@@ -33,6 +33,4 @@ export type RocketResult = { matchId: string; endReason: string | null; settings
 export type LeftGame = { resultAvailable: boolean };
 
 export function isGameAvailable(game: GameCatalog['games'][number], type: 'WORDLY' | 'ROCKET') { return game.gameType === type && game.status === 'AVAILABLE'; }
-export function isWordlyAvailable(game: GameCatalog['games'][number]) { return isGameAvailable(game, 'WORDLY'); }
-export function dueAt(deadlineAt: string | null, now: number) { return deadlineAt ? Math.max(0, Math.ceil((new Date(deadlineAt).getTime() - now) / 1000)) : null; }
 export function mergeRanking(current: GameRanking | null, incoming: GameRanking) { return !current || Date.parse(incoming.serverTime) >= Date.parse(current.serverTime) ? incoming : current; }

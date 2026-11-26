@@ -9,20 +9,14 @@ export type VocabularyItem = {
   id: string; lemma: string; normalizedLemma: string; ipa: string | null; pronunciationAudioReference: string | null;
   status: string; senses: VocabularySense[];
 };
-export type VocabularyTopic = {
-  id: string; slug: string; name: string; nameVi: string; coverKey: string | null; coverUrl: string | null;
-  sortOrder: number; wordCount: number;
-};
 export type VocabularySet = {
   id: string; title: string; description: string | null; kind: 'BAND' | 'TOPIC'; cefrLevel: string | null;
   topicId: string | null; topicName: string | null; topicNameVi: string | null; coverKey: string | null;
   coverUrl: string | null; sortOrder: number; status: LibraryStatus; topicCount: number | null; wordCount: number | null;
 };
 export type VocabularyAchievement = { code: string; achieved: boolean; progress: number; target: number };
-export type VocabularyCatalogWord = {
-  id: string; lemma: string; ipa: string | null; pronunciationAudioReference: string | null;
-  senses: Array<Pick<VocabularySense, 'id' | 'partOfSpeech' | 'englishDefinition' | 'vietnameseMeaning' | 'exampleSentence'>>;
-};
+/** Badges the server still reports but the app can no longer earn: finishing a vocabulary topic needed the removed topic study flow. */
+const RETIRED_ACHIEVEMENTS: ReadonlySet<string> = new Set(['TOPIC_COMPLETED']);
 export type VocabularyPronunciation = { lemma: string; normalizedLemma: string; ipa: string | null; audioUk: string | null; audioUs: string | null };
 export type LibraryStatus = 'ACTIVE' | 'ARCHIVED' | 'DELETED';
 export type FlashcardSourceType = 'MANUAL' | 'VOCABULARY_SENSE' | 'HIGHLIGHT' | 'PRACTICE_QUESTION';
@@ -71,14 +65,12 @@ export const vocabApi = {
     )));
     return pages.flat();
   },
-  listTopics: (signal?: AbortSignal) => apiRequest<VocabularyTopic[]>(`${contentVocabularyPath}/topics`, { auth: false, signal }),
-  achievements: (timezone = 'Asia/Ho_Chi_Minh') => apiRequest<{ items: VocabularyAchievement[] }>(`/api/learning-support/flashcards/notebook/achievements${params({ timezone })}`, { auth: true }),
-  listTopicWords: (topicId: string, page = 0, size = 30, signal?: AbortSignal) =>
-    apiRequest<PageResponse<VocabularyCatalogWord>>(`${contentVocabularyPath}${params({ topicId, page, size })}`, { auth: false, signal }),
-  listSets: (kind: 'BAND' | 'TOPIC' | undefined = 'TOPIC', page = 0, size = 50, signal?: AbortSignal) =>
+  achievements: async (timezone = 'Asia/Ho_Chi_Minh') => {
+    const result = await apiRequest<{ items: VocabularyAchievement[] }>(`/api/learning-support/flashcards/notebook/achievements${params({ timezone })}`, { auth: true });
+    return { ...result, items: result.items.filter((item) => !RETIRED_ACHIEVEMENTS.has(item.code)) };
+  },
+  listSets: (kind?: 'BAND' | 'TOPIC', page = 0, size = 50, signal?: AbortSignal) =>
     apiRequest<PageResponse<VocabularySet>>(`${contentVocabularyPath}/sets${params({ kind, page, size })}`, { auth: false, signal }),
-  listSetWords: (setId: string, page = 0, size = 30, signal?: AbortSignal) =>
-    apiRequest<PageResponse<VocabularyItem>>(`${contentVocabularyPath}/sets/${encodeURIComponent(setId)}/words${params({ page, size })}`, { auth: false, signal }),
   listDecks: (page = 0, size = 50, status: LibraryStatus = 'ACTIVE', signal?: AbortSignal) => apiRequest<PageResponse<FlashcardDeck>>(`${decksPath}${params({ page, size, status })}`, { auth: true, signal }),
   getDeck: (deckId: string, signal?: AbortSignal) => apiRequest<FlashcardDeck>(`${decksPath}/${encodeURIComponent(deckId)}`, { auth: true, signal }),
   createDeck: (draft: DeckDraft) => apiRequest<FlashcardDeck>(decksPath, { method: 'POST', body: draft, auth: true }),
@@ -99,24 +91,6 @@ export const vocabApi = {
     return apiRequest<UploadedFlashcardImage>(`${cardsPath}/images`, { method: 'POST', body: form, auth: true });
   },
 };
-
-/** Normalize deck-list cache values shared between screens (legacy cache may hold the paged response). */
-export function normalizeDeckList(value: unknown): FlashcardDeck[] {
-  if (Array.isArray(value)) return value as FlashcardDeck[];
-  if (value && typeof value === 'object' && 'items' in value && Array.isArray(value.items)) {
-    return value.items as FlashcardDeck[];
-  }
-  return [];
-}
-
-export async function listActiveDecks(): Promise<FlashcardDeck[]> {
-  const decks: FlashcardDeck[] = [];
-  for (let page = 0; ; page++) {
-    const response = await vocabApi.listDecks(page, 50);
-    decks.push(...response.items);
-    if (!response.items.length || decks.length >= response.total) return decks;
-  }
-}
 
 export async function listAllDeckItems(deckId: string, signal?: AbortSignal): Promise<DeckItem[]> {
   const result: DeckItem[] = [];

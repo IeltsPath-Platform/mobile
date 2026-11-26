@@ -14,6 +14,7 @@ import {
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
 import { Button } from '@/src/components/ui/button';
+import { OwlMascot } from '@/src/components/ui/owl-mascot';
 import { Text } from '@/src/components/ui/text';
 import { DictionaryLookup } from '@/src/features/flashcards/components/dictionary-lookup';
 import {
@@ -175,7 +176,7 @@ export default function FlashcardsScreen() {
                       Sổ từ của bạn
                     </Text>
                     <Text className="mt-0.5 text-sm text-muted">
-                      {notebookSummary.data!.total} từ đã lưu
+                      {notebookSummary.data?.total ?? 0} từ đã lưu
                       {notebookDue > 0 ? ` · ${notebookDue} từ cần ôn` : ' · Đã ôn hết'}
                     </Text>
                   </View>
@@ -241,17 +242,20 @@ export default function FlashcardsScreen() {
             ) : null}
             {/* Nút nhanh */}
             <View className="flex-row gap-3">
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => open('/flashcards/notebook')}
-                className="min-h-14 flex-1 flex-row items-center justify-center gap-2 rounded-2xl active:opacity-80"
-                style={{ borderWidth: 2, borderBottomWidth: 4, borderColor: colors.line, borderBottomColor: colors.edge, backgroundColor: colors.surface }}
-              >
-                <BookOpen size={20} color={colors.accentDeep} />
-                <Text weight="extrabold" className="text-sm">
-                  Sổ từ
-                </Text>
-              </Pressable>
+              {/* The notebook card above is the way in once words are saved; one entry is enough. */}
+              {hasNotebook ? null : (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => open('/flashcards/notebook')}
+                  className="min-h-14 flex-1 flex-row items-center justify-center gap-2 rounded-2xl active:opacity-80"
+                  style={{ borderWidth: 2, borderBottomWidth: 4, borderColor: colors.line, borderBottomColor: colors.edge, backgroundColor: colors.surface }}
+                >
+                  <BookOpen size={20} color={colors.accentDeep} />
+                  <Text weight="extrabold" className="text-sm">
+                    Sổ từ
+                  </Text>
+                </Pressable>
+              )}
               <Pressable
                 accessibilityRole="button"
                 onPress={() => open('/flashcards/progress')}
@@ -326,7 +330,7 @@ export default function FlashcardsScreen() {
         ListEmptyComponent={
           enabled && active.isSuccess ? (
             <View className="items-center gap-3 rounded-3xl p-6" style={{ borderWidth: 2, borderBottomWidth: 4, borderColor: colors.line, borderBottomColor: colors.edge, backgroundColor: colors.surface }}>
-              <Image source={require('@/assets/images/owl/nav-owl-stand.webp')} contentFit="contain" style={{ width: 96, height: 96 }} accessibilityIgnoresInvertColors />
+              <OwlMascot size={104} />
               <Text weight="black" className="text-lg">
                 {tab === 'decks'
                   ? 'Tạo bộ thẻ đầu tiên'

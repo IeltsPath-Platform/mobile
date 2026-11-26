@@ -36,7 +36,7 @@ function ThemeKeyed({ children }: { children: ReactNode }) {
 /** `screenLayout` for navigators whose screens are leaf pages. */
 export const themedScreenLayout = ({ children }: { children: ReactNode }) => <ThemeKeyed>{children}</ThemeKeyed>;
 
-const NESTED_NAVIGATORS = new Set(['(tabs)', '(auth)', 'games', 'learn', 'flashcards']);
+const NESTED_NAVIGATORS = new Set(['(tabs)', '(auth)', 'games', 'flashcards']);
 
 /** Root stack variant: nested navigators re-theme their own screens, so they must not be remounted. */
 export const rootScreenLayout = ({ route, children }: { route: { name: string }; children: ReactNode }) =>

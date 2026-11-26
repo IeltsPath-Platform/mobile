@@ -1,6 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { Alert } from 'react-native';
 
+import { ApiError } from '@/src/lib/api-client';
 import { haptics } from '@/src/lib/haptics';
 
 import { communityApi, type CommunityPost, type ReactionType } from './api';
@@ -21,6 +22,16 @@ async function guarded(key: string, run: () => Promise<void>) {
   try { await run(); } finally { inFlight.delete(key); }
 }
 
+/**
+ * The server says the post is gone (someone deleted it): drop it from the lists and the open screen, so the viewer is not
+ * left looking at a post that every tap now fails on. Other errors leave the cached post alone.
+ */
+function dropIfGone(qc: QueryClient, postId: string, error: unknown) {
+  if (!(error instanceof ApiError) || error.status !== 404) return;
+  removePostFromCaches(qc, postId);
+  qc.removeQueries({ queryKey: ['community', 'detail', postId] });
+}
+
 function fail(title: string, error: unknown) {
   haptics.error();
   Alert.alert(title, error instanceof Error ? error.message : 'Vui lòng thử lại.');
@@ -35,6 +46,7 @@ export function reactToPost(qc: QueryClient, post: CommunityPost, type: Reaction
     } catch (error) {
       // Restore only the reaction fields so concurrent bookmark/follow/comment updates survive.
       updateCommunityPostCache(qc, post.id, (cached) => ({ ...cached, myReaction: post.myReaction, reactionCounts: post.reactionCounts }));
+      dropIfGone(qc, post.id, error);
       fail('Không thể thả cảm xúc', error);
     }
   });
@@ -52,6 +64,7 @@ export function toggleBookmark(qc: QueryClient, post: CommunityPost) {
     } catch (error) {
       restore();
       updateCommunityPostCache(qc, post.id, () => post);
+      dropIfGone(qc, post.id, error);
       fail('Không thể cập nhật bài đã lưu', error);
     }
   });
@@ -88,6 +101,8 @@ export function deletePost(qc: QueryClient, post: CommunityPost, onDone?: () => 
       await communityApi.delete(post.id);
       haptics.success();
       onDone?.();
+      // After the screen has left: the cached detail would otherwise show the deleted post when a notification opens it.
+      qc.removeQueries({ queryKey: ['community', 'detail', post.id] });
     } catch (error) {
       restore();
       fail('Không thể xóa bài viết', error);

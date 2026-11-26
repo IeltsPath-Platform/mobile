@@ -10,6 +10,7 @@ import { Text } from '@/src/components/ui/text';
 import { useAuth } from '@/src/features/auth/auth-provider';
 import { ProfileAchievements } from '@/src/features/profile/profile-achievements';
 import { vocabApi } from '@/src/features/vocab/api';
+import { useStudyTimezone } from '@/src/features/flashcards/queries';
 import { colors } from '@/src/theme';
 import { useTheme } from '@/src/theme/app-theme';
 
@@ -17,9 +18,10 @@ export default function AchievementsScreen() {
   useTheme();
   const { authEnabled, status } = useAuth();
   const signedIn = authEnabled && status === 'authenticated';
+  const timezone = useStudyTimezone();
   const achievements = useQuery({
-    queryKey: ['vocab', 'achievements'],
-    queryFn: () => vocabApi.achievements(),
+    queryKey: ['vocab', 'achievements', timezone],
+    queryFn: () => vocabApi.achievements(timezone),
     enabled: signedIn,
     staleTime: 60_000,
   });

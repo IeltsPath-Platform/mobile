@@ -6,16 +6,25 @@ import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BackButton } from '@/src/components/navigation/back-header';
+import { StatusBarStrip } from '@/src/components/ui/band-status-bar';
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
 import { FormAlert } from '@/src/components/ui/form-alert';
 import { Text } from '@/src/components/ui/text';
 import { TextField } from '@/src/components/ui/text-field';
+import { useAuth, useCurrentUser } from '@/src/features/auth/auth-provider';
 import { profileApi } from '@/src/features/profile/api';
+import { SetPasswordCard } from '@/src/features/profile/components/set-password-card';
+import { ApiError } from '@/src/lib/api-client';
+import { PASSWORD_HINT, PASSWORD_MIN_LENGTH, newPasswordError } from '@/src/lib/password-rules';
 import { colors } from '@/src/theme';
 
 export default function ChangePasswordScreen() {
   const insets = useSafeAreaInsets();
+  const { signOut } = useAuth();
+  const user = useCurrentUser();
+  const needsPassword = user.data?.hasPassword === false;
+  const needsVerification = user.data?.emailVerified === false;
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -25,11 +34,13 @@ export default function ChangePasswordScreen() {
   const mutation = useMutation({
     mutationFn: () => {
       if (!currentPassword) throw new Error('Vui lòng nhập mật khẩu hiện tại.');
-      if (newPassword.length < 6) throw new Error('Mật khẩu mới cần có ít nhất 6 ký tự.');
+      const problem = newPasswordError(newPassword);
+      if (problem) throw new Error(problem);
       if (newPassword !== confirmPassword) throw new Error('Mật khẩu xác nhận chưa khớp.');
       if (currentPassword === newPassword) throw new Error('Mật khẩu mới cần khác mật khẩu hiện tại.');
       return profileApi.changePassword({ currentPassword, newPassword });
     },
+    // Changing the password revokes every refresh token, so the session ends here and the user signs in again.
     onSuccess: () => {
       setFormError('');
       setSaved(true);
@@ -37,11 +48,17 @@ export default function ChangePasswordScreen() {
       setNewPassword('');
       setConfirmPassword('');
     },
-    onError: (error: Error) => setFormError(error.message),
+    onError: (error: Error) => {
+      if (error instanceof ApiError && error.code === 'EMAIL_NOT_VERIFIED') {
+        setFormError('Bạn cần xác minh email trước khi đổi mật khẩu.');
+        return;
+      }
+      setFormError(error.message);
+    },
   });
 
   return (
-    <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'web' ? undefined : 'padding'}>
       <View className="flex-1 bg-canvas">
         <ScrollView
           keyboardShouldPersistTaps="handled"
@@ -61,13 +78,13 @@ export default function ChangePasswordScreen() {
               <View className="h-14 w-14 items-center justify-center rounded-2xl bg-white/15"><ShieldCheck size={27} color="#fff" /></View>
               <View className="flex-1">
                 <Text weight="extrabold" className="text-base text-white">Tạo mật khẩu an toàn</Text>
-                <Text className="mt-1 text-sm leading-5 text-white/75">Mật khẩu mới phải có ít nhất 6 ký tự.</Text>
+                <Text className="mt-1 text-sm leading-5 text-white/75">Mật khẩu mới phải có ít nhất {PASSWORD_MIN_LENGTH} ký tự.</Text>
               </View>
             </View>
           </View>
 
-          {saved ? <View className="mt-4"><FormAlert tone="success" message="Mật khẩu đã được cập nhật thành công." /></View> : null}
-          <Card className="mt-4 gap-4 p-4">
+          {saved ? <View className="mt-4"><FormAlert tone="success" message="Mật khẩu đã được cập nhật. Hãy đăng nhập lại để tiếp tục." /></View> : null}
+          {needsPassword && user.data ? <SetPasswordCard email={user.data.email} /> : <Card className="mt-4 gap-4 p-4">
             <View className="mb-1 flex-row items-center gap-3">
               <View className="h-10 w-10 items-center justify-center rounded-2xl bg-accent-soft"><LockKeyhole size={18} color={colors.accentDeep} /></View>
               <View className="flex-1">
@@ -76,14 +93,16 @@ export default function ChangePasswordScreen() {
               </View>
             </View>
             <TextField label="Mật khẩu hiện tại" value={currentPassword} onChangeText={setCurrentPassword} secureToggle autoCapitalize="none" autoCorrect={false} textContentType="password" placeholder="Mật khẩu đang dùng" returnKeyType="next" />
-            <TextField label="Mật khẩu mới" value={newPassword} onChangeText={setNewPassword} secureToggle autoCapitalize="none" autoCorrect={false} textContentType="newPassword" placeholder="Ít nhất 6 ký tự" returnKeyType="next" />
+            <TextField label="Mật khẩu mới" value={newPassword} onChangeText={setNewPassword} secureToggle autoCapitalize="none" autoCorrect={false} textContentType="newPassword" placeholder={PASSWORD_HINT} returnKeyType="next" />
             <TextField label="Nhập lại mật khẩu mới" value={confirmPassword} onChangeText={setConfirmPassword} secureToggle autoCapitalize="none" autoCorrect={false} textContentType="newPassword" placeholder="Xác nhận mật khẩu mới" returnKeyType="done" onSubmitEditing={() => { if (currentPassword && newPassword && confirmPassword && !mutation.isPending) mutation.mutate(); }} />
             {formError ? <FormAlert message={formError} /> : null}
-            {saved ? <Button label="Quay về hồ sơ" variant="secondary" icon={<CheckCircle2 size={18} color={colors.success} />} onPress={() => router.back()} /> : null}
-          </Card>
+            {needsVerification ? <Button label="Xác minh email" variant="secondary" onPress={() => router.push('/profile/verify-email' as never)} /> : null}
+            {saved ? <Button label="Đăng nhập lại" variant="secondary" icon={<CheckCircle2 size={18} color={colors.success} />} onPress={() => void signOut()} /> : null}
+          </Card>}
         </ScrollView>
+        <StatusBarStrip color={colors.canvas} />
 
-        {!saved ? <View className="border-t border-line bg-surface px-5 pt-3" style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
+        {!saved && !needsPassword ? <View className="border-t border-line bg-surface px-5 pt-3" style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
           <Button label="Cập nhật mật khẩu" loading={mutation.isPending} loadingLabel="Đang cập nhật" disabled={!currentPassword || !newPassword || !confirmPassword} onPress={() => { setSaved(false); setFormError(''); mutation.mutate(); }} />
         </View> : null}
       </View>

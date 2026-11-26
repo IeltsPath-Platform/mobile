@@ -7,6 +7,7 @@ const apiLocation = resolveApiUrl({
   port: process.env.EXPO_PUBLIC_API_PORT,
   device: process.env.EXPO_PUBLIC_DEVICE,
   platform: Platform.OS,
+  release: !__DEV__,
   metroHost: Constants.expoConfig?.hostUri ?? Constants.expoGoConfig?.debuggerHost,
   webHost: Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.hostname : undefined,
 });
@@ -17,3 +18,6 @@ export const REQUEST_TIMEOUT_MS = 15_000;
 
 // Login is required unless this is exactly "false" (local UI work without the gateway).
 export const AUTH_ENABLED = process.env.EXPO_PUBLIC_AUTH_ENABLED !== 'false';
+
+// Google sign-in needs the web client ID registered in the backend GOOGLE_CLIENT_IDS.
+export const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID?.trim() || undefined;

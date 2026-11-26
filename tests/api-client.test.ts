@@ -5,6 +5,7 @@ vi.mock('../src/lib/token-storage', () => ({
   tokenStorage: { load: async () => state.tokens, save: async (v: typeof state.tokens) => { state.tokens = v; }, clear: async () => { state.tokens = null; } },
 }));
 import { apiRequest } from '../src/lib/api-client';
+import { resetServerClock, serverOffsetMs } from '../src/lib/server-clock';
 
 beforeEach(() => {
   state.tokens = { accessToken: 'old', refreshToken: 'refresh-old' };
@@ -72,5 +73,92 @@ describe('refresh token contract', () => {
     vi.stubGlobal('fetch', async () => json(401, {}));
     await expect(apiRequest('/me', { auth: true })).rejects.toMatchObject({ status: 401 });
     expect(state.tokens).toBeNull();
+  });
+});
+
+describe('error messages', () => {
+  it('replaces the English gateway 429 body with a Vietnamese message and keeps Retry-After', async () => {
+    vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ status: 429, message: 'Request rate limit exceeded' }), { status: 429, headers: { 'Retry-After': '3' } }));
+    await expect(apiRequest('/feed')).rejects.toMatchObject({ status: 429, retryAfterSeconds: 3, message: 'Bạn thao tác quá nhanh. Vui lòng thử lại sau 3 giây.' });
+  });
+  it('still surfaces the server message for other errors', async () => {
+    vi.stubGlobal('fetch', async () => json(409, { message: 'Hết tim', code: 'VOCAB_NO_HEARTS' }));
+    await expect(apiRequest('/x', { method: 'POST' })).rejects.toMatchObject({ status: 409, code: 'VOCAB_NO_HEARTS', message: 'Hết tim' });
+  });
+  it('never shows an English service message: it becomes a Vietnamese sentence for the status and keeps the original body', async () => {
+    vi.stubGlobal('fetch', async () => json(404, { status: 404, message: 'Submission was not found' }));
+    await expect(apiRequest('/x')).rejects.toMatchObject({
+      status: 404,
+      message: 'Không tìm thấy nội dung này. Nội dung có thể đã bị xóa hoặc không còn khả dụng.',
+      body: { message: 'Submission was not found' },
+    });
+  });
+  it.each([
+    [500, 'Máy chủ đang gặp sự cố. Vui lòng thử lại sau.'],
+    [503, 'Dịch vụ tạm thời chưa sẵn sàng. Vui lòng thử lại sau ít phút.'],
+    [418, 'Có lỗi xảy ra, vui lòng thử lại.'],
+  ])('uses a Vietnamese sentence for an English %i body and for an empty one', async (status, expected) => {
+    vi.stubGlobal('fetch', async () => json(status, { message: 'Internal Server Error' }));
+    await expect(apiRequest('/x')).rejects.toMatchObject({ status, message: expected });
+    vi.stubGlobal('fetch', async () => new Response('', { status }));
+    await expect(apiRequest('/x')).rejects.toMatchObject({ status, message: expected });
+  });
+});
+
+describe('401 that rejects user input, not the session', () => {
+  it('surfaces CURRENT_PASSWORD_INVALID without refreshing or signing out', async () => {
+    const calls: string[] = [];
+    vi.stubGlobal('fetch', async (url: string) => {
+      calls.push(url);
+      if (url.endsWith('/auth/refresh')) return json(200, { accessToken: 'new', refreshToken: 'refresh-new' });
+      return json(401, { status: 401, message: 'Mật khẩu hiện tại không chính xác', details: { code: 'CURRENT_PASSWORD_INVALID' } });
+    });
+    await expect(apiRequest('/api/users/me/password', { method: 'POST', auth: true, body: {} }))
+      .rejects.toMatchObject({ status: 401, code: 'CURRENT_PASSWORD_INVALID', message: 'Mật khẩu hiện tại không chính xác' });
+    expect(calls.some((url) => url.endsWith('/auth/refresh'))).toBe(false);
+    expect(state.tokens).toEqual({ accessToken: 'old', refreshToken: 'refresh-old' });
+  });
+
+  it('still refreshes when the 401 is a bare token rejection from the gateway', async () => {
+    const calls: string[] = [];
+    vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
+      calls.push(url);
+      if (url.endsWith('/auth/refresh')) return json(200, { accessToken: 'new', refreshToken: 'refresh-new' });
+      const auth = (init.headers as Record<string, string>).Authorization;
+      return auth === 'Bearer new' ? json(200, { ok: true }) : json(401, { status: 401, error: 'Unauthorized', message: 'Unauthorized', details: null });
+    });
+    await expect(apiRequest('/api/users/me', { auth: true })).resolves.toEqual({ ok: true });
+    expect(calls.filter((url) => url.endsWith('/auth/refresh'))).toHaveLength(1);
+    expect(state.tokens?.refreshToken).toBe('refresh-new');
+  });
+});
+
+describe('server clock', () => {
+  it('learns the server time from the Date header of a response', async () => {
+    resetServerClock();
+    const serverTime = Date.now() + 10 * 60_000; // the server is ten minutes ahead of this phone
+    vi.stubGlobal('fetch', async () => new Response('{}', { status: 200, headers: { Date: new Date(serverTime).toUTCString() } }));
+    await apiRequest('/x');
+    expect(Math.abs(serverOffsetMs() - 10 * 60_000)).toBeLessThan(2_000);
+    resetServerClock();
+  });
+});
+
+describe('unreadable responses', () => {
+  it('reports a non-JSON success page in Vietnamese instead of returning null', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>captive portal</html>', { status: 200 })));
+    await expect(apiRequest('/portal')).rejects.toMatchObject({ code: 'BAD_RESPONSE', status: 502 });
+  });
+
+  it('reports a body cut off mid-way as a network error', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true, status: 200, headers: new Headers(), text: async () => { throw new TypeError('Network request failed'); },
+    })));
+    await expect(apiRequest('/cut')).rejects.toMatchObject({ code: 'NETWORK', status: 0 });
+  });
+
+  it('accepts an empty body', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 204 })));
+    await expect(apiRequest('/empty')).resolves.toBeNull();
   });
 });

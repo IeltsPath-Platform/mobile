@@ -9,8 +9,12 @@ import { TextField } from '@/src/components/ui/text-field';
 import { authApi } from '@/src/features/auth/api';
 import { AuthLink } from '@/src/features/auth/components/auth-link';
 import { AuthScreen } from '@/src/features/auth/components/auth-screen';
-import { applyApiError, FEATURE_COMING_SOON, isFeatureUnavailable } from '@/src/features/auth/form-errors';
+import { applyApiError } from '@/src/features/auth/form-errors';
 import { forgotPasswordSchema, type ForgotPasswordInput } from '@/src/features/auth/schemas';
+import { ApiError } from '@/src/lib/api-client';
+
+// Same text whether or not the email is registered, so the screen never confirms which accounts exist.
+const RESET_SENT_MESSAGE = 'Nếu email này đã đăng ký, mã đặt lại mật khẩu sẽ được gửi tới hộp thư của bạn trong vài phút.';
 
 export default function ForgotPasswordScreen() {
   const [formError, setFormError] = useState<string | null>(null);
@@ -30,10 +34,12 @@ export default function ForgotPasswordScreen() {
     setFormError(null);
     setSentMessage(null);
     try {
-      const response = await authApi.forgotPassword(email.trim());
-      setSentMessage(response.message);
+      await authApi.forgotPassword(email.trim());
+      setSentMessage(RESET_SENT_MESSAGE);
     } catch (error) {
-      setFormError(isFeatureUnavailable(error) ? FEATURE_COMING_SOON : applyApiError(error, setError, ['email']));
+      // The backend answers 404 for an unknown email; treat it like a sent request.
+      if (error instanceof ApiError && error.status === 404) setSentMessage(RESET_SENT_MESSAGE);
+      else setFormError(applyApiError(error, setError, ['email']));
     }
   });
 

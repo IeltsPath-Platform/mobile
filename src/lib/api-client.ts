@@ -1,4 +1,7 @@
 import { API_BASE_URL, API_CONFIGURATION_ERROR, REQUEST_TIMEOUT_MS } from './env';
+import { userFacingMessage } from './error-message';
+import { weakPasswordMessage } from './password-rules';
+import { observeServerDate } from './server-clock';
 import { tokenStorage, type SessionTokens } from './token-storage';
 
 type ErrorBody = {
@@ -8,33 +11,30 @@ type ErrorBody = {
   code?: string;
   path?: string;
   details?: Record<string, string> | null;
-  reviews?: unknown;
-};
-
-export type ApiReviewRef = {
-  reviewId: string;
-  lessonId: string;
-  knowledgePointId: string;
 };
 
 export class ApiError extends Error {
   readonly status: number;
   readonly details: Record<string, string>;
   readonly code?: string;
-  readonly reviews: ApiReviewRef[];
+  /** Seconds from the Retry-After header of a 429, when the server sent one. */
+  readonly retryAfterSeconds?: number;
+  /** The parsed error body, for callers that read fields beyond message, code and details. */
+  readonly body?: unknown;
 
   constructor(
     status: number,
     message: string,
     details?: Record<string, string> | null,
-    extras?: { code?: string; reviews?: ApiReviewRef[] },
+    extras?: { code?: string; retryAfterSeconds?: number; body?: unknown },
   ) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.details = details ?? {};
     this.code = extras?.code ?? details?.code;
-    this.reviews = extras?.reviews ?? [];
+    this.retryAfterSeconds = extras?.retryAfterSeconds;
+    this.body = extras?.body;
   }
 
   get isNetworkError() {
@@ -48,12 +48,12 @@ type RequestOptions = {
   auth?: boolean;
   signal?: AbortSignal;
   timeoutMs?: number;
+  headers?: Record<string, string>;
 };
 
 type TokenPair = { accessToken: string; refreshToken: string };
 
-const NETWORK_ERROR_MESSAGE = 'Không kết nối được máy chủ. Kiểm tra mạng hoặc địa chỉ API.';
-const FALLBACK_ERROR_MESSAGE = 'Có lỗi xảy ra, vui lòng thử lại.';
+const NETWORK_ERROR_MESSAGE = 'Không kết nối được máy chủ. Kiểm tra kết nối mạng rồi thử lại.';
 const MULTIPART_TIMEOUT_MS = 60_000;
 
 let sessionExpiredListener: (() => void) | null = null;
@@ -65,7 +65,7 @@ export function onSessionExpired(listener: (() => void) | null) {
 
 async function send(path: string, options: RequestOptions, accessToken?: string): Promise<Response> {
   if (API_CONFIGURATION_ERROR) throw new ApiError(0, API_CONFIGURATION_ERROR, null, { code: 'API_CONFIGURATION' });
-  const headers: Record<string, string> = { Accept: 'application/json' };
+  const headers: Record<string, string> = { ...options.headers, Accept: 'application/json' };
   const multipart = typeof FormData !== 'undefined' && options.body instanceof FormData;
   if (options.body !== undefined && !multipart) headers['Content-Type'] = 'application/json';
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
@@ -79,7 +79,8 @@ async function send(path: string, options: RequestOptions, accessToken?: string)
   if (options.signal?.aborted) controller.abort();
 
   try {
-    return await fetch(`${API_BASE_URL}${path}`, {
+    const sentAt = Date.now();
+    const response = await fetch(`${API_BASE_URL}${path}`, {
       method: options.method ?? 'GET',
       headers,
       body: options.body === undefined ? undefined : multipart ? options.body as FormData : JSON.stringify(options.body),
@@ -87,6 +88,8 @@ async function send(path: string, options: RequestOptions, accessToken?: string)
       credentials: 'omit',
       signal: controller.signal,
     });
+    observeServerDate(response.headers.get('Date'), sentAt, Date.now());
+    return response;
   } catch (cause) {
     if (options.signal?.aborted && !timedOut) {
       const cancelled = new Error('Request cancelled');
@@ -110,34 +113,39 @@ async function send(path: string, options: RequestOptions, accessToken?: string)
 }
 
 async function parse<T>(response: Response): Promise<T> {
-  const text = await response.text();
+  let text: string;
+  try {
+    text = await response.text();
+  } catch {
+    throw new ApiError(0, NETWORK_ERROR_MESSAGE, null, { code: 'NETWORK' });
+  }
   const data = text ? safeJson(text) : null;
 
   if (!response.ok) {
     const body = (data ?? {}) as ErrorBody;
-    const fallback = response.status === 503 ? 'Dịch vụ tạm chưa sẵn sàng. Kiểm tra backend rồi thử lại.' : FALLBACK_ERROR_MESSAGE;
-    throw new ApiError(response.status, body.message || body.detail || fallback, body.details, {
-      code: body.code,
-      reviews: readReviews(body.reviews),
-    });
+    const retryAfterSeconds = readRetryAfter(response.headers.get('Retry-After'));
+    // The gateway's rate-limit body is English; show a Vietnamese message instead.
+    const message = response.status === 429
+      ? rateLimitMessage(retryAfterSeconds)
+      : (body.code === 'WEAK_PASSWORD' ? weakPasswordMessage(body.details?.reasons) : null)
+        ?? userFacingMessage(response.status, body.message || body.detail);
+    throw new ApiError(response.status, message, body.details, { code: body.code, retryAfterSeconds, body: data });
+  }
+  if (text && data === null && text.trim() !== 'null') {
+    throw new ApiError(502, 'Máy chủ trả về dữ liệu không đọc được. Kiểm tra kết nối mạng rồi thử lại.', null, { code: 'BAD_RESPONSE' });
   }
   return data as T;
 }
 
-function readReviews(value: unknown): ApiReviewRef[] {
-  if (!Array.isArray(value)) return [];
-  const reviews: ApiReviewRef[] = [];
-  for (const item of value) {
-    if (!item || typeof item !== 'object') continue;
-    const row = item as Record<string, unknown>;
-    if (typeof row.reviewId !== 'string' || typeof row.lessonId !== 'string') continue;
-    reviews.push({
-      reviewId: row.reviewId,
-      lessonId: row.lessonId,
-      knowledgePointId: typeof row.knowledgePointId === 'string' ? row.knowledgePointId : '',
-    });
-  }
-  return reviews;
+function rateLimitMessage(retryAfterSeconds?: number): string {
+  return retryAfterSeconds
+    ? `Bạn thao tác quá nhanh. Vui lòng thử lại sau ${retryAfterSeconds} giây.`
+    : 'Bạn thao tác quá nhanh. Vui lòng thử lại sau ít giây.';
+}
+
+function readRetryAfter(value: string | null): number | undefined {
+  const seconds = value ? Number(value) : NaN;
+  return Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : undefined;
 }
 
 function safeJson(text: string): unknown {
@@ -168,6 +176,18 @@ async function refreshTokens(): Promise<SessionTokens | null> {
   }
 }
 
+/**
+ * A 401 that carries an error code rejects something the user typed (e.g. CURRENT_PASSWORD_INVALID
+ * on password change), not the session. Token failures from the gateway and services have no code.
+ * Treating those as session expiry would refresh, fail again and sign the user out.
+ * The exception is `SESSION_REVOKED`: the gateway sends it for a token whose session was ended elsewhere.
+ */
+async function isBusinessRejection(response: Response): Promise<boolean> {
+  const body = safeJson(await response.clone().text().catch(() => '')) as ErrorBody | null;
+  const code = body?.code || body?.details?.code;
+  return Boolean(code) && code !== 'SESSION_REVOKED';
+}
+
 // Refresh tokens rotate, so concurrent 401s must share a single refresh call.
 function refreshOnce() {
   refreshInFlight ??= refreshTokens().finally(() => {
@@ -186,7 +206,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   }
 
   const response = await send(path, options, tokens.accessToken);
-  if (response.status !== 401) return parse<T>(response);
+  if (response.status !== 401 || await isBusinessRejection(response)) return parse<T>(response);
 
   const latest = await tokenStorage.load();
   const refreshed = latest && latest.accessToken !== tokens.accessToken ? latest : await refreshOnce();
@@ -195,7 +215,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     throw new ApiError(401, 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.');
   }
   const retry = await send(path, options, refreshed.accessToken);
-  if (retry.status === 401) {
+  if (retry.status === 401 && !await isBusinessRejection(retry)) {
     // A freshly issued token was rejected too: the session cannot be recovered.
     await tokenStorage.clear();
     sessionExpiredListener?.();
