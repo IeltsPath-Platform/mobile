@@ -242,17 +242,20 @@ export default function FlashcardsScreen() {
             ) : null}
             {/* Nút nhanh */}
             <View className="flex-row gap-3">
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => open('/flashcards/notebook')}
-                className="min-h-14 flex-1 flex-row items-center justify-center gap-2 rounded-2xl active:opacity-80"
-                style={{ borderWidth: 2, borderBottomWidth: 4, borderColor: colors.line, borderBottomColor: colors.edge, backgroundColor: colors.surface }}
-              >
-                <BookOpen size={20} color={colors.accentDeep} />
-                <Text weight="extrabold" className="text-sm">
-                  Sổ từ
-                </Text>
-              </Pressable>
+              {/* The notebook card above is the way in once words are saved; one entry is enough. */}
+              {hasNotebook ? null : (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => open('/flashcards/notebook')}
+                  className="min-h-14 flex-1 flex-row items-center justify-center gap-2 rounded-2xl active:opacity-80"
+                  style={{ borderWidth: 2, borderBottomWidth: 4, borderColor: colors.line, borderBottomColor: colors.edge, backgroundColor: colors.surface }}
+                >
+                  <BookOpen size={20} color={colors.accentDeep} />
+                  <Text weight="extrabold" className="text-sm">
+                    Sổ từ
+                  </Text>
+                </Pressable>
+              )}
               <Pressable
                 accessibilityRole="button"
                 onPress={() => open('/flashcards/progress')}

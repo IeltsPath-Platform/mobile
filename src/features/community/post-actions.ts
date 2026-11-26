@@ -101,6 +101,8 @@ export function deletePost(qc: QueryClient, post: CommunityPost, onDone?: () => 
       await communityApi.delete(post.id);
       haptics.success();
       onDone?.();
+      // After the screen has left: the cached detail would otherwise show the deleted post when a notification opens it.
+      qc.removeQueries({ queryKey: ['community', 'detail', post.id] });
     } catch (error) {
       restore();
       fail('Không thể xóa bài viết', error);

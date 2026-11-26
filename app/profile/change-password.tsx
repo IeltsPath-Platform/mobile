@@ -6,6 +6,7 @@ import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BackButton } from '@/src/components/navigation/back-header';
+import { StatusBarStrip } from '@/src/components/ui/band-status-bar';
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
 import { FormAlert } from '@/src/components/ui/form-alert';
@@ -57,7 +58,7 @@ export default function ChangePasswordScreen() {
   });
 
   return (
-    <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'web' ? undefined : 'padding'}>
       <View className="flex-1 bg-canvas">
         <ScrollView
           keyboardShouldPersistTaps="handled"
@@ -99,6 +100,7 @@ export default function ChangePasswordScreen() {
             {saved ? <Button label="Đăng nhập lại" variant="secondary" icon={<CheckCircle2 size={18} color={colors.success} />} onPress={() => void signOut()} /> : null}
           </Card>}
         </ScrollView>
+        <StatusBarStrip color={colors.canvas} />
 
         {!saved && !needsPassword ? <View className="border-t border-line bg-surface px-5 pt-3" style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
           <Button label="Cập nhật mật khẩu" loading={mutation.isPending} loadingLabel="Đang cập nhật" disabled={!currentPassword || !newPassword || !confirmPassword} onPress={() => { setSaved(false); setFormError(''); mutation.mutate(); }} />

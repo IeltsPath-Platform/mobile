@@ -18,7 +18,7 @@ const GOOGLE_ERRORS: Record<string, string> = {
   GOOGLE_SIGNIN_UNAVAILABLE: 'Đăng nhập Google tạm chưa sẵn sàng. Vui lòng thử lại sau.',
 };
 
-const EXPO_GO_MESSAGE = 'Bản ứng dụng này chưa hỗ trợ đăng nhập Google (Expo Go hoặc bản cài cũ). Hãy cài bản dev build mới nhất, hoặc dùng email và mật khẩu.';
+const EXPO_GO_MESSAGE = 'Bản ứng dụng này chưa hỗ trợ đăng nhập Google. Hãy cập nhật ứng dụng, hoặc dùng email và mật khẩu.';
 
 function describe(error: unknown, google: ReturnType<typeof loadGoogleSignin>): string | null {
   if (error instanceof ApiError) return (error.code && GOOGLE_ERRORS[error.code]) || error.message;

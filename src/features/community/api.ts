@@ -4,7 +4,7 @@ import { imageUploadForm } from '@/src/lib/image-upload-form';
 export type PostCategory = 'GENERAL' | 'QUESTION' | 'DISCUSSION' | 'WRITING_SHARING' | 'SPEAKING_PARTNER' | 'RESOURCE_TIPS';
 export type PostBackground = 'VIOLET' | 'CRIMSON' | 'MIDNIGHT' | 'SUNSET' | 'OCEAN' | 'FOREST' | 'ROSE' | 'AURORA';
 export type ReactionType = 'LIKE' | 'LOVE' | 'HELPFUL' | 'ACCURATE';
-export type PublicProfile = { id: string; displayName: string; avatarUrl?: string | null; bio?: string | null; targetBand?: number | null; streak?: number };
+export type PublicProfile = { id: string; displayName: string; avatarUrl?: string | null; bio?: string | null; targetBand?: number | null };
 export type CommunityPost = {
   id: string; authorId: string; category: PostCategory; title: string | null; body: string;
   createdAt: string; updatedAt?: string; imageUrls: string[]; videoUrl?: string | null;
@@ -42,7 +42,7 @@ export function parseOffsetPage<T>(value: unknown, pageNumber: number, size: num
   const content = Array.isArray(data.content) ? data.content : [];
   return { content: content as T[], page: data.page ?? pageNumber, size: data.size ?? size,
     totalElements: data.totalElements ?? content.length, totalPages: data.totalPages ?? (content.length < size ? pageNumber + 1 : pageNumber + 2),
-    last: data.last ?? content.length < size };
+    last: data.last ?? (data.totalPages != null ? pageNumber + 1 >= data.totalPages : content.length < size) };
 }
 export function notificationHasNext(items: unknown[], size: number) { return items.length === size; }
 export function parseMentionMarkup(body: string) {

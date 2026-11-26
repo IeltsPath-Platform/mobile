@@ -4,10 +4,13 @@ import { useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, View } from 'react-native';
 
 import { BackHeader } from '@/src/components/navigation/back-header';
+import { StatusBarStrip } from '@/src/components/ui/band-status-bar';
 import { Button } from '@/src/components/ui/button';
 import { EmptyState } from '@/src/components/ui/empty-state';
 import { Text } from '@/src/components/ui/text';
 import { colors, lightColors } from '@/src/theme';
+import { safeErrorMessage } from '@/src/lib/error-message';
+import { useSingleFlight } from '@/src/lib/use-single-flight';
 
 import { getApprovedErrorTypes, errorTypesByCode, type LearnerErrorType } from '../../api/examiner-reviews';
 import { getExaminer, getHumanReview, readStudyPoints, type ExaminerStudyPoint, type HumanReview } from '../../api/examiners';
@@ -59,13 +62,14 @@ export function ExaminerResultView({ submission, submissionId, title }: { submis
     return (
       <View className="flex-1 bg-canvas">
         <BackHeader title="Kết quả Writing" fallbackHref={CATALOG} />
-        <EmptyState title="Chưa tải được bài chấm" message={review.error.message} mood="oops" action={<Button label="Thử lại" variant="secondary" onPress={refresh} />} />
+        <EmptyState title="Chưa tải được bài chấm" message={safeErrorMessage(review.error, 'Chưa tải được bài chấm. Vui lòng thử lại.')} mood="oops" action={<Button label="Thử lại" variant="secondary" onPress={refresh} />} />
       </View>
     );
   }
 
   return (
-    <ScrollView className="flex-1 bg-canvas" contentContainerStyle={{ paddingBottom: 40 }}>
+    <View className="flex-1 bg-canvas">
+    <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
       <SkillBand color={colors.skill.writing} title="Giáo viên chấm" subtitle={title} fallbackHref={CATALOG}>
         {done && review.data ? <TeacherBand review={review.data} /> : null}
       </SkillBand>
@@ -93,6 +97,8 @@ export function ExaminerResultView({ submission, submissionId, title }: { submis
         )}
       </View>
     </ScrollView>
+    <StatusBarStrip color={colors.skill.writing} />
+    </View>
   );
 }
 
@@ -228,6 +234,7 @@ function Done({ review, essay, types }: { review: HumanReview; essay: string; ty
 
 /** What to study after the examiner's grade; each point opens its review or practice on the website. */
 function StudyPoints({ points }: { points: ExaminerStudyPoint[] }) {
+  const openOnce = useSingleFlight();
   if (!points.length) return null;
   return (
     <Card title="Cần ôn">
@@ -235,18 +242,19 @@ function StudyPoints({ points }: { points: ExaminerStudyPoint[] }) {
         const title = point.name ?? point.code ?? CRITERION_NAME[point.criterionCode ?? ''] ?? point.criterionCode ?? 'Kiến thức cần học';
         const detail = point.kind === 'ERROR_CODE' ? `Lỗi giáo viên đánh dấu ×${point.count ?? 1}` : `${CRITERION_NAME[point.criterionCode ?? ''] ?? point.criterionCode ?? 'Tiêu chí'}${point.band != null ? ` · band ${point.band.toFixed(1)}` : ''}`;
         const target = point.practiceKnowledgePointId ?? point.knowledgePointId;
-        const open = async () => {
+        // One at a time: every opening of a knowledge point creates a new practice set on the server.
+        const open = () => openOnce(async () => {
           try {
             if (point.reviewItemId) await openOnWeb(`/learn/reviews/${point.reviewItemId}`);
             else if (target) await practiseKnowledgePointOnWeb(target);
-          } catch (cause) { Alert.alert('Chưa mở được bài ôn', cause instanceof Error ? cause.message : 'Hãy thử lại sau.'); }
-        };
+          } catch (cause) { Alert.alert('Chưa mở được bài ôn', safeErrorMessage(cause, 'Hãy thử lại sau.')); }
+        });
         return (
           <View key={`${point.kind}-${point.knowledgePointId ?? index}`} className="mt-2 rounded-2xl p-3" style={{ backgroundColor: colors.canvas }}>
             <Text weight="bold" className="text-sm text-ink">{title}</Text>
             <Text className="text-xs text-muted">{detail}</Text>
             {WEB_APP_URL && (point.reviewItemId || target) ? (
-              <Pressable onPress={() => void open()} accessibilityRole="link" className="mt-2 min-h-10 flex-row items-center gap-1.5 self-start rounded-full px-3" style={{ backgroundColor: colors.accentSoft }}>
+              <Pressable onPress={() => void open()} accessibilityRole="link" className="mt-2 min-h-11 flex-row items-center gap-1.5 self-start rounded-full px-3" style={{ backgroundColor: colors.accentSoft }}>
                 <ExternalLink size={14} color={colors.accentDeep} />
                 <Text weight="bold" className="text-sm" style={{ color: colors.accentDeep }}>{point.reviewItemId ? 'Ôn tập (web)' : 'Luyện (web)'}</Text>
               </Pressable>

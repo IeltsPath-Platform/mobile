@@ -110,7 +110,8 @@ function RootNavigator() {
   const isAuthenticated = status === "authenticated";
 
   useEffect(() => {
-    if (!isAuthenticated) return;
+    // `ready`: on a cold start the navigator is not mounted yet and a push now would be lost.
+    if (!isAuthenticated || !ready) return;
     let handledResponseKey: string | undefined;
     const openNotification = (response: Notifications.NotificationResponse) => {
       const responseKey = `${response.notification.request.identifier}:${response.actionIdentifier}`;
@@ -130,7 +131,7 @@ function RootNavigator() {
       if (response) openNotification(response);
     }).catch(() => undefined);
     return () => { subscription.remove(); received.remove(); };
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, ready, router]);
 
   if (!ready || (AUTH_ENABLED && status === "loading")) {
     return (

@@ -11,6 +11,7 @@ import { RewardToast } from '@/src/components/effects/reward-toast';
 import { Button } from '@/src/components/ui/button';
 import { Text } from '@/src/components/ui/text';
 import { useCurrentUser } from '@/src/features/auth/auth-provider';
+import { isGone } from '@/src/features/games/errors';
 import { PRACTICE_HOME } from '@/src/features/games/game-meta';
 import { GameStateScreen, ProgressBar, StandingsStrip, TimerPill } from '@/src/features/games/ui/game-ui';
 import { UsedLetters } from '@/src/features/games/wordly/used-letters';
@@ -75,7 +76,8 @@ export default function WordlyMatchScreen() {
   if (match.isPending || current.isPending) {
     return <GameStateScreen loading title="Đang vào ván Wordly…" message="Đang đồng bộ từ và trạng thái của bạn" />;
   }
-  if (match.isError || !match.data) {
+  // A failed refetch must not throw the player out of a live match; a match the server no longer has does.
+  if (!match.data || isGone(match.error)) {
     return (
       <GameStateScreen
         icon={WifiOff}

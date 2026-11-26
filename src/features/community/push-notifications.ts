@@ -75,6 +75,7 @@ export async function unregisterCurrentInstallation() {
 }
 
 export function getNotificationRoute(data: Record<string, unknown> | undefined) {
+  if (data?.eventType === 'library.vocabulary-review-due.v1') return '/(tabs)/flashcards' as const;
   const postId = typeof data?.postId === 'string' ? data.postId : undefined;
   if (postId) {
     const commentId = typeof data?.commentId === 'string' ? data.commentId : '';

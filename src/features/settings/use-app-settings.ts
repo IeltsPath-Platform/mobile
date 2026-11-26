@@ -110,15 +110,9 @@ export function useAppSettings() {
     setSettings(next);
   }, []);
 
-  const resetSettings = useCallback(async () => {
-    await clearAppSettingsStorage();
-    setSettings({ ...DEFAULT_APP_SETTINGS });
-  }, []);
-
   return {
     settings,
     ready,
     update,
-    resetSettings,
   };
 }

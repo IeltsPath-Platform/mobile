@@ -143,3 +143,22 @@ describe('server clock', () => {
     resetServerClock();
   });
 });
+
+describe('unreadable responses', () => {
+  it('reports a non-JSON success page in Vietnamese instead of returning null', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>captive portal</html>', { status: 200 })));
+    await expect(apiRequest('/portal')).rejects.toMatchObject({ code: 'BAD_RESPONSE', status: 502 });
+  });
+
+  it('reports a body cut off mid-way as a network error', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true, status: 200, headers: new Headers(), text: async () => { throw new TypeError('Network request failed'); },
+    })));
+    await expect(apiRequest('/cut')).rejects.toMatchObject({ code: 'NETWORK', status: 0 });
+  });
+
+  it('accepts an empty body', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 204 })));
+    await expect(apiRequest('/empty')).resolves.toBeNull();
+  });
+});

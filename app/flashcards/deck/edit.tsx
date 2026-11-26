@@ -19,6 +19,7 @@ import { FormAlert } from '@/src/components/ui/form-alert';
 import { Text } from '@/src/components/ui/text';
 import { vocabApi } from '@/src/features/vocab/api';
 import { invalidateFlashcards } from '@/src/features/flashcards/queries';
+import { safeErrorMessage } from '@/src/lib/error-message';
 import { colors } from '@/src/theme';
 
 const input =
@@ -67,7 +68,7 @@ export default function EditDeckScreen() {
         params: { deckId: deck.id },
       });
     },
-    onError: (e: Error) => setError(e.message),
+    onError: (e: Error) => setError(safeErrorMessage(e, 'Không lưu được bộ thẻ. Vui lòng thử lại.')),
   });
   const pickCover = async () => {
     try {
@@ -109,7 +110,7 @@ export default function EditDeckScreen() {
       setCoverKey(uploaded.key);
       setCoverUrl(uploaded.url);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không tải được ảnh.');
+      setError(safeErrorMessage(e, 'Không tải được ảnh. Vui lòng thử lại.'));
     } finally {
       setUploadingCover(false);
     }
@@ -123,7 +124,7 @@ export default function EditDeckScreen() {
       />
       <KeyboardAvoidingView
         className="flex-1"
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'web' ? undefined : 'padding'}
       >
         <ScrollView
           className="flex-1"

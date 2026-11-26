@@ -1,6 +1,7 @@
 import type { FieldValues, Path, UseFormSetError } from 'react-hook-form';
 
 import { ApiError } from '@/src/lib/api-client';
+import { safeErrorMessage } from '@/src/lib/error-message';
 
 /**
  * Pushes backend field errors (ErrorResponse.details) into the form and
@@ -11,7 +12,7 @@ export function applyApiError<T extends FieldValues>(
   setError: UseFormSetError<T>,
   fields: readonly Path<T>[],
 ): string {
-  if (!(error instanceof ApiError)) return 'Có lỗi xảy ra, vui lòng thử lại.';
+  if (!(error instanceof ApiError)) return safeErrorMessage(error);
 
   let matchedField = false;
   for (const [field, message] of Object.entries(error.details)) {

@@ -1,0 +1,150 @@
+diff --git a/services/content-service/src/main/java/com/ieltspath/content/api/exception/GlobalExceptionHandler.java b/services/content-service/src/main/java/com/ieltspath/content/api/exception/GlobalExceptionHandler.java
+index a3ea78c8..2a196f76 100644
+--- a/services/content-service/src/main/java/com/ieltspath/content/api/exception/GlobalExceptionHandler.java
++++ b/services/content-service/src/main/java/com/ieltspath/content/api/exception/GlobalExceptionHandler.java
+@@ -495,6 +495,12 @@ public class GlobalExceptionHandler {
+                 Map.of("code", "INVALID_MEDIA_REFERENCE"));
+     }
+ 
++    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
++    public ResponseEntity<ErrorResponse> methodNotAllowed(org.springframework.web.HttpRequestMethodNotSupportedException ex,
++            HttpServletRequest request) {
++        return buildResponse(HttpStatus.METHOD_NOT_ALLOWED, "Phương thức này không được hỗ trợ.", request.getRequestURI(), null);
++    }
++
+     @ExceptionHandler(Exception.class)
+     public ResponseEntity<ErrorResponse> handleGenericException(Exception ex, HttpServletRequest request) {
+         log.error("Unhandled exception processing request: {}", request.getRequestURI(), ex);
+diff --git a/services/game-service/src/main/java/com/ieltspath/game/api/exception/GlobalExceptionHandler.java b/services/game-service/src/main/java/com/ieltspath/game/api/exception/GlobalExceptionHandler.java
+index 68dabca9..29ebd6dd 100644
+--- a/services/game-service/src/main/java/com/ieltspath/game/api/exception/GlobalExceptionHandler.java
++++ b/services/game-service/src/main/java/com/ieltspath/game/api/exception/GlobalExceptionHandler.java
+@@ -1,5 +1,6 @@
+ package com.ieltspath.game.api.exception;
+ 
++import com.ieltspath.commonsecurity.error.VietnameseErrorMessages;
+ import com.ieltspath.game.domain.exception.GameMatchNotFoundException;
+ import com.ieltspath.game.domain.exception.GameRoomNotFoundException;
+ import com.ieltspath.game.domain.exception.GameSessionNotFoundException;
+@@ -35,7 +36,7 @@ public class GlobalExceptionHandler {
+         body.put("status", e.status());
+         body.put("error", HttpStatus.valueOf(e.status()).getReasonPhrase());
+         body.put("code", e.code());
+-        body.put("message", e.getMessage());
++        body.put("message", VietnameseErrorMessages.userFacing(e.status(), e.getMessage()));
+         body.put("path", request.getRequestURI());
+         body.put("details", e instanceof com.ieltspath.game.domain.exception.NotEnoughWordsException shortage
+                 ? java.util.Map.of("available", shortage.available()) : null);
+@@ -91,6 +92,19 @@ public class GlobalExceptionHandler {
+                 HttpStatus.SERVICE_UNAVAILABLE, "Content service is unavailable", request, null);
+     }
+ 
++    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
++    public ResponseEntity<ErrorResponse> methodNotAllowed(org.springframework.web.HttpRequestMethodNotSupportedException ex,
++            HttpServletRequest request) {
++        return error(HttpStatus.METHOD_NOT_ALLOWED, "Phương thức này không được hỗ trợ.", request, null);
++    }
++
++    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
++    public ResponseEntity<ErrorResponse> typeMismatch(
++            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException exception,
++            HttpServletRequest request) {
++        return error(HttpStatus.BAD_REQUEST, "Dữ liệu gửi lên không hợp lệ", request, null);
++    }
++
+     @ExceptionHandler(MethodArgumentNotValidException.class)
+     public ResponseEntity<ErrorResponse> validation(
+             MethodArgumentNotValidException exception, HttpServletRequest request) {
+@@ -107,6 +121,7 @@ public class GlobalExceptionHandler {
+     @ExceptionHandler(Exception.class)
+     public ResponseEntity<ErrorResponse> unexpected(
+             Exception exception, HttpServletRequest request) {
++        log.error("Unhandled exception processing request: {}", request.getRequestURI(), exception);
+         return error(
+                 HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred", request, null);
+     }
+@@ -116,13 +131,18 @@ public class GlobalExceptionHandler {
+             String message,
+             HttpServletRequest request,
+             Map<String, String> details) {
++        String userMessage = VietnameseErrorMessages.userFacing(status.value(), message);
++        if (!userMessage.equals(message)) {
++            log.warn("Error message without Vietnamese text replaced for the client: status={} path={} message={}",
++                    status.value(), request.getRequestURI(), message);
++        }
+         return ResponseEntity.status(status)
+                 .body(
+                         new ErrorResponse(
+                                 Instant.now(),
+                                 status.value(),
+                                 status.getReasonPhrase(),
+-                                message,
++                                userMessage,
+                                 request.getRequestURI(),
+                                 details));
+     }
+diff --git a/services/game-service/src/main/java/com/ieltspath/game/domain/exception/GameMatchNotFoundException.java b/services/game-service/src/main/java/com/ieltspath/game/domain/exception/GameMatchNotFoundException.java
+index adf60ccc..b9523060 100644
+--- a/services/game-service/src/main/java/com/ieltspath/game/domain/exception/GameMatchNotFoundException.java
++++ b/services/game-service/src/main/java/com/ieltspath/game/domain/exception/GameMatchNotFoundException.java
+@@ -1,2 +1,2 @@
+ package com.ieltspath.game.domain.exception;
+-public class GameMatchNotFoundException extends RuntimeException { public GameMatchNotFoundException(Object id){super("Game match not found: "+id);} }
++public class GameMatchNotFoundException extends RuntimeException { public GameMatchNotFoundException(Object id){super("Không tìm thấy trận đấu");} }
+diff --git a/services/game-service/src/main/java/com/ieltspath/game/domain/exception/GameSessionNotFoundException.java b/services/game-service/src/main/java/com/ieltspath/game/domain/exception/GameSessionNotFoundException.java
+index 4f7c2248..eb3c6030 100644
+--- a/services/game-service/src/main/java/com/ieltspath/game/domain/exception/GameSessionNotFoundException.java
++++ b/services/game-service/src/main/java/com/ieltspath/game/domain/exception/GameSessionNotFoundException.java
+@@ -3,5 +3,5 @@ package com.ieltspath.game.domain.exception;
+ import java.util.UUID;
+ 
+ public class GameSessionNotFoundException extends RuntimeException {
+-    public GameSessionNotFoundException(UUID id) { super("Game session not found: " + id); }
++    public GameSessionNotFoundException(UUID id) { super("Không tìm thấy phiên chơi"); }
+ }
+diff --git a/services/library-service/src/main/java/com/ieltspath/library/api/exception/GlobalExceptionHandler.java b/services/library-service/src/main/java/com/ieltspath/library/api/exception/GlobalExceptionHandler.java
+index 67f17593..a583486f 100644
+--- a/services/library-service/src/main/java/com/ieltspath/library/api/exception/GlobalExceptionHandler.java
++++ b/services/library-service/src/main/java/com/ieltspath/library/api/exception/GlobalExceptionHandler.java
+@@ -161,6 +161,12 @@ public class GlobalExceptionHandler {
+                 messageForPath(request, "Forbidden", "Access denied"), request.getRequestURI(), null);
+     }
+ 
++    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
++    public ResponseEntity<ErrorResponse> methodNotAllowed(org.springframework.web.HttpRequestMethodNotSupportedException ex,
++            HttpServletRequest request) {
++        return buildResponse(HttpStatus.METHOD_NOT_ALLOWED, "Phương thức này không được hỗ trợ.", request.getRequestURI(), null);
++    }
++
+     @ExceptionHandler(Exception.class)
+     public ResponseEntity<ErrorResponse> handleGenericException(Exception ex, HttpServletRequest request) {
+         log.error("Unhandled exception processing request: {}", request.getRequestURI(), ex);
+diff --git a/services/user-service/src/main/java/com/ieltspath/user/application/usecase/AuthTokenIssuer.java b/services/user-service/src/main/java/com/ieltspath/user/application/usecase/AuthTokenIssuer.java
+index 92a596ff..5dcd7ed3 100644
+--- a/services/user-service/src/main/java/com/ieltspath/user/application/usecase/AuthTokenIssuer.java
++++ b/services/user-service/src/main/java/com/ieltspath/user/application/usecase/AuthTokenIssuer.java
+@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
+ import java.util.Base64;
+ import java.util.UUID;
+ import com.ieltspath.user.application.command.LoginContext;
++import com.ieltspath.user.application.port.AuthAuditContextProvider;
+ 
+ @Service
+ @RequiredArgsConstructor
+@@ -23,12 +24,15 @@ public class AuthTokenIssuer {
+     private final RefreshTokenRepository refreshTokenRepository;
+     private final TokenHashService tokenHashService;
+     private final AuthTokenProperties properties;
++    private final AuthAuditContextProvider contextProvider;
+     private final SecureRandom secureRandom = new SecureRandom();
+ 
+     public AuthTokenResult issue(User user) {
+         UUID familyId = UUID.randomUUID();
+         LocalDateTime startedAt = LocalDateTime.now();
+-        return issue(user, familyId, startedAt, LoginContext.UNKNOWN);
++        // A new session records the device and address of the sign-in request, shown in the session list.
++        LoginContext context = contextProvider.current();
++        return issue(user, familyId, startedAt, context == null ? LoginContext.UNKNOWN : context);
+     }
+ 
+     public AuthTokenResult issue(User user, UUID familyId, LocalDateTime sessionStartedAt, LoginContext context) {

@@ -113,7 +113,12 @@ async function send(path: string, options: RequestOptions, accessToken?: string)
 }
 
 async function parse<T>(response: Response): Promise<T> {
-  const text = await response.text();
+  let text: string;
+  try {
+    text = await response.text();
+  } catch {
+    throw new ApiError(0, NETWORK_ERROR_MESSAGE, null, { code: 'NETWORK' });
+  }
   const data = text ? safeJson(text) : null;
 
   if (!response.ok) {
@@ -125,6 +130,9 @@ async function parse<T>(response: Response): Promise<T> {
       : (body.code === 'WEAK_PASSWORD' ? weakPasswordMessage(body.details?.reasons) : null)
         ?? userFacingMessage(response.status, body.message || body.detail);
     throw new ApiError(response.status, message, body.details, { code: body.code, retryAfterSeconds, body: data });
+  }
+  if (text && data === null && text.trim() !== 'null') {
+    throw new ApiError(502, 'Máy chủ trả về dữ liệu không đọc được. Kiểm tra kết nối mạng rồi thử lại.', null, { code: 'BAD_RESPONSE' });
   }
   return data as T;
 }

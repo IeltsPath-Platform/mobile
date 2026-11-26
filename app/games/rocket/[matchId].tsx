@@ -9,6 +9,7 @@ import { RewardToast } from '@/src/components/effects/reward-toast';
 import { Button } from '@/src/components/ui/button';
 import { Text } from '@/src/components/ui/text';
 import { useCurrentUser } from '@/src/features/auth/auth-provider';
+import { isGone } from '@/src/features/games/errors';
 import { PRACTICE_HOME, resultRoute } from '@/src/features/games/game-meta';
 import { RocketArena } from '@/src/features/games/rocket/rocket-arena';
 import { useRocketMatch } from '@/src/features/games/rocket/use-rocket-match';
@@ -24,13 +25,14 @@ export default function RocketMatchScreen() {
   const { match, current, round, result } = game;
 
   if (match.isPending || current.isPending) {
-    return <GameStateScreen loading title="Đang đồng bộ Rocket…" message="Đang chuẩn bị đường chạy cho bạn" />;
+    return <GameStateScreen loading title="Đang đồng bộ ván Tên lửa…" message="Đang chuẩn bị đường chạy cho bạn" />;
   }
-  if (match.isError || !match.data) {
+  // A failed refetch must not throw the player out of a live match; a match the server no longer has does.
+  if (!match.data || isGone(match.error)) {
     return (
       <GameStateScreen
         icon={WifiOff}
-        title="Không tải được ván Rocket"
+        title="Không tải được ván Tên lửa"
         message={match.error?.message}
         actions={[
           { label: 'Thử lại', onPress: () => void match.refetch() },
@@ -116,7 +118,7 @@ export default function RocketMatchScreen() {
               <View className="items-center rounded-3xl p-6" style={{ backgroundColor: colors.accentSoft }}>
                 <Clock3 size={26} color={colors.accent} />
                 <Text weight="bold" className="mt-2 text-sm text-accent">
-                  Vòng mới mở sau {game.secondsLeft} giây
+                  {game.secondsLeft > 0 ? `Vòng mới mở sau ${game.secondsLeft} giây` : game.connected ? 'Đang mở vòng mới…' : 'Mất kết nối. Đang nối lại…'}
                 </Text>
               </View>
             ) : (

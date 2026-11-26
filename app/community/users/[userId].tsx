@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Bookmark, ChevronRight, Flame, Target } from 'lucide-react-native';
+import { Bookmark, ChevronRight } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, View } from 'react-native';
 
@@ -59,6 +59,9 @@ export default function PublicProfileScreen() {
     setAuthorFollowing(qc, userId, !was);
     try {
       await communityApi.follow(userId, was);
+      // The counts are patched above; the lists of names behind them have to be read again.
+      void qc.invalidateQueries({ queryKey: ['community', 'profile-list', userId, 'followers'] });
+      void qc.invalidateQueries({ queryKey: ['community', 'profile-list', current.data?.id, 'following'] });
     } catch (error) {
       setAuthorFollowing(qc, userId, was);
       haptics.error();
@@ -130,21 +133,6 @@ export default function PublicProfileScreen() {
 
         <Text accessibilityRole="header" weight="black" className="mt-3 text-2xl" style={{ letterSpacing: -0.4 }}>{p.displayName}</Text>
         {p.bio ? <Text className="mt-1.5 text-[15px] leading-6 text-ink">{p.bio}</Text> : null}
-
-        {p.targetBand != null || p.streak != null ? (
-          <View className="mt-3 flex-row flex-wrap gap-2">
-            {p.targetBand != null ? (
-              <View className="flex-row items-center gap-1.5 rounded-full px-3 py-1.5" style={{ backgroundColor: colors.listeningSoft }}>
-                <Target size={14} color={colors.accent} /><Text weight="semibold" className="text-xs" style={{ color: colors.accent }}>Mục tiêu band {p.targetBand}</Text>
-              </View>
-            ) : null}
-            {p.streak != null ? (
-              <View className="flex-row items-center gap-1.5 rounded-full px-3 py-1.5" style={{ backgroundColor: colors.warmSoft }}>
-                <Flame size={14} color={colors.flame} fill={colors.flame} /><Text weight="semibold" className="text-xs" style={{ color: colors.xpDeep }}>{p.streak} ngày liên tục</Text>
-              </View>
-            ) : null}
-          </View>
-        ) : null}
 
         <View className="mt-4 flex-row gap-6">
           <Pressable onPress={() => setTab('followers')} accessibilityRole="button" className="min-h-11 justify-center">

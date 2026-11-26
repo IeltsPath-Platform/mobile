@@ -5,6 +5,8 @@ import { BackHeader } from '@/src/components/navigation/back-header';
 import { Text } from '@/src/components/ui/text';
 import { useCurrentUser } from '@/src/features/auth/auth-provider';
 import { communityApi } from '@/src/features/community/api';
+import { PushPermissionNotice } from '@/src/features/community/components/push-permission-notice';
+import { safeErrorMessage } from '@/src/lib/error-message';
 import { colors } from '@/src/theme';
 import { useTheme } from '@/src/theme/app-theme';
 
@@ -56,6 +58,11 @@ const PREFERENCE_COPY: Record<string, { title: string; detail: string; group: Pr
     detail: 'Nhắc khi quyền Premium sắp hết hạn hoặc đã hết hạn.',
     group: 'premium',
   },
+  'library.vocabulary-review-due.v1': {
+    title: 'Từ vựng đến hạn ôn',
+    detail: 'Nhắc mỗi sáng khi bạn có từ vựng đến hạn ôn tập.',
+    group: 'learning',
+  },
   'assessment.grading-requested.v1': {
     title: 'Bài viết cần chấm',
     detail: 'Khi học viên chọn bạn chấm bài.',
@@ -73,9 +80,9 @@ const PREFERENCE_COPY: Record<string, { title: string; detail: string; group: Pr
   },
 };
 
-// Unknown types fall back to the raw event type so new ones stay distinguishable instead of repeating one label.
+// A type this version does not know gets a plain label: the raw event code means nothing to the learner.
 const preferenceCopy = (type: string) =>
-  PREFERENCE_COPY[type] ?? { title: type, detail: 'Loại thông báo khác.', group: 'other' as const };
+  PREFERENCE_COPY[type] ?? { title: 'Thông báo khác', detail: 'Loại thông báo mới. Cập nhật ứng dụng để xem chi tiết.', group: 'other' as const };
 
 const SECTIONS: { key: PreferenceGroup; title: string }[] = [
   { key: 'activity', title: 'BÀI VIẾT & BÌNH LUẬN' },
@@ -110,7 +117,7 @@ export default function NotificationPreferencesScreen() {
       await communityApi.updatePreference(eventType, enabled);
       await queryClient.invalidateQueries({ queryKey: ['community', 'notification-preferences'] });
     } catch (error) {
-      Alert.alert('Chưa thể lưu tuỳ chọn', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+      Alert.alert('Chưa thể lưu tuỳ chọn', safeErrorMessage(error, 'Vui lòng thử lại.'));
     } finally { setBusy(undefined); }
   };
 
@@ -119,7 +126,7 @@ export default function NotificationPreferencesScreen() {
     try {
       queryClient.setQueryData(['community', 'mail-preferences'], await communityApi.updateMailPreferences(learning));
     } catch (error) {
-      Alert.alert('Chưa thể lưu tuỳ chọn email', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+      Alert.alert('Chưa thể lưu tuỳ chọn email', safeErrorMessage(error, 'Vui lòng thử lại.'));
     } finally { setMailBusy(false); }
   };
 
@@ -127,6 +134,7 @@ export default function NotificationPreferencesScreen() {
     <BackHeader title="Tuỳ chọn thông báo" fallbackHref="/(tabs)/community" />
     <ScrollView contentContainerClassName="px-4 pb-10 pt-4">
       <Text className="mb-4 text-sm text-muted">Chọn hoạt động bạn muốn nhận thông báo.</Text>
+      <PushPermissionNotice />
       {query.isPending ? <View className="items-center py-16"><ActivityIndicator color={colors.accent} /><Text className="mt-3 text-sm text-muted">Đang tải tuỳ chọn…</Text></View>
         : query.isError ? <Pressable onPress={() => void query.refetch()} className="items-center rounded-3xl border border-line bg-surface p-6"><Text weight="bold">Không tải được tuỳ chọn</Text><Text className="mt-2 text-sm text-accent">Chạm để thử lại</Text></Pressable>
         : sections.length ? <View className="gap-4">

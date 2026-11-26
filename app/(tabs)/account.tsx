@@ -9,7 +9,6 @@ import {
   MonitorSmartphone,
   Settings2,
   Trash2,
-  Trophy,
   UserRound,
 } from 'lucide-react-native';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -47,6 +46,7 @@ import {
 } from '@/src/features/settings/components/settings-rows';
 import { clearAppSettingsStorage, useAppSettings } from '@/src/features/settings/use-app-settings';
 import { vocabApi } from '@/src/features/vocab/api';
+import { useStudyTimezone } from '@/src/features/flashcards/queries';
 import { ApiError } from '@/src/lib/api-client';
 import { haptics } from '@/src/lib/haptics';
 import { colors } from '@/src/theme';
@@ -92,13 +92,13 @@ export default function AccountScreen() {
       }
       await queryClient.invalidateQueries({ queryKey: profileQueryKeys.oauth });
     } catch (error) {
-      Alert.alert('Chưa huỷ được liên kết', errorMessage(error));
+      Alert.alert('Chưa hủy được liên kết', errorMessage(error));
     }
   };
   const unlinkGoogle = () =>
-    Alert.alert('Huỷ liên kết Google?', 'Bạn sẽ không đăng nhập bằng Google được nữa. Hãy chắc chắn đã có mật khẩu để đăng nhập.', [
+    Alert.alert('Hủy liên kết Google?', 'Bạn sẽ không đăng nhập bằng Google được nữa. Hãy chắc chắn đã có mật khẩu để đăng nhập.', [
       { text: 'Giữ lại', style: 'cancel' },
-      { text: 'Huỷ liên kết', style: 'destructive', onPress: () => void unlink() },
+      { text: 'Hủy liên kết', style: 'destructive', onPress: () => void unlink() },
     ]);
 
   const relationshipsQuery = useQuery({
@@ -108,9 +108,10 @@ export default function AccountScreen() {
     staleTime: 60_000,
   });
 
+  const timezone = useStudyTimezone();
   const achievementsQuery = useQuery({
-    queryKey: ['vocab', 'achievements'],
-    queryFn: () => vocabApi.achievements(),
+    queryKey: ['vocab', 'achievements', timezone],
+    queryFn: () => vocabApi.achievements(timezone),
     enabled: signedIn,
     staleTime: 60_000,
   });
@@ -241,7 +242,6 @@ export default function AccountScreen() {
   const band = learnerQuery.data?.selfReportedBand != null ? `Band ${learnerQuery.data.selfReportedBand}` : null;
   const followersCount = relationshipsQuery.data?.followerCount ?? (relationshipsQuery.isPending ? '…' : '—');
   const achievementItems = achievementsQuery.data?.items;
-  const completedAchievements = achievementItems?.filter((item) => item.achieved).length ?? 0;
   const hasSummaryError =
     learnerQuery.isError || relationshipsQuery.isError || achievementsQuery.isError;
   const retrySummary = () => {
@@ -341,16 +341,6 @@ export default function AccountScreen() {
           />
 
           <View className="h-5" />
-          <SettingsSection title="Học tập">
-            <SettingsLinkRow
-              icon={Trophy}
-              title="Thành tích & Huy hiệu"
-              badgeText={achievementItems ? `${completedAchievements}/${achievementItems.length}` : undefined}
-              onPress={() => router.push('/achievements' as never)}
-              isLast
-            />
-          </SettingsSection>
-
           <SettingsSection title="Nội dung khác">
             <SettingsLinkRow
               icon={Palette}
@@ -376,7 +366,7 @@ export default function AccountScreen() {
               onPress={() => router.push('/profile/change-password' as never)}
             />
             <SettingsLinkRow icon={MonitorSmartphone} title="Thiết bị đăng nhập" onPress={() => router.push('/profile/sessions' as never)} />
-            {googleIdentity ? <SettingsLinkRow icon={Link2Off} title="Huỷ liên kết Google" value="Đã liên kết" onPress={unlinkGoogle} /> : null}
+            {googleIdentity ? <SettingsLinkRow icon={Link2Off} title="Hủy liên kết Google" value="Đã liên kết" onPress={unlinkGoogle} /> : null}
             {user?.emailVerified === false ? (
               <SettingsLinkRow
                 icon={MailCheck}

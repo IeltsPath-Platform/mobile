@@ -5,6 +5,7 @@ import { Pressable, TextInput, View } from 'react-native';
 import { Button } from '@/src/components/ui/button';
 import { Text } from '@/src/components/ui/text';
 import { notebookApi } from '@/src/features/flashcards/notebook-api';
+import { safeErrorMessage } from '@/src/lib/error-message';
 import { colors } from '@/src/theme';
 import { QueryState } from './query-state';
 import { Panel, ProgressBar } from './progress-ui';
@@ -68,7 +69,7 @@ export function WeeklyGoalPanel({ timezone }: { timezone: string }) {
           <ProgressBar value={goal.data.progress} max={goal.data.target} />
           <View className="flex-row justify-between pt-1">
             {goal.data.days.map((day, index) => (
-              <View key={day.date} className="items-center gap-1">
+              <View key={day.date} accessible accessibilityLabel={`${WEEKDAY[index]}: ${day.achieved ? 'đã học' : 'chưa học'}`} className="items-center gap-1">
                 <View
                   className="h-8 w-8 items-center justify-center rounded-full"
                   style={{
@@ -77,13 +78,8 @@ export function WeeklyGoalPanel({ timezone }: { timezone: string }) {
                     borderColor: colors.line,
                   }}
                 >
-                  <Text
-                    weight="bold"
-                    className="text-[11px]"
-                    style={{ color: day.achieved ? colors.accentDeep : colors.muted }}
-                  >
-                    {day.achieved ? '✓' : WEEKDAY[index]}
-                  </Text>
+                  {/* The day name is under the circle; the circle only marks a day with study. */}
+                  {day.achieved ? <Text weight="bold" className="text-[11px] text-accent-deep">✓</Text> : null}
                 </View>
                 <Text className={`text-[9px] ${day.achieved ? 'text-accent-deep' : 'text-muted'}`}>
                   {WEEKDAY[index]}
@@ -106,7 +102,7 @@ export function WeeklyGoalPanel({ timezone }: { timezone: string }) {
             placeholderTextColor={colors.muted}
           />
           <Text className="text-xs text-muted">Từ 10 đến 1.000 từ mỗi tuần.</Text>
-          {save.error ? <Text className="text-sm text-danger">{save.error.message}</Text> : null}
+          {save.error ? <Text className="text-sm text-danger">{safeErrorMessage(save.error, 'Chưa lưu được mục tiêu. Vui lòng thử lại.')}</Text> : null}
           <Button
             label="Lưu mục tiêu"
             disabled={!validTarget}

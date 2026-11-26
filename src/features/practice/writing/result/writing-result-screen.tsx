@@ -5,9 +5,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, View, type ScrollViewInstance } from 'react-native';
 
 import { BackHeader } from '@/src/components/navigation/back-header';
+import { StatusBarStrip } from '@/src/components/ui/band-status-bar';
 import { Button } from '@/src/components/ui/button';
 import { EmptyState } from '@/src/components/ui/empty-state';
 import { Text } from '@/src/components/ui/text';
+import { safeErrorMessage } from '@/src/lib/error-message';
 import { colors } from '@/src/theme';
 
 import { getWritingSubmission, type WritingCorrection, type WritingCriterion, type WritingSubmission } from '../../api/writing';
@@ -59,11 +61,11 @@ export function WritingResultScreen({ submissionId }: { submissionId: string }) 
   }, [client, status]);
 
   if (submission.isPending) return <View className="flex-1 items-center justify-center bg-canvas"><ActivityIndicator color={colors.accent} /><Text className="mt-2 text-sm text-muted">Đang tải kết quả chấm bài…</Text></View>;
-  if (submission.isError) {
+  if (!submission.data) {
     return (
       <View className="flex-1 bg-canvas">
         <BackHeader title="Kết quả Writing" fallbackHref={CATALOG} />
-        <EmptyState title="Chưa tải được kết quả" message={submission.error.message} mood="oops" action={<Button label="Thử lại" variant="secondary" onPress={() => void submission.refetch()} />} />
+        <EmptyState title="Chưa tải được kết quả" message={safeErrorMessage(submission.error, 'Chưa tải được kết quả. Vui lòng thử lại.')} mood="oops" action={<Button label="Thử lại" variant="secondary" onPress={() => void submission.refetch()} />} />
       </View>
     );
   }
@@ -78,6 +80,7 @@ export function WritingResultScreen({ submissionId }: { submissionId: string }) 
           <ActivityIndicator size="large" color={colors.accent} />
           <Text weight="extrabold" className="text-center text-lg text-ink">AI đang chấm bài viết</Text>
           <Text className="text-center text-sm text-muted">Thường mất vài chục giây. Bạn có thể rời màn hình, kết quả sẽ có trong Lịch sử làm bài.</Text>
+          <Button label="Kiểm tra lại" variant="secondary" loading={submission.isRefetching} onPress={() => void submission.refetch()} />
         </View>
       </View>
     );
@@ -88,7 +91,7 @@ export function WritingResultScreen({ submissionId }: { submissionId: string }) 
         <BackHeader title="Kết quả Writing" fallbackHref={CATALOG} />
         <EmptyState title="Bài viết chưa có điểm" message={data.status === 'PAYMENT_PENDING'
           ? 'Bài đã được chấm nhưng chưa trừ được point nên kết quả chưa mở. Hãy kiểm tra số dư rồi gửi chấm lại bài này; point chỉ bị trừ khi bạn nhận được kết quả.'
-          : `Bài này chưa được chấm xong${data.failureCode ? ` (${data.failureCode})` : ''}. Point chỉ bị trừ khi chấm thành công.`} mood="oops" action={<Button label="Về danh mục Writing" variant="secondary" onPress={() => leaveToCatalog(CATALOG)} />} />
+          : 'Bài này chưa được chấm xong. Point chỉ bị trừ khi chấm thành công, bạn có thể làm lại từ danh mục Writing.'} mood="oops" action={<Button label="Về danh mục Writing" variant="secondary" onPress={() => leaveToCatalog(CATALOG)} />} />
       </View>
     );
   }
@@ -227,6 +230,7 @@ function Graded({ submission, submissionId, title, seconds, limit, retryPath }: 
         ) : null}
         </View>
       </ScrollView>
+      <StatusBarStrip color={colors.skill.writing} />
 
       <Sheet visible={picked !== null} onClose={() => setPicked(null)} title="Lỗi trong bài">
         {picked ? <CorrectionCard item={picked} group={picked.errorCode ? groupOf.get(picked.errorCode) : undefined} /> : null}

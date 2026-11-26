@@ -1,6 +1,6 @@
 import { BookText, Lightbulb, Save, Search } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, Pressable, ScrollView, Switch, TextInput, View } from 'react-native';
+import { Alert, AppState, Pressable, ScrollView, Switch, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/src/components/ui/button';
@@ -16,9 +16,17 @@ import { KeyboardShell, closeTest, useLeaveTestGuard } from '../components/test-
 import { WordLookupSheet } from '../components/word-lookup-sheet';
 import { useStudySession } from '../hooks/use-study-session';
 import { useTicker } from '../hooks/use-ticker';
-import { boldRuns, countWords, essaySections, joinSections, loadDraft, saveDraft } from '../model/writing-text';
+import { boldRuns, clearDraft, countWords, essaySections, joinSections, loadDraft, saveDraft } from '../model/writing-text';
 import { TaskPanel } from './task-panel';
 import { useWritingGrade } from './use-writing-grade';
+
+/** Resolves true when the learner wants a fresh attempt at an exam whose time already ran out. */
+const askRestart = () => new Promise<boolean>((resolve) => Alert.alert(
+  'Lần thi trước đã hết giờ',
+  'Giữ bài cũ để chấm (nếu đủ từ), hoặc xóa và thi lại từ đầu.',
+  [{ text: 'Giữ bài cũ', onPress: () => resolve(false) }, { text: 'Thi lại', style: 'destructive', onPress: () => resolve(true) }],
+  { cancelable: false },
+));
 
 const CATALOG = '/practice/catalog/writing';
 type Tab = 'task' | 'answer' | 'dictionary';
@@ -86,7 +94,13 @@ export function WritingScreen({ task, mode }: { task: WritingTask; mode: Writing
 
   useEffect(() => {
     let cancelled = false;
-    void loadDraft(draftKey).then((found) => {
+    void loadDraft(draftKey).then(async (stored) => {
+      let found = stored;
+      // Left past its limit, an exam draft would reopen locked for good; the learner decides whether to start over.
+      if (found && exam && limit && (found.seconds ?? 0) >= limit && !cancelled && await askRestart()) {
+        await clearDraft(draftKey);
+        found = null;
+      }
       if (cancelled) return;
       if (found) {
         const restored = restoreParts(found.texts, parts.length);
@@ -99,7 +113,7 @@ export function WritingScreen({ task, mode }: { task: WritingTask; mode: Writing
       setLoaded(true);
     });
     return () => { cancelled = true; };
-  }, [draftKey, parts.length]);
+  }, [draftKey, parts.length, exam, limit]);
 
   const elapsed = useCallback(() => baseSeconds.current + Math.floor((Date.now() - opened.current) / 1000), []);
   /** Seconds spent writing; an exam never counts past its limit. */

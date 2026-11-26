@@ -1,5 +1,6 @@
 // Ported from frontend/src/features/practice/history/historyLoaders.ts.
 import { apiRequest } from '@/src/lib/api-client';
+import { queryClient } from '@/src/lib/query-client';
 
 import { getPracticeHistory, searchReadingTests } from '../api/attempts';
 import { HISTORY_PAGE_SIZE, listSubmissionHistory, type SubmissionHistoryItem } from '../api/history';
@@ -8,11 +9,17 @@ import { courseRow, freeRow, knowledgeRow, practiceRow, type HistoryNames, type 
 
 export interface HistoryPage { rows: HistoryRow[]; hasNext: boolean }
 
+const NAMES_STALE_MS = 5 * 60_000;
+
+function cachedList<T>(path: string) {
+  return queryClient.fetchQuery({ queryKey: ['practice', 'history-names', path], queryFn: () => apiRequest<T[]>(path, { auth: true }), staleTime: NAMES_STALE_MS }).catch((): T[] => []);
+}
+
 /** The names of the topics and courses a page mentions; a name that cannot be read is left out. */
 async function resolveNames(items: readonly SubmissionHistoryItem[]): Promise<HistoryNames> {
   const [topics, courses] = await Promise.all([
-    items.some((item) => item.topicId) ? apiRequest<{ topicId: string; name: string }[]>('/api/learning/topics', { auth: true }).catch(() => []) : Promise.resolve([]),
-    items.some((item) => item.courseId) ? apiRequest<{ courseId: string; name: string }[]>('/api/learning/courses', { auth: true }).catch(() => []) : Promise.resolve([]),
+    items.some((item) => item.topicId) ? cachedList<{ topicId: string; name: string }>('/api/learning/topics') : Promise.resolve([]),
+    items.some((item) => item.courseId) ? cachedList<{ courseId: string; name: string }>('/api/learning/courses') : Promise.resolve([]),
   ]);
   return {
     topics: new Map(topics.map((topic) => [topic.topicId, topic.name] as const)),

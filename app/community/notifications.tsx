@@ -46,6 +46,7 @@ const systemTexts: Record<string, string> = {
   'assessment.result-ready.v1': 'Kết quả bài thi của bạn đã sẵn sàng.',
   'access.subscription-granted.v1': 'Bạn đã được nâng cấp Premium.',
   'access.subscription-expiry-notice.v1': 'Gói Premium của bạn sắp hết hạn hoặc đã hết hạn.',
+  'library.vocabulary-review-due.v1': 'Bạn có từ vựng đến hạn ôn. Chạm để mở Flashcards.',
 };
 
 const isSystemNotification = (type: string) => !type.startsWith('community.');
@@ -296,7 +297,11 @@ export default function NotificationsScreen({ inTab = false }: { inTab?: boolean
         }
       })();
     }
-    // System notices have no screen in the app yet; opening one only marks it read.
+    if (item.eventType === 'library.vocabulary-review-due.v1') {
+      router.push('/(tabs)/flashcards' as never);
+      return;
+    }
+    // Other system notices have no screen in the app yet; opening one only marks it read.
     if (isSystemNotification(item.eventType)) return;
     if (item.eventType === 'community.user-followed.v1') router.push(`/community/users/${item.actorId}` as never);
     else if (item.postId) router.push({ pathname: '/community/[postId]', params: { postId: item.postId, commentId: item.commentId ?? '' } } as never);

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { LightStatusBar } from '@/src/components/ui/band-status-bar';
 import { Text } from '@/src/components/ui/text';
 import { colors } from '@/src/theme';
 
@@ -17,8 +18,10 @@ type ExamHeaderProps = {
   seconds?: number | null;
   /** A live clock instead of `seconds`: re-read every second inside the header only, so the screen does not re-render. */
   readClock?: () => number;
-  /** Counting down: the clock turns red in the last five minutes. */
+  /** Counting down: the clock turns red near the end. */
   countdown?: boolean;
+  /** Seconds left at which a countdown turns red: five minutes, less for a test that is itself that short. */
+  urgentFrom?: number;
   onSettings?: () => void;
   right?: ReactNode;
   /** Header colour, normally the skill colour. Without it the header is a plain surface bar. */
@@ -33,13 +36,14 @@ export function headerIconColor(tint?: string) {
 }
 
 /** Top bar of every test screen: close, title, clock, display settings and the answered progress. */
-export function ExamHeader({ title, subtitle, onClose, seconds = null, readClock, countdown = false, onSettings, right, tint, progress }: ExamHeaderProps) {
+export function ExamHeader({ title, subtitle, onClose, seconds = null, readClock, countdown = false, urgentFrom = 300, onSettings, right, tint, progress }: ExamHeaderProps) {
   const insets = useSafeAreaInsets();
   const onTint = Boolean(tint);
   const fg = onTint ? '#ffffff' : colors.ink;
   const icon = headerIconColor(tint);
   return (
     <View style={{ paddingTop: insets.top, backgroundColor: tint ?? colors.surface, borderBottomWidth: onTint ? 0 : 1, borderBottomColor: colors.line }}>
+      {onTint ? <LightStatusBar /> : null}
       <View className="min-h-[56px] flex-row items-center gap-1 px-2">
         <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Thoát bài làm" hitSlop={8} className="h-11 w-11 items-center justify-center rounded-full active:opacity-70">
           <X size={22} color={icon} strokeWidth={2.4} />
@@ -48,8 +52,8 @@ export function ExamHeader({ title, subtitle, onClose, seconds = null, readClock
           <Text accessibilityRole="header" numberOfLines={1} weight="black" className="text-base" style={{ color: fg }}>{title}</Text>
           {subtitle ? <Text numberOfLines={1} weight="bold" className="text-[11px] uppercase tracking-wider" style={{ color: onTint ? 'rgba(255,255,255,0.8)' : colors.muted }}>{subtitle}</Text> : null}
         </View>
-        {readClock ? <LiveClock read={readClock} countdown={countdown} tint={tint} />
-          : seconds !== null ? <ClockPill seconds={seconds} countdown={countdown} tint={tint} /> : null}
+        {readClock ? <LiveClock read={readClock} countdown={countdown} urgentFrom={urgentFrom} tint={tint} />
+          : seconds !== null ? <ClockPill seconds={seconds} countdown={countdown} urgentFrom={urgentFrom} tint={tint} /> : null}
         {right}
         {onSettings ? (
           <Pressable onPress={onSettings} accessibilityRole="button" accessibilityLabel="Cài đặt hiển thị" hitSlop={8} className="h-11 w-10 items-center justify-center rounded-full active:opacity-70">
@@ -66,13 +70,13 @@ export function ExamHeader({ title, subtitle, onClose, seconds = null, readClock
   );
 }
 
-function LiveClock({ read, countdown, tint }: { read: () => number; countdown: boolean; tint?: string }) {
+function LiveClock({ read, countdown, urgentFrom, tint }: { read: () => number; countdown: boolean; urgentFrom: number; tint?: string }) {
   const seconds = useTicker(read);
-  return <ClockPill seconds={seconds} countdown={countdown} tint={tint} />;
+  return <ClockPill seconds={seconds} countdown={countdown} urgentFrom={urgentFrom} tint={tint} />;
 }
 
-function ClockPill({ seconds, countdown, tint }: { seconds: number; countdown: boolean; tint?: string }) {
-  const urgent = countdown && seconds <= 300;
+function ClockPill({ seconds, countdown, urgentFrom, tint }: { seconds: number; countdown: boolean; urgentFrom: number; tint?: string }) {
+  const urgent = countdown && seconds <= urgentFrom;
   const onTint = Boolean(tint);
   return (
     <View

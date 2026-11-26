@@ -18,6 +18,9 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ],
       "package": "com.doan.ieltsmobile",
       "googleServicesFile": "./google-services.json"
     },
@@ -51,7 +54,8 @@
         "expo-image-picker",
         {
           "photosPermission": "Cho phép IELTSPath truy cập ảnh để bạn chia sẻ trong cộng đồng.",
-          "microphonePermission": false
+          "microphonePermission": false,
+          "cameraPermission": false
         }
       ],
       "expo-secure-store",

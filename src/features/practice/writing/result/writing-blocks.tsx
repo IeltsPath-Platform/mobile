@@ -5,6 +5,7 @@ import { Alert, Pressable, View } from 'react-native';
 
 import { Text } from '@/src/components/ui/text';
 import { colors } from '@/src/theme';
+import { safeErrorMessage } from '@/src/lib/error-message';
 
 import { WEB_APP_URL, practiseKnowledgePointOnWeb } from '../../api/learning-links';
 import { getPracticeSinceEssay } from '../../api/history';
@@ -61,10 +62,10 @@ export function PractiseButton({ knowledgePointId, label = 'Luyện lỗi này' 
   if (!knowledgePointId || !WEB_APP_URL) return null;
   const open = async () => {
     setBusy(true);
-    try { await practiseKnowledgePointOnWeb(knowledgePointId); } catch (cause) { Alert.alert('Chưa mở được bài luyện', cause instanceof Error ? cause.message : 'Hãy thử lại sau.'); } finally { setBusy(false); }
+    try { await practiseKnowledgePointOnWeb(knowledgePointId); } catch (cause) { Alert.alert('Chưa mở được bài luyện', safeErrorMessage(cause, 'Hãy thử lại sau.')); } finally { setBusy(false); }
   };
   return (
-    <Pressable onPress={() => void open()} disabled={busy} accessibilityRole="link" className="mt-2 min-h-10 flex-row items-center gap-1.5 self-start rounded-full px-3" style={{ backgroundColor: colors.accentSoft, opacity: busy ? 0.6 : 1 }}>
+    <Pressable onPress={() => void open()} disabled={busy} accessibilityRole="link" className="mt-2 min-h-11 flex-row items-center gap-1.5 self-start rounded-full px-3" style={{ backgroundColor: colors.accentSoft, opacity: busy ? 0.6 : 1 }}>
       <ExternalLink size={14} color={colors.accentDeep} />
       <Text weight="bold" className="text-sm" style={{ color: colors.accentDeep }}>{busy ? 'Đang mở…' : `${label} (web)`}</Text>
     </Pressable>

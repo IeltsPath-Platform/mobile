@@ -20,9 +20,12 @@ const TECHNICAL_NAME = /\b[\w.]*exception\b|java\.|org\.springframework|stack tr
 const ENGLISH_ERROR = /\b(?:failed|failure|error|invalid|denied|unauthorized|forbidden|not found|please|request|server|network|timeout|expired|already|could not|unable|unknown|service|internal)\b/i;
 
 function isSafeVietnamese(text: string) {
-  return VIETNAMESE_LETTER.test(text) && !TECHNICAL_CODE.test(text) && !TECHNICAL_UUID.test(text)
+  return VIETNAMESE_LETTER.test(text) && !TECHNICAL_CODE.test(text.replace(PLAIN_ACRONYMS, '')) && !TECHNICAL_UUID.test(text)
     && !TECHNICAL_NAME.test(text) && !ENGLISH_ERROR.test(text);
 }
+
+/** Names the app itself writes in capitals; without this a Vietnamese sentence that mentions them reads as a code. */
+const PLAIN_ACRONYMS = /\b(?:IELTS|CEFR|JPEG|HEIC|WEBP)\b/g;
 
 /**
  * The text of a server error for the learner. Messages with Vietnamese letters are written for people and pass through;

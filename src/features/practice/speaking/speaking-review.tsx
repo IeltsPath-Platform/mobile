@@ -11,6 +11,7 @@ import { Button } from '@/src/components/ui/button';
 import { Text } from '@/src/components/ui/text';
 import { ApiError } from '@/src/lib/api-client';
 import { createRequestId } from '@/src/lib/request-id';
+import { useSingleFlight } from '@/src/lib/use-single-flight';
 import { colors } from '@/src/theme';
 
 import { getSpeakingTerms, type SpeakingTerms } from '../api/speaking';
@@ -87,6 +88,7 @@ export function SpeakingReview({ packageVersionId, parts }: { packageVersionId: 
   const [termsLoading, setTermsLoading] = useState(false);
   const [consent, setConsent] = useState(false);
   const [sending, setSending] = useState(false);
+  const sendOnce = useSingleFlight();
   const [progress, setProgress] = useState<SendProgress | null>(null);
   const [error, setError] = useState('');
   const [sent, setSent] = useState(false);
@@ -132,6 +134,7 @@ export function SpeakingReview({ packageVersionId, parts }: { packageVersionId: 
 
   async function send() {
     if (sending || problem || !terms || terms.enabled === false || !consent || toSend.length === 0) return;
+    await sendOnce(async () => {
     requestId.current ??= createRequestId();
     const pending = { requestId: requestId.current, sent: sentFiles.current };
     writePendingSend(packageVersionId, pending);
@@ -166,6 +169,7 @@ export function SpeakingReview({ packageVersionId, parts }: { packageVersionId: 
     } finally {
       setSending(false);
     }
+    });
   }
 
   const recordAgain = (task: SpeakingTask, index: number) => {
@@ -173,13 +177,13 @@ export function SpeakingReview({ packageVersionId, parts }: { packageVersionId: 
     router.push({ pathname: '/practice/speaking/[packageVersionId]/[sectionId]', params: { packageVersionId, sectionId: task.sectionId, parts: parts.join(','), q: String(index) } } as never);
   };
 
-  const leave = () => Alert.alert('Bỏ bài Speaking này?', 'Các bản ghi trên thiết bị sẽ bị xoá.', [
+  const leave = () => Alert.alert('Bỏ bài Speaking này?', 'Các bản ghi trên thiết bị sẽ bị xóa.', [
     { text: 'Ở lại', style: 'cancel' },
     { text: 'Bỏ bài', style: 'destructive', onPress: () => { guardOff(); clearSession(packageVersionId); leaveToCatalog(CATALOG); } },
   ]);
 
   if (tasks.isPending) return <View className="flex-1 items-center justify-center bg-canvas"><ActivityIndicator color={colors.accent} /><Text className="mt-2 text-sm text-muted">Đang tải bài của bạn…</Text></View>;
-  if (tasks.isError) return <TaskLoadError title="Xem lại bài Speaking" heading="Chưa tải được bài" error={tasks.error} fallbackHref={CATALOG} onRetry={() => void tasks.refetch()} />;
+  if (!tasks.data) return <TaskLoadError title="Xem lại bài Speaking" heading="Chưa tải được bài" error={tasks.error} fallbackHref={CATALOG} onRetry={() => void tasks.refetch()} />;
 
   return (
     <View className="flex-1 bg-canvas">

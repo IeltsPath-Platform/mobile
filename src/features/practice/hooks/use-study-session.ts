@@ -89,7 +89,7 @@ export function useStudySession(sourceType: SourceType, sourceId: string, enable
         pending = null;
       } catch (reason) {
         const code = reason instanceof ApiError ? reason.code : undefined;
-        if (code === 'LEASE_EXPIRED' || code === 'SESSION_CLOSED') { session = null; collector = null; pending = null; }
+        if (code === 'LEASE_EXPIRED' || code === 'SESSION_CLOSED' || code === 'SESSION_NOT_FOUND') { session = null; collector = null; pending = null; }
       }
     }
 

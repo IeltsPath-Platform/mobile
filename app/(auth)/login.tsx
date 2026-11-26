@@ -16,7 +16,7 @@ import { applyApiError } from '@/src/features/auth/form-errors';
 import { loginSchema, type LoginInput } from '@/src/features/auth/schemas';
 
 export default function LoginScreen() {
-  const { signIn } = useAuth();
+  const { signIn, sessionExpired } = useAuth();
   const [formError, setFormError] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
   const passwordRef = useRef<TextInputInstance>(null);
@@ -24,7 +24,11 @@ export default function LoginScreen() {
   // A 429 carries Retry-After; disable the button until it elapses instead of letting the user hammer the endpoint.
   useEffect(() => {
     if (cooldown <= 0) return;
-    const timer = setTimeout(() => setCooldown((value) => value - 1), 1000);
+    const timer = setTimeout(() => {
+      setCooldown((value) => value - 1);
+      // The wait is over: "try again in N seconds" would now be wrong.
+      if (cooldown === 1) setFormError(null);
+    }, 1000);
     return () => clearTimeout(timer);
   }, [cooldown]);
 
@@ -53,7 +57,7 @@ export default function LoginScreen() {
     <AuthScreen
       title="Đăng nhập"
       footer={<AuthLink prompt="Chưa có tài khoản?" label="Đăng ký" href="/register" />}>
-      {formError ? <FormAlert message={formError} /> : null}
+      {formError ? <FormAlert message={formError} /> : sessionExpired ? <FormAlert message="Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại." /> : null}
 
       <Controller
         control={control}

@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { LightStatusBar } from '@/src/components/ui/band-status-bar';
 import { Text } from '@/src/components/ui/text';
 
 type SkillBandProps = {
@@ -25,6 +26,7 @@ export function SkillBand({ color, title, subtitle, right, onBack, fallbackHref 
   const back = onBack ?? (() => (router.canGoBack() ? router.back() : router.replace(fallbackHref as never)));
   return (
     <View style={{ backgroundColor: color, paddingTop: insets.top + 6, paddingBottom: 16, borderBottomLeftRadius: 28, borderBottomRightRadius: 28, overflow: 'hidden' }}>
+      <LightStatusBar />
       <View pointerEvents="none" style={{ position: 'absolute', right: -50, top: -30, width: 180, height: 180, borderRadius: 90, backgroundColor: '#ffffff', opacity: 0.12 }} />
       <View pointerEvents="none" style={{ position: 'absolute', right: 70, bottom: -60, width: 120, height: 120, borderRadius: 60, backgroundColor: '#ffffff', opacity: 0.08 }} />
       <View className="flex-row items-center gap-3 px-4">
@@ -33,7 +35,7 @@ export function SkillBand({ color, title, subtitle, right, onBack, fallbackHref 
         </Pressable>
         <View className="min-w-0 flex-1">
           <Text accessibilityRole="header" weight="black" className="text-xl" style={{ color: '#ffffff' }} numberOfLines={1}>{title}</Text>
-          {subtitle ? <Text className="text-xs" style={{ color: 'rgba(255,255,255,0.85)' }} numberOfLines={1}>{subtitle}</Text> : null}
+          {subtitle ? <Text className="text-xs" style={{ color: 'rgba(255,255,255,0.85)' }} numberOfLines={2}>{subtitle}</Text> : null}
         </View>
         {right}
       </View>

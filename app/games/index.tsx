@@ -1,4 +1,4 @@
-import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BackButton } from '@/src/components/navigation/back-header';
@@ -26,7 +26,8 @@ export default function GameCatalogScreen() {
         : `${setup.wordLimit} từ`;
 
   return (
-    <View className="flex-1 bg-canvas">
+    // The room-code box sits at the end of the page: without this the keyboard covers it and the code is typed blind.
+    <KeyboardAvoidingView className="flex-1 bg-canvas" behavior={Platform.OS === 'web' ? undefined : 'padding'}>
       <View className="flex-row items-center gap-3 px-4 pb-2 pt-1">
         <BackButton fallbackHref="/(tabs)/practice" />
         <View className="flex-1">
@@ -102,6 +103,6 @@ export default function GameCatalogScreen() {
           />
         </View>
       ) : null}
-    </View>
+    </KeyboardAvoidingView>
   );
 }

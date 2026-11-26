@@ -27,7 +27,7 @@ class BadgeBoundary extends Component<{ children: ReactNode }, { failed: boolean
  */
 function Badge({ borderColor }: { borderColor: string }) {
   const queryClient = useQueryClient();
-  const count = useUnread().data?.count ?? 0;
+  const count = useUnread({ polls: true }).data?.count ?? 0;
 
   useEffect(() => {
     if (Platform.OS === 'web') return;

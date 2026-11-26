@@ -21,7 +21,7 @@ type GameEntry = GameCatalog['games'][number];
 
 const gameInfo = (): Record<GameType, { title: string; subtitle: string; Icon: typeof Gamepad2; tint: string; foreground: string; solid: string }> => ({
   WORDLY: { title: 'Wordly', subtitle: 'Đoán từ qua gợi ý, rèn phản xạ và vốn từ.', Icon: Gamepad2, tint: colors.accentSoft, foreground: colors.accent, solid: colors.success },
-  ROCKET: { title: 'Rocket', subtitle: 'Chọn đáp án thật nhanh, thi đua cùng bạn bè.', Icon: Rocket, tint: colors.warmSoft, foreground: colors.accentWarm, solid: colors.accentWarm },
+  ROCKET: { title: 'Tên lửa', subtitle: 'Chọn đáp án thật nhanh, thi đua cùng bạn bè.', Icon: Rocket, tint: colors.warmSoft, foreground: colors.accentWarm, solid: colors.accentWarm },
 });
 
 function availability(status: string) {
@@ -114,7 +114,7 @@ export default function PracticeScreen() {
                   ĐANG CHƠI
                 </Text>
                 <Text className="mt-1 text-base" weight="black">
-                  {activeGame.gameType === 'ROCKET' ? 'Rocket' : 'Wordly'}
+                  {activeGame.gameType === 'ROCKET' ? 'Tên lửa' : 'Wordly'}
                   {activeGame.roomStatus === 'WAITING' ? ` · Phòng ${activeGame.roomCode}` : ''}
                 </Text>
                 <Text className="mt-1 text-xs text-muted">Chạm để quay lại ván của bạn</Text>

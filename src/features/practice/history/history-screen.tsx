@@ -10,6 +10,7 @@ import { EmptyState } from '@/src/components/ui/empty-state';
 import { Text } from '@/src/components/ui/text';
 import { Skeleton } from '@/src/components/ui/skeleton';
 import { colors } from '@/src/theme';
+import { safeErrorMessage } from '@/src/lib/error-message';
 
 import { listExaminerReviews } from '../api/examiner-reviews';
 import { getMyGradingJobs } from '../api/grading-jobs';
@@ -96,7 +97,7 @@ function RowList({ queryKey, load, empty, catalog }: { queryKey: unknown[]; load
       onEndReached={() => { if (query.hasNextPage && !query.isFetching) void query.fetchNextPage(); }}
       refreshControl={<RefreshControl refreshing={query.isRefetching && !query.isFetchingNextPage} onRefresh={() => void query.refetch()} tintColor={colors.accent} />}
       ListEmptyComponent={query.isPending ? <RowSkeletons /> : query.isError ? (
-        <EmptyState title="Chưa tải được lịch sử" message={query.error.message} mood="oops" action={<Button label="Thử lại" variant="secondary" onPress={() => void query.refetch()} />} />
+        <EmptyState title="Chưa tải được lịch sử" message={safeErrorMessage(query.error, 'Chưa tải được lịch sử. Vui lòng thử lại.')} mood="oops" action={<Button label="Thử lại" variant="secondary" onPress={() => void query.refetch()} />} />
       ) : <EmptyState title={empty} message="Bài bạn nộp sẽ hiện ở đây." action={catalog ? <Button label="Chọn đề" onPress={() => router.push(catalog as never)} /> : undefined} />}
       ListFooterComponent={query.isFetchingNextPage ? <ActivityIndicator className="py-4" color={colors.accent} /> : undefined}
     />
@@ -166,7 +167,7 @@ function TeacherReviews() {
         </View>
       ) : undefined}
       ListEmptyComponent={reviews.isPending ? <RowSkeletons /> : reviews.isError ? (
-        <EmptyState title="Chưa tải được danh sách" message={reviews.error.message} mood="oops" action={<Button label="Thử lại" variant="secondary" onPress={() => void reviews.refetch()} />} />
+        <EmptyState title="Chưa tải được danh sách" message={safeErrorMessage(reviews.error, 'Chưa tải được danh sách. Vui lòng thử lại.')} mood="oops" action={<Button label="Thử lại" variant="secondary" onPress={() => void reviews.refetch()} />} />
       ) : rows.length ? <Text className="py-6 text-center text-sm text-muted">Không có bài nào ở mục này.</Text> : (
         <EmptyState title="Bạn chưa gửi bài nào cho giáo viên" message="Khi bạn chọn giáo viên chấm một bài Writing, bài đó sẽ hiện ở đây." action={<Button label="Đến danh mục Writing" onPress={() => router.push('/practice/catalog/writing' as never)} />} />
       )}

@@ -10,9 +10,11 @@ import { createRequestId } from '@/src/lib/request-id';
 import { sound } from '@/src/lib/sound';
 
 import { gameApi } from '../api';
+import { isGone } from '../errors';
 import { PRACTICE_HOME, resultRoute } from '../game-meta';
 import { useCountdown } from '../use-countdown';
 import { useGameSocket } from '../use-game-socket';
+import { useHardwareBack } from '../use-hardware-back';
 import type { CurrentWord, GameEvent, GameRanking, GuessResponse } from '../types';
 import { mergeRanking } from '../types';
 import { recordReview } from '../review-log';
@@ -21,10 +23,20 @@ import { normalizeWordlyGuess } from '../wordly-input';
 
 type PendingGuess = { wordId: string; guess: string; requestId: string; attemptsUsed: number };
 
+/** Conflicts about the state of the match: sending the same answer again cannot succeed. */
+const STALE_GUESS_MESSAGES: Record<string, string> = {
+  WORD_EXPIRED: 'Đã hết giờ cho từ này. Hãy chơi tiếp từ mới.',
+  WORD_NOT_CURRENT: 'Ván đã chuyển sang từ khác. Hãy đoán từ đang hiển thị.',
+  MATCH_FINISHED: 'Ván này đã kết thúc.',
+  PLAYER_NOT_ACTIVE: 'Bạn không còn lượt chơi trong ván này.',
+  PLAYER_FORFEITED: 'Bạn đã rời ván này nên không gửi thêm đáp án được.',
+};
+
 /** Server rejections that will not succeed on retry: the typed answer must be edited. */
 function isDefinitiveRejection(cause: unknown, dictionaryRejected: boolean) {
   return (
     dictionaryRejected ||
+    (cause instanceof ApiError && cause.code !== undefined && cause.code in STALE_GUESS_MESSAGES) ||
     (cause instanceof ApiError && cause.status >= 400 && cause.status < 500 && ![408, 409, 425, 429].includes(cause.status))
   );
 }
@@ -75,7 +87,7 @@ export function useWordlyMatch(matchId: string) {
       if (query.state.data?.wordStatus !== 'ACTIVE') return false;
       return connectedRef.current ? 15_000 : 5_000;
     },
-    retry: (count, cause) => count < 2 && !(cause instanceof Error && /403|404|not active/i.test(cause.message)),
+    retry: (count, cause) => count < 2 && !isGone(cause),
   });
 
   const multiplayer = match.data?.playerMode === 'MULTIPLAYER';
@@ -281,7 +293,7 @@ export function useWordlyMatch(matchId: string) {
       void current.refetch();
       const message = cause instanceof Error ? cause.message : '';
       const dictionaryRejected = (cause instanceof ApiError && cause.code === 'WORD_NOT_FOUND')
-        || /word was not found in this match's dictionary|không có trong từ điển của ván chơi/i.test(message);
+        || /không có trong từ điển của ván chơi/i.test(message);
       const definitive = isDefinitiveRejection(cause, dictionaryRejected);
       if (definitive) {
         // The server rejected this answer for good; release the lock so it can be edited.
@@ -289,7 +301,7 @@ export function useWordlyMatch(matchId: string) {
         setGuessPending(false);
       }
       if (dictionaryRejected) setError('Từ này không có trong bộ từ của ván. Hãy sửa đáp án rồi thử lại.');
-      else if (definitive) setError(message || 'Đáp án chưa hợp lệ. Hãy kiểm tra rồi thử lại.');
+      else if (definitive) setError((cause instanceof ApiError && cause.code && STALE_GUESS_MESSAGES[cause.code]) || message || 'Đáp án chưa hợp lệ. Hãy kiểm tra rồi thử lại.');
       else setError('Kết nối chập chờn. Nhấn ĐOÁN để gửi lại cùng đáp án.');
     } finally {
       setBusy(false);
@@ -347,6 +359,7 @@ export function useWordlyMatch(matchId: string) {
       ]),
     [leave],
   );
+  useHardwareBack(confirmLeave, Boolean(word) && !isGone(match.error));
 
   return {
     match,

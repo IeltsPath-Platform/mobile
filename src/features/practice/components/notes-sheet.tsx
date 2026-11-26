@@ -37,7 +37,11 @@ export function NotesSheet({ visible, onClose, annotations, sectionId, sectionLa
               className="min-h-11 text-base text-ink"
               style={{ textAlignVertical: 'top' }}
             />
-            <Pressable onPress={() => annotations.removeNote(note.id)} accessibilityRole="button" accessibilityLabel="Xoá ghi chú" hitSlop={8} className="mt-1 h-9 w-9 items-center justify-center self-end">
+            <Pressable
+              onPress={() => (note.text.trim()
+                ? Alert.alert('Xóa ghi chú này?', 'Ghi chú đã xóa không lấy lại được.', [{ text: 'Hủy', style: 'cancel' }, { text: 'Xóa', style: 'destructive', onPress: () => annotations.removeNote(note.id) }])
+                : annotations.removeNote(note.id))}
+              accessibilityRole="button" accessibilityLabel="Xóa ghi chú" hitSlop={8} className="mt-1 h-9 w-9 items-center justify-center self-end">
               <Trash2 size={17} color={colors.danger} />
             </Pressable>
           </View>
@@ -48,10 +52,10 @@ export function NotesSheet({ visible, onClose, annotations, sectionId, sectionLa
         </Pressable>
         {notes.length > 1 ? (
           <Pressable
-            onPress={() => Alert.alert('Xoá tất cả ghi chú?', `Xoá ${notes.length} ghi chú của ${sectionLabel}.`, [{ text: 'Huỷ', style: 'cancel' }, { text: 'Xoá hết', style: 'destructive', onPress: () => annotations.removeSectionNotes(sectionId) }])}
+            onPress={() => Alert.alert('Xóa tất cả ghi chú?', `Xóa ${notes.length} ghi chú của ${sectionLabel}.`, [{ text: 'Hủy', style: 'cancel' }, { text: 'Xóa hết', style: 'destructive', onPress: () => annotations.removeSectionNotes(sectionId) }])}
             accessibilityRole="button"
             className="min-h-11 items-center justify-center">
-            <Text weight="bold" style={{ color: colors.danger }}>Xoá tất cả ghi chú</Text>
+            <Text weight="bold" style={{ color: colors.danger }}>Xóa tất cả ghi chú</Text>
           </Pressable>
         ) : null}
       </View>

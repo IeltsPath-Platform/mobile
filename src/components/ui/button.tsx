@@ -1,5 +1,5 @@
 import { ActivityIndicator, Pressable, View, type PressableProps } from 'react-native';
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { colors } from '@/src/theme';
@@ -21,6 +21,8 @@ type ButtonProps = Omit<PressableProps, 'children'> & {
 
 /** Height of the darker edge under a chunky button; the face sinks by this much when pressed. */
 const EDGE = 4;
+/** A second tap this soon is the same intent: `disabled` only takes effect after a render, too late to stop it. */
+const REPEAT_PRESS_MS = 500;
 
 function paletteFor(variant: ButtonVariant, disabled: boolean, isDark: boolean) {
   // Text on bright fills: white in light mode, deep canvas in dark mode where fills are lighter.
@@ -57,7 +59,8 @@ export function Button({
   const isDisabled = Boolean(disabled || loading);
   const flat = variant === 'ghost';
   const palette = paletteFor(variant, Boolean(disabled) && !loading, isDark);
-  const { style: customStyle, onPressIn, onPressOut, ...pressableProps } = props;
+  const { style: customStyle, onPress, onPressIn, onPressOut, ...pressableProps } = props;
+  const lastPress = useRef(0);
   const reduceMotion = useReducedMotion();
   const pressed = useSharedValue(0);
   const faceStyle = useAnimatedStyle(() => ({ transform: [{ translateY: pressed.value * EDGE }] }));
@@ -69,6 +72,12 @@ export function Button({
       accessibilityState={{ disabled: isDisabled, busy: loading }}
       accessibilityLabel={text}
       disabled={isDisabled}
+      onPress={onPress ? (event) => {
+        const now = Date.now();
+        if (now - lastPress.current < REPEAT_PRESS_MS) return;
+        lastPress.current = now;
+        onPress(event);
+      } : undefined}
       onPressIn={(event) => {
         if (!isDisabled && !flat) pressed.value = reduceMotion ? 1 : withTiming(1, { duration: motion.micro / 2 });
         onPressIn?.(event);

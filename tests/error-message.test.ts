@@ -29,3 +29,14 @@ describe('user-facing error messages', () => {
     expect(safeErrorMessage(new Error('Ảnh cần nhỏ hơn 20 MB.'))).toBe('Ảnh cần nhỏ hơn 20 MB.');
   });
 });
+
+describe('acronyms the app writes itself', () => {
+  it('does not mistake IELTS or CEFR for a technical code', () => {
+    expect(userFacingMessage(400, 'Đề IELTS này chưa được xuất bản.')).toBe('Đề IELTS này chưa được xuất bản.');
+    expect(userFacingMessage(400, 'Chọn cấp độ CEFR khác.')).toBe('Chọn cấp độ CEFR khác.');
+  });
+
+  it('still hides a code next to an acronym', () => {
+    expect(userFacingMessage(500, 'Lỗi IELTS: PREMIUM_REQUIRED')).toBe('Máy chủ đang gặp sự cố. Vui lòng thử lại sau.');
+  });
+});

@@ -120,6 +120,7 @@ export function SpeakingRoom({ task, parts, initialIndex, timed }: Props) {
         subtitle={task.title}
         readClock={limit !== null ? readRemaining : undefined}
         countdown
+        urgentFrom={60}
         onClose={exit}
         tint={tint}
         progress={total ? answered / total : undefined}

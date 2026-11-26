@@ -5,6 +5,7 @@ import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BackButton } from '@/src/components/navigation/back-header';
+import { StatusBarStrip } from '@/src/components/ui/band-status-bar';
 import { Button } from '@/src/components/ui/button';
 import { Card } from '@/src/components/ui/card';
 import { FormAlert } from '@/src/components/ui/form-alert';
@@ -47,7 +48,7 @@ export default function VerifyEmailScreen() {
   };
 
   return (
-    <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'web' ? undefined : 'padding'}>
       <View className="flex-1 bg-canvas">
         <ScrollView
           keyboardShouldPersistTaps="handled"
@@ -102,6 +103,7 @@ export default function VerifyEmailScreen() {
             </Card>
           )}
         </ScrollView>
+        <StatusBarStrip color={colors.canvas} />
       </View>
     </KeyboardAvoidingView>
   );

@@ -21,7 +21,7 @@ import { clearDraft, countWords, storeResultContext } from '../model/writing-tex
 const AI_ERRORS: Record<string, string> = {
   ESSAY_EMPTY: 'Bài viết đang trống.',
   ESSAY_TOO_SHORT: 'Bài viết còn quá ngắn để chấm.',
-  ESSAY_TOO_LONG: 'Bài viết quá dài để chấm.',
+  ESSAY_TOO_LONG: 'Bài viết quá dài để chấm. Hãy rút gọn rồi gửi lại.',
   GRADING_UNAVAILABLE: 'Hệ thống chấm bài đang bận, point chưa bị trừ. Hãy thử lại sau.',
   GRADING_IN_PROGRESS: 'Bài này đang được chấm. Hãy đợi trong giây lát.',
   DAILY_LIMIT_REACHED: 'Bạn đã dùng hết số lần chấm bài trong hôm nay.',
@@ -34,7 +34,7 @@ const AI_ERRORS: Record<string, string> = {
 const EXAMINER_ERRORS: Record<string, string> = {
   ESSAY_EMPTY: 'Bài viết đang trống.',
   ESSAY_TOO_SHORT: 'Bài viết còn quá ngắn để gửi giáo viên chấm.',
-  ESSAY_TOO_LONG: 'Bài viết quá dài để chấm.',
+  ESSAY_TOO_LONG: 'Bài viết quá dài để chấm. Hãy rút gọn rồi gửi lại.',
   HUMAN_GRADING_CREDIT_REQUIRED: 'Gói Premium của bạn đã hết lượt giáo viên chấm, hoặc đã hết hạn.',
   EXAMINER_UNAVAILABLE: 'Giáo viên này vừa đủ bài hôm nay, đang tắt nhận bài hoặc tạm chưa nhận bài mới. Hãy chọn giáo viên khác.',
   HUMAN_REVIEW_UNAVAILABLE: 'Chưa gửi được cho giáo viên, lượt chấm của bạn chưa bị trừ. Hãy thử lại sau.',

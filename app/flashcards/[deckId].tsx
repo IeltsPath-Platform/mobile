@@ -57,7 +57,7 @@ export default function DeckStudyScreen() {
         </View>
       </View>
     );
-  if (deckQuery.isError || dueQuery.isError)
+  if (!deckQuery.data || !dueQuery.data)
     return (
       <View className="flex-1 bg-canvas">
         <BackHeader title="Học thẻ" fallbackHref="/(tabs)/flashcards" />

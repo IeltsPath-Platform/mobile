@@ -48,10 +48,10 @@ export type PointWallet = z.infer<typeof walletSchema>;
 export type ActivationResult = z.infer<typeof activationSchema>;
 
 const KEY_ERROR_MESSAGES: Record<string, string> = {
-  'Activation key has already been redeemed': 'Mã này đã được sử dụng.',
-  'Activation key has expired': 'Mã kích hoạt đã hết hạn.',
-  'Activation key has been revoked': 'Mã kích hoạt đã bị thu hồi.',
-  'Mã kích hoạt không hợp lệ': 'Mã kích hoạt không hợp lệ. Vui lòng kiểm tra lại mã.',
+  KEY_ALREADY_REDEEMED: 'Mã này đã được sử dụng.',
+  KEY_EXPIRED: 'Mã kích hoạt đã hết hạn.',
+  KEY_REVOKED: 'Mã kích hoạt đã bị thu hồi.',
+  KEY_NOT_FOUND: 'Mã kích hoạt không hợp lệ. Vui lòng kiểm tra lại mã.',
 };
 
 export function normalizeActivationKey(rawKey: string): string {
@@ -63,7 +63,7 @@ export function activationErrorMessage(cause: unknown): string {
   if (cause instanceof ApiError) {
     if (cause.status === 429) return 'Bạn thao tác quá nhanh. Vui lòng chờ một chút rồi thử lại.';
     if (cause.status >= 500) return 'Dịch vụ tạm thời gián đoạn. Vui lòng thử lại sau.';
-    return KEY_ERROR_MESSAGES[cause.message] ?? (cause.message || 'Chưa thể kích hoạt mã. Vui lòng kiểm tra mã và thử lại.');
+    return (cause.code && KEY_ERROR_MESSAGES[cause.code]) || cause.message || 'Chưa thể kích hoạt mã. Vui lòng kiểm tra mã và thử lại.';
   }
   return 'Chưa thể kích hoạt mã. Vui lòng kiểm tra mã và thử lại.';
 }

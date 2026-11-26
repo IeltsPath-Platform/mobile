@@ -8,7 +8,6 @@ import { ActivityIndicator, Pressable, View } from 'react-native';
 import { Button } from '@/src/components/ui/button';
 import { Text } from '@/src/components/ui/text';
 import { notebookApi } from '@/src/features/flashcards/notebook-api';
-import { vocabApi } from '@/src/features/vocab/api';
 import { colors } from '@/src/theme';
 
 import { lookupWord, type WordEntry } from '../api/word-lookup';
@@ -106,6 +105,7 @@ function SoundButton({ label, onPress }: { label: string; onPress: () => void })
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label === 'Nghe' ? 'Nghe phát âm' : `Nghe phát âm ${label}`}
+      hitSlop={6}
       className="min-h-9 flex-row items-center gap-1.5 rounded-full px-3 active:opacity-70"
       style={{ backgroundColor: colors.accentSoft }}>
       <Volume2 size={16} color={colors.accentDeep} />
@@ -114,26 +114,10 @@ function SoundButton({ label, onPress }: { label: string; onPress: () => void })
   );
 }
 
-/**
- * The ids of the meanings of a looked-up word and whether each is in the notebook. The lookup answers without ids, so
- * they come from a search of the same lemma; a meaning is matched by its text, then by its place in the list.
- */
+/** The ids of the meanings of a looked-up word and whether each is in the notebook. */
 function useNotebook(entry: WordEntry | null | undefined) {
   const client = useQueryClient();
-  const lemma = entry?.lemma.toLowerCase() ?? '';
-  const search = useQuery({
-    queryKey: ['practice', 'lookup-ids', lemma],
-    queryFn: ({ signal }) => vocabApi.search(entry!.lemma, signal),
-    enabled: Boolean(entry && entry.senses.length > 0),
-    staleTime: Infinity,
-    retry: 1,
-  });
-  const ids = useMemo(() => {
-    const item = search.data?.find((candidate) => candidate.normalizedLemma === lemma || candidate.lemma.toLowerCase() === lemma);
-    return (entry?.senses ?? []).map((sense, index) =>
-      item?.senses.find((candidate) => candidate.vietnameseMeaning === sense.vietnameseMeaning && candidate.englishDefinition === sense.englishDefinition)?.id
-      ?? item?.senses[index]?.id ?? null);
-  }, [search.data, entry, lemma]);
+  const ids = useMemo(() => (entry?.senses ?? []).map((sense) => sense.id), [entry]);
   const known = useMemo(() => ids.filter((id): id is string => id !== null), [ids]);
   const saved = useQuery({
     queryKey: ['flashcards', 'notebook', 'saved', known],
@@ -145,14 +129,13 @@ function useNotebook(entry: WordEntry | null | undefined) {
     mutationFn: notebookApi.add,
     onSuccess: () => client.invalidateQueries({ queryKey: ['flashcards'] }),
   });
-  return { ids, saved, add, preparing: Boolean(entry && entry.senses.length > 0) && (search.isPending || search.isFetching) };
+  return { ids, saved, add };
 }
 
 type Notebook = ReturnType<typeof useNotebook>;
 
 function SaveButton({ notebook, senseId }: { notebook: Notebook; senseId: string | null }) {
-  const { saved, add, preparing } = notebook;
-  if (preparing) return <View className="mt-3 h-12 items-center justify-center"><ActivityIndicator color={colors.muted} /></View>;
+  const { saved, add } = notebook;
   // A meaning the library cannot name by id cannot be saved: show nothing rather than a button that fails.
   if (!senseId) return null;
   const isSaved = saved.data?.includes(senseId) ?? false;

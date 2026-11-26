@@ -108,7 +108,7 @@ export default function DeckDetailScreen() {
         </View>
       </View>
     );
-  if (deck.isError || items.isError)
+  if (!deck.data || !items.data)
     return (
       <View className="flex-1 bg-canvas">
         <BackHeader title="Bộ thẻ" fallbackHref="/(tabs)/flashcards" />

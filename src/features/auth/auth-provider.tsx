@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { onSessionExpired } from '@/src/lib/api-client';
 import { AUTH_ENABLED } from '@/src/lib/env';
@@ -17,6 +17,8 @@ export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
 type AuthContextValue = {
   status: AuthStatus;
   authEnabled: boolean;
+  /** True after the server ended the session on its own, so the sign-in screens can say why they appeared. */
+  sessionExpired: boolean;
   signIn: (input: LoginInput) => Promise<void>;
   signInWithGoogle: (idToken: string) => Promise<void>;
   signUp: (input: RegisterInput) => Promise<void>;
@@ -45,9 +47,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const [sessionExpired, setSessionExpired] = useState(false);
+  // Requests still in flight after a deliberate sign-out also report a missing session; those are not an expiry.
+  const signedIn = useRef(false);
+  useEffect(() => { signedIn.current = status === 'authenticated'; }, [status]);
+
   useEffect(() => {
     if (!AUTH_ENABLED) return;
     onSessionExpired(() => {
+      if (signedIn.current) {
+        signedIn.current = false;
+        setSessionExpired(true);
+        // No access token is left to unregister the device, so drop the push token itself.
+        void Notifications.unregisterForNotificationsAsync().catch(() => undefined);
+        void Notifications.dismissAllNotificationsAsync().catch(() => undefined);
+        void Notifications.clearLastNotificationResponseAsync().catch(() => undefined);
+      }
       void queryClient.cancelQueries();
       queryClient.clear();
       setStatus('unauthenticated');
@@ -78,6 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await adoptSessionOwner(tokens.accessToken);
       void queryClient.cancelQueries();
       queryClient.clear();
+      setSessionExpired(false);
       setStatus('authenticated');
     },
     [queryClient],
@@ -120,26 +136,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     if (!AUTH_ENABLED) return;
+    signedIn.current = false;
     const tokens = await tokenStorage.load().catch(() => null);
     // Best effort and capped: the device binding needs the access token, so this runs before the
     // local session is cleared, but an unreachable server must not hold the user on this screen.
-    const serverCleanup = Promise.allSettled([
-      unregisterCurrentInstallation(),
-      tokens ? authApi.logout(tokens.refreshToken) : Promise.resolve(),
-    ]);
+    // One after the other: a logout that lands first would revoke the token the unregister call needs.
+    const serverCleanup = unregisterCurrentInstallation()
+      .catch(() => undefined)
+      .then(() => (tokens ? authApi.logout(tokens.refreshToken) : undefined))
+      .catch(() => undefined);
     await Promise.race([serverCleanup, new Promise((resolve) => setTimeout(resolve, 3_000))]);
     await tokenStorage.clear();
     // Signing out hands the phone over: the learner's drafts, answers and recordings go with the session.
     await clearUserData();
     void signOutGoogle();
+    void Notifications.dismissAllNotificationsAsync().catch(() => undefined);
+    void Notifications.clearLastNotificationResponseAsync().catch(() => undefined);
     void queryClient.cancelQueries();
     queryClient.clear();
+    setSessionExpired(false);
     setStatus('unauthenticated');
   }, [queryClient]);
 
   const value = useMemo(
-    () => ({ status, authEnabled: AUTH_ENABLED, signIn, signInWithGoogle, signUp, signOut }),
-    [status, signIn, signInWithGoogle, signUp, signOut],
+    () => ({ status, authEnabled: AUTH_ENABLED, sessionExpired, signIn, signInWithGoogle, signUp, signOut }),
+    [status, sessionExpired, signIn, signInWithGoogle, signUp, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
+import { ApiError } from '@/src/lib/api-client';
 import { API_BASE_URL } from '@/src/lib/env';
 
 import { gameApi } from './api';
@@ -30,10 +31,11 @@ export function useGameSocket(
     let connecting = false;
     let failures = 0;
 
-    const scheduleRetry = () => {
+    const scheduleRetry = (waitSeconds = 0) => {
       if (disposed || terminal || AppState.currentState !== 'active') return;
       clearTimeout(retry);
-      const delay = Math.min(1_000 * 2 ** failures, MAX_RETRY_DELAY_MS);
+      // A rate-limited ticket request names how long to wait; asking sooner only extends the limit.
+      const delay = Math.max(Math.min(1_000 * 2 ** failures, MAX_RETRY_DELAY_MS), waitSeconds * 1_000);
       failures += 1;
       retry = setTimeout(() => void connect(), delay);
     };
@@ -131,7 +133,7 @@ export function useGameSocket(
       } catch (error) {
         connecting = false;
         if (__DEV__ && failures === 0) console.warn('[game] WebSocket setup failed', error);
-        scheduleRetry();
+        scheduleRetry(error instanceof ApiError ? error.retryAfterSeconds : 0);
       }
     };
 

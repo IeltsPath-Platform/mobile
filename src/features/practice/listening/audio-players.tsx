@@ -16,6 +16,8 @@ const VOLUMES = [1, 0.75, 0.5, 0.25] as const;
 export function usePlaybackAudioMode() {
   useEffect(() => {
     void setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true, interruptionMode: 'doNotMix', allowsRecording: false }).catch(() => undefined);
+    // Leaving Listening gives game and study sounds back the quiet mode of the rest of the app.
+    return () => { void setAudioModeAsync({ playsInSilentMode: false, shouldPlayInBackground: false, interruptionMode: 'mixWithOthers' }).catch(() => undefined); };
   }, []);
 }
 

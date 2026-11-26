@@ -13,7 +13,7 @@ import { QuestionGridSheet, QuestionStrip } from '../components/question-nav';
 import { QuestionGroups } from '../components/question-groups';
 import { ReaderSettingsSheet, useReaderPrefs } from '../components/reader-prefs';
 import { SubmitSheet } from '../components/submit-sheet';
-import { KeyboardShell, SectionTabs, TestFooter, closeTest, leaveToCatalog, useLeaveTestGuard } from '../components/test-shell';
+import { KeyboardShell, SectionTabs, TestFooter, closeTest, leaveToCatalog, unsavedAnswersMessage, useLeaveTestGuard } from '../components/test-shell';
 import { useAnnotations } from '../hooks/use-annotations';
 import { useScrollToItem } from '../hooks/use-scroll-to-item';
 import { useStudySession } from '../hooks/use-study-session';
@@ -54,7 +54,7 @@ export function ListeningScreen({ attemptId, attempt, sections, saved }: { attem
   const questions = useScrollToItem(12);
   const scroll = questions.scrollRef;
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const guardOff = useLeaveTestGuard(!runner.submitting && !runner.closed);
+  const guardOff = useLeaveTestGuard(!runner.submitting && !runner.closed, unsavedAnswersMessage(runner.answers.failed));
 
   useEffect(() => { if (runner.timed) void readPlayedSections(attemptId).then(setPlayed); }, [attemptId, runner.timed]);
   useEffect(() => () => {

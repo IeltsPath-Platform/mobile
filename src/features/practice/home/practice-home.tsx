@@ -6,6 +6,7 @@ import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Skeleton } from '@/src/components/ui/skeleton';
+import { LightStatusBar, StatusBarStrip } from '@/src/components/ui/band-status-bar';
 import { Text } from '@/src/components/ui/text';
 import { haptics } from '@/src/lib/haptics';
 import { colors } from '@/src/theme';
@@ -55,6 +56,7 @@ export const PracticeHome = forwardRef<ScrollViewInstance, Props>(function Pract
   const tried = HOME_SKILLS.filter((skill) => (data.latestBySkill[skill].data?.length ?? 0) > 0).length;
 
   return (
+    <View className="flex-1">
     <ScrollView
       ref={ref}
       onScroll={onScroll}
@@ -118,6 +120,9 @@ export const PracticeHome = forwardRef<ScrollViewInstance, Props>(function Pract
         </View>
       </View>
     </ScrollView>
+    <LightStatusBar />
+    <StatusBarStrip color={colors.heroStart} />
+    </View>
   );
 });
 
@@ -154,7 +159,7 @@ function NextCard({ signedIn, resume, suggestion, onOpen }: { signedIn: boolean;
       <View className="flex-row items-center gap-3 rounded-3xl p-4" style={{ backgroundColor: colors.surface, borderBottomWidth: 4, borderBottomColor: 'rgba(0,0,0,0.18)' }}>
         <View className="flex-1">
           <Text weight="black" className="text-[11px] uppercase tracking-wider" style={{ color: content.ink }}>{content.eyebrow}</Text>
-          <Text weight="extrabold" numberOfLines={2} className="mt-0.5 text-base text-ink">{content.title}</Text>
+          <Text weight="extrabold" numberOfLines={3} className="mt-0.5 text-base text-ink">{content.title}</Text>
         </View>
         <View className="min-h-11 flex-row items-center gap-1 rounded-full px-4" style={{ backgroundColor: content.color }}>
           <Text weight="extrabold" className="text-sm" style={{ color: '#ffffff' }}>{content.action}</Text>

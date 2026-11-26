@@ -10,7 +10,7 @@ import { Button } from '@/src/components/ui/button';
 import { Text } from '@/src/components/ui/text';
 import { useCurrentUser } from '@/src/features/auth/auth-provider';
 import { gameApi } from '@/src/features/games/api';
-import { gameErrorMessage } from '@/src/features/games/errors';
+import { gameErrorMessage, isGone } from '@/src/features/games/errors';
 import { GAME_META, GAMES_HOME, gameTone, matchRoute, resultRoute, toGameKind } from '@/src/features/games/game-meta';
 import { MemberRow, RoomCodeCard, RoomSettingsCard } from '@/src/features/games/room/room-parts';
 import type { GameEvent, GameRoom } from '@/src/features/games/types';
@@ -178,7 +178,7 @@ export default function GameRoomScreen() {
           <ActivityIndicator color={colors.accent} />
           <Text className="mt-3 text-sm text-muted">Đang tải phòng…</Text>
         </View>
-      ) : query.isError || !room ? (
+      ) : !room || isGone(query.error) ? (
         <View className="m-4 rounded-3xl border border-line bg-surface p-5">
           <Text weight="bold">Không tải được phòng chơi.</Text>
           <Text className="mt-2 text-sm text-muted">{query.error?.message ?? 'Có thể phòng đã đóng hoặc mã không hợp lệ.'}</Text>

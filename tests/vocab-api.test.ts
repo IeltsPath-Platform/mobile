@@ -55,21 +55,10 @@ describe('vocabulary topic catalog API', () => {
     expect(apiRequestMock.mock.calls[1][1].body).toEqual({ correct: false, requestId: 'request-1', sessionId: 'session-1' });
   });
 
-  it('loads the public vocabulary topic list', async () => {
-    const signal = new AbortController().signal;
-    await vocabApi.listTopics(signal);
+  it('asks for every word set unless a kind is chosen', async () => {
+    await vocabApi.listSets(undefined, 0, 30);
 
-    expect(apiRequestMock).toHaveBeenCalledWith('/api/content/vocabulary/topics', { auth: false, signal });
-  });
-
-  it('loads public vocabulary words filtered by topic and paginated', async () => {
-    const signal = new AbortController().signal;
-    await vocabApi.listTopicWords('topic id/1', 2, 30, signal);
-
-    expect(apiRequestMock).toHaveBeenCalledWith(
-      '/api/content/vocabulary?topicId=topic%20id%2F1&page=2&size=30',
-      { auth: false, signal },
-    );
+    expect(apiRequestMock).toHaveBeenCalledWith('/api/content/vocabulary/sets?page=0&size=30', { auth: false, signal: undefined });
   });
 
   it('sends uploaded images through the shared multipart builder', async () => {

@@ -6,6 +6,7 @@ import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { Button } from '@/src/components/ui/button';
 import { Text } from '@/src/components/ui/text';
 import { ApiError } from '@/src/lib/api-client';
+import { safeErrorMessage } from '@/src/lib/error-message';
 import { colors } from '@/src/theme';
 
 import { getSpeakingSubmission, settleSpeakingSubmission, type SpeakingSubmission } from '../../api/speaking';
@@ -55,7 +56,7 @@ function useSpeakingResult(submissionId: string) {
       .then(() => { setSettleError(''); void refetch(); })
       .catch((cause) => {
         if (cause instanceof ApiError && cause.status === 402) setShort(true);
-        else setSettleError(cause instanceof Error ? cause.message : 'Chưa hoàn tất được kết quả. Hãy thử lại.');
+        else setSettleError(safeErrorMessage(cause, 'Chưa hoàn tất được kết quả. Hãy thử lại.'));
       })
       .finally(() => { settling.current = false; });
   }, [status, short, submissionId, refetch, retryCount]);
@@ -76,14 +77,14 @@ export function SpeakingResultScreen({ submissionId }: { submissionId: string })
   }, [client, status]);
   const view = status === 'GRADED' && submission?.result ? parseSpeakingResult(submission.result) : null;
   const working = status !== undefined && WORKING.has(status);
-  const error = (query.error?.message ?? '') || settleError;
+  const error = (query.error ? safeErrorMessage(query.error, 'Chưa tải được kết quả. Hãy thử lại.') : '') || settleError;
 
   return (
     <View className="flex-1 bg-canvas">
-      <SkillBand color={colors.skill.speaking} title="Kết quả Speaking" subtitle={view ? 'Đã chấm xong' : query.isPending || working ? 'AI đang chấm bài nói' : 'Bài luyện Speaking'} onBack={() => leaveToCatalog(CATALOG)} right={<BandIcon><Mic size={22} color={colors.skill.speaking} /></BandIcon>} />
+      <SkillBand color={colors.skill.speaking} title="Kết quả Speaking" subtitle={view ? 'Đã chấm xong' : query.isPending ? 'Đang tải kết quả' : working ? 'AI đang chấm bài nói' : 'Bài luyện Speaking'} fallbackHref={CATALOG} right={<BandIcon><Mic size={22} color={colors.skill.speaking} /></BandIcon>} />
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 14 }}>
-        {query.isPending ? <Waiting status={undefined} /> : null}
-        {working && !short ? <Waiting status={status} /> : null}
+        {query.isPending ? <ActivityIndicator accessibilityLabel="Đang tải kết quả" className="py-8" color={colors.accent} /> : null}
+        {working && !short ? <Waiting status={status!} /> : null}
         {short ? <Notice tone="warn" title="Chưa nhận được kết quả" text="Số dư point hiện tại chưa đủ để nhận kết quả bài này. Bài chấm của bạn được giữ lại, bạn nạp thêm point rồi thử lại nhé." action={<Button label="Thử lại" variant="secondary" onPress={retry} />} /> : null}
         {status === 'NEEDS_EXAMINER' ? <Notice tone="stop" title="Hệ thống chấm đang lỗi" text="Hệ thống chấm đang lỗi, vui lòng thử lại sau. Bạn không bị trừ point." /> : null}
         {status === 'ABANDONED' ? <Notice tone="stop" title="Bài nộp đã dừng" text="Bài này chưa được gửi đủ bản ghi nên đã dừng. Bạn có thể ghi âm và gửi lại." /> : null}
@@ -103,19 +104,19 @@ const STEPS = [
 ];
 const STAGE_OF: Record<string, number> = { UPLOADING: 0, QUEUED: 0, ANALYZING: 1, GRADING: 2, PAYMENT_PENDING: 3, FAILED_RETRYABLE: 2 };
 
-function Waiting({ status }: { status: string | undefined }) {
+function Waiting({ status }: { status: string }) {
   const [opened] = useState(Date.now);
   const [now, setNow] = useState(opened);
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 5000); return () => clearInterval(timer); }, []);
   const waited = (now - opened) / 1000;
-  const stage = status === undefined ? 0 : STAGE_OF[status] ?? 0;
+  const stage = STAGE_OF[status] ?? 0;
   const retrying = status === 'FAILED_RETRYABLE';
   const note = waited >= 120 ? 'Vẫn đang chấm, bài nói dài có thể mất vài phút · bạn không cần gửi lại.' : waited >= 30 ? 'Bài nói dài hoặc hệ thống đang đông nên cần thêm thời gian.' : 'Thời gian chấm tùy độ dài bài nói · kết quả sẽ tự hiện ra.';
   return (
     <Card>
       <View className="flex-row items-center gap-3">
         <ActivityIndicator color={colors.accent} />
-        <Text weight="extrabold" className="flex-1 text-base text-ink">{retrying ? 'Đang thử chấm lại' : status === undefined ? 'Đang tải kết quả' : ['Đang chờ tới lượt chấm', 'Đang phân tích giọng nói', 'Đang chấm bài', 'Đang hoàn tất kết quả'][stage]}</Text>
+        <Text weight="extrabold" className="flex-1 text-base text-ink">{retrying ? 'Đang thử chấm lại' : ['Đang chờ tới lượt chấm', 'Đang phân tích giọng nói', 'Đang chấm bài', 'Đang hoàn tất kết quả'][stage]}</Text>
       </View>
       <Text className="mt-2 text-sm text-muted">{retrying ? 'Lần chấm trước chưa thành công, hệ thống tự thử lại. Bạn không bị trừ point.' : STEPS[stage]!.hint}</Text>
       <View className="mt-3 gap-2">

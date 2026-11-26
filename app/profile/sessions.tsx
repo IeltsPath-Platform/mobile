@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MonitorSmartphone } from 'lucide-react-native';
-import { ActivityIndicator, Alert, RefreshControl, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, RefreshControl, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BackHeader } from '@/src/components/navigation/back-header';
@@ -53,12 +53,19 @@ export default function SessionsScreen() {
       ) : sessions.isError && !sessions.data ? (
         <EmptyState title="Chưa tải được danh sách" message={sessions.error.message} mood="oops" action={<Button label="Thử lại" variant="secondary" onPress={() => void sessions.refetch()} />} />
       ) : (
-        <ScrollView
+        // Virtualised: an account used for a while holds dozens of sessions, and drawing them all at once took seconds.
+        <FlatList
+          data={list}
+          keyExtractor={(session) => session.sessionId}
+          initialNumToRender={5}
+          windowSize={5}
           contentContainerStyle={{ padding: 16, paddingBottom: Math.max(insets.bottom, 16) + 16, gap: 12 }}
-          refreshControl={<RefreshControl refreshing={sessions.isRefetching} onRefresh={() => void sessions.refetch()} tintColor={colors.accent} />}>
-          {failure ? <FormAlert message={failure.message} /> : null}
-          {list.map((session) => (
-            <Card key={session.sessionId} className="gap-2 p-4">
+          refreshControl={<RefreshControl refreshing={sessions.isRefetching} onRefresh={() => void sessions.refetch()} tintColor={colors.accent} />}
+          ListHeaderComponent={failure ? <FormAlert message={failure.message} /> : undefined}
+          ListEmptyComponent={<Text className="text-center text-sm text-muted">Chưa có phiên đăng nhập nào.</Text>}
+          ListFooterComponent={hasOthers ? <Button label="Đăng xuất mọi thiết bị khác" loading={revokeOthers.isPending} disabled={busy} onPress={confirmOthers} /> : undefined}
+          renderItem={({ item: session }) => (
+            <Card className="gap-2 p-4">
               <View className="flex-row items-center gap-3">
                 <View className="h-11 w-11 items-center justify-center rounded-2xl bg-accent-soft"><MonitorSmartphone size={20} color={colors.accentDeep} /></View>
                 <View className="min-w-0 flex-1">
@@ -73,10 +80,8 @@ export default function SessionsScreen() {
                 <Button variant="secondary" label="Đăng xuất thiết bị này" loading={revokeOne.isPending && revokeOne.variables === session.sessionId} disabled={busy} onPress={() => confirmOne(session)} />
               )}
             </Card>
-          ))}
-          {list.length === 0 ? <Text className="text-center text-sm text-muted">Chưa có phiên đăng nhập nào.</Text> : null}
-          {hasOthers ? <Button label="Đăng xuất mọi thiết bị khác" loading={revokeOthers.isPending} disabled={busy} onPress={confirmOthers} /> : null}
-        </ScrollView>
+          )}
+        />
       )}
     </View>
   );

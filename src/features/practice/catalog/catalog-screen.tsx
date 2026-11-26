@@ -231,7 +231,7 @@ export function CatalogScreen({ skill, initialPart, initialFormat }: { skill: Sk
         <View className="min-h-12 flex-1 flex-row items-center gap-2 rounded-2xl bg-surface px-3" style={{ borderWidth: 1.5, borderColor: colors.line }}>
           <Search size={18} color={colors.muted} />
           <TextInput value={query} onChangeText={setQuery} placeholder="Tìm đề theo tên" placeholderTextColor={colors.muted} returnKeyType="search" accessibilityLabel="Tìm đề" className="flex-1 text-[15px] text-ink" />
-          {query ? <Pressable onPress={() => setQuery('')} accessibilityRole="button" accessibilityLabel="Xoá tìm kiếm" hitSlop={8}><X size={18} color={colors.muted} /></Pressable> : null}
+          {query ? <Pressable onPress={() => setQuery('')} accessibilityRole="button" accessibilityLabel="Xóa tìm kiếm" hitSlop={8}><X size={18} color={colors.muted} /></Pressable> : null}
         </View>
         <Pressable onPress={() => setFilterOpen(true)} accessibilityRole="button" accessibilityLabel={`Lọc dạng câu hỏi${selectedFormats.length ? `, đang chọn ${selectedFormats.length}` : ''}`} className="min-h-12 w-12 items-center justify-center rounded-2xl" style={{ borderWidth: 1.5, borderColor: selectedFormats.length ? tint : colors.line, backgroundColor: selectedFormats.length ? `${tint}1f` : colors.surface }}>
           <SlidersHorizontal size={19} color={selectedFormats.length ? skillInk(skill) : colors.ink} />

@@ -28,7 +28,9 @@ import { CommunityAvatar, CommunityImage } from '@/src/features/community/compon
 import { CATEGORY_LABELS } from '@/src/features/community/format';
 import { postBackgroundColor } from '@/src/features/community/post-background';
 import { ApiError } from '@/src/lib/api-client';
+import { safeErrorMessage } from '@/src/lib/error-message';
 import { haptics } from '@/src/lib/haptics';
+import { useSingleFlight } from '@/src/lib/use-single-flight';
 import { colors } from '@/src/theme';
 import { useTheme } from '@/src/theme/app-theme';
 
@@ -49,7 +51,7 @@ const BACKGROUNDS: { key: PostBackground; label: string }[] = [
 
 const MAX_IMAGE_COUNT = 4;
 const MAX_SOURCE_IMAGE_SIZE = 20 * 1024 * 1024;
-const MAX_BODY_LENGTH = 5_000;
+const MAX_BODY_LENGTH = 20_000;
 const MAX_BACKGROUND_LENGTH = 280;
 const ALLOWED_IMAGE_HOSTS = ['images.unsplash.com', 'i.imgur.com', 'supabase.co'];
 const ALLOWED_VIDEO_HOSTS = ['youtube.com', 'www.youtube.com', 'youtu.be', 'loom.com', 'www.loom.com', 'drive.google.com'];
@@ -85,6 +87,7 @@ export default function ComposerScreen() {
   const [sheet, setSheet] = useState<'none' | 'category' | 'options'>('none');
   const [showBackgrounds, setShowBackgrounds] = useState(false);
   const [busy, setBusy] = useState(false);
+  const singleFlight = useSingleFlight();
   const [picking, setPicking] = useState(false);
   const [uploadingUris, setUploadingUris] = useState<string[]>([]);
   const [failedUris, setFailedUris] = useState<string[]>([]);
@@ -145,7 +148,7 @@ export default function ComposerScreen() {
   const liftGuard = useRef<() => void>(() => undefined);
   const disablePrevention = usePreventRemove(busy || (isDirty && hasDraft), ({ repeat }) => {
     if (busy) return;
-    Alert.alert('Bỏ bài viết đang soạn?', 'Nội dung bạn vừa nhập sẽ bị xoá.', [
+    Alert.alert('Bỏ bài viết đang soạn?', 'Nội dung bạn vừa nhập sẽ bị xóa.', [
       { text: 'Tiếp tục soạn', style: 'cancel' },
       { text: 'Bỏ bài viết', style: 'destructive', onPress: () => { liftGuard.current(); repeat(); } },
     ]);
@@ -277,7 +280,7 @@ export default function ComposerScreen() {
     const band = targetBand.trim() ? Number(targetBand.replace(',', '.')) : undefined;
     const normalizedVideoUrl = videoUrl.trim();
     if (!normalizedBody) return setError('Hãy viết nội dung trước khi đăng.');
-    if (normalizedBody.length > MAX_BODY_LENGTH) return setError('Nội dung tối đa 5.000 ký tự.');
+    if (normalizedBody.length > MAX_BODY_LENGTH) return setError('Nội dung tối đa 20.000 ký tự.');
     if (title.trim().length > 200) return setError('Tiêu đề tối đa 200 ký tự.');
     if (band !== undefined && (!Number.isFinite(band) || band < 0 || band > 9 || (band * 2) % 1 !== 0)) {
       return setError('Band mục tiêu phải từ 0 đến 9, theo bước 0,5.');
@@ -289,6 +292,7 @@ export default function ComposerScreen() {
       return setError('Bài nền màu chỉ hỗ trợ nội dung chữ tối đa 280 ký tự.');
     }
 
+    await singleFlight(async () => {
     setBusy(true);
     setError('');
     try {
@@ -316,11 +320,12 @@ export default function ComposerScreen() {
       ]);
     } catch (cause) {
       haptics.error();
-      setError(cause instanceof Error ? cause.message : 'Không thể đăng bài. Hãy kiểm tra kết nối rồi thử lại.');
+      setError(safeErrorMessage(cause, 'Không thể đăng bài. Hãy kiểm tra kết nối rồi thử lại.'));
       requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: 0, animated: true }));
     } finally {
       setBusy(false);
     }
+    });
   };
 
   const canUseBackground = images.length === 0 && !videoUrl.trim() && body.trim().length <= MAX_BACKGROUND_LENGTH;
@@ -378,6 +383,7 @@ export default function ComposerScreen() {
                   <Pressable
                     onPress={() => { Keyboard.dismiss(); setSheet('category'); }}
                     disabled={busy}
+                    hitSlop={8}
                     className="mt-1 min-h-8 flex-row items-center gap-1 rounded-full border px-3 active:opacity-70"
                     style={{ backgroundColor: palette.background, borderColor: palette.border }}
                     accessibilityRole="button"
@@ -427,7 +433,7 @@ export default function ComposerScreen() {
               )}
 
               {images.length ? (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-4" contentContainerClassName="gap-3 pr-2">
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-4" style={{ flexGrow: 0 }} contentContainerClassName="items-start gap-3 pr-2">
                   {images.map((image, index) => (
                     <View key={`${image.uri}-${index}`} className="relative">
                       <CommunityImage uri={image.uri} label={`Ảnh đính kèm ${index + 1}`} className="h-32 w-32 rounded-2xl" />
@@ -438,7 +444,7 @@ export default function ComposerScreen() {
                         </Pressable>
                       ) : null}
                       {image.url && image.size > 0 && !uploadingUris.includes(image.uri) ? <View className="absolute bottom-1.5 left-1.5 h-5 w-5 items-center justify-center rounded-full" style={{ backgroundColor: colors.success }}><Check size={12} color="white" strokeWidth={3} /></View> : null}
-                      <Pressable disabled={busy} onPress={() => { markDirty(); setFailedUris((current) => current.filter((uri) => uri !== image.uri)); setImages((current) => current.filter((_, itemIndex) => itemIndex !== index)); }} className="absolute right-1 top-1 h-9 w-9 items-center justify-center rounded-full bg-black/55" accessibilityRole="button" accessibilityLabel={`Xóa ảnh ${index + 1}`}>
+                      <Pressable disabled={busy} onPress={() => { markDirty(); setFailedUris((current) => current.filter((uri) => uri !== image.uri)); setImages((current) => current.filter((_, itemIndex) => itemIndex !== index)); }} hitSlop={6} className="absolute right-1 top-1 h-9 w-9 items-center justify-center rounded-full bg-black/55" accessibilityRole="button" accessibilityLabel={`Xóa ảnh ${index + 1}`}>
                         <X size={17} color="white" />
                       </Pressable>
                     </View>
@@ -497,7 +503,11 @@ export default function ComposerScreen() {
           </ToolButton>
           <View className="flex-1" />
           <Text className="mr-3 text-xs" style={{ color: body.length > MAX_BODY_LENGTH - 500 ? colors.danger : colors.muted }}>
-            {images.length ? `${images.length}/${MAX_IMAGE_COUNT} ảnh · ` : ''}{body.length > 3_500 ? `${body.length}/${MAX_BODY_LENGTH}` : ''}
+            {[
+              images.length ? `${images.length}/${MAX_IMAGE_COUNT} ảnh` : '',
+              body.length > 3_500 ? `${body.length}/${MAX_BODY_LENGTH}` : '',
+              hasDraft && !body.trim() ? 'Viết nội dung để đăng' : '',
+            ].filter(Boolean).join(' · ')}
           </Text>
         </View>
       </KeyboardAvoidingView>

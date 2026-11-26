@@ -12,7 +12,7 @@ export const GAME_META: Record<
   { name: string; Icon: LucideIcon }
 > = {
   WORDLY: { name: 'Wordly', Icon: Grid3x3 },
-  ROCKET: { name: 'Rocket', Icon: Rocket },
+  ROCKET: { name: 'Tên lửa', Icon: Rocket },
 };
 
 /** Per-game accent pair; reads the live palette so dark mode follows. */

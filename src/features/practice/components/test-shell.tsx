@@ -72,7 +72,12 @@ export function KeyboardShell({ children }: { children: ReactNode }) {
  * Leaving a test in progress asks first. Answers are already saved, so leaving loses nothing; the alert says so.
  * Returns a function that lifts the guard (used before navigating to the result).
  */
-export function useLeaveTestGuard(active: boolean, message = 'Đáp án đã được lưu. Bạn có thể quay lại làm tiếp từ tab Luyện tập.', title = 'Tạm rời bài làm?') {
+/** The warning for a Reading or Listening test whose answers could not all be saved. */
+export const unsavedAnswersMessage = (failed: number) => (failed > 0
+  ? `${failed} câu chưa lưu được do lỗi kết nối. Rời bây giờ có thể mất các đáp án này; hãy kiểm tra mạng trước.`
+  : undefined);
+
+export function useLeaveTestGuard(active: boolean, message = 'Đáp án đã được lưu. Bạn có thể quay lại làm tiếp từ tab Hôm nay.', title = 'Tạm rời bài làm?') {
   // The alert's button lifts the guard it belongs to, which only exists once the hook has returned: reach it through a ref.
   const disable = useRef<() => void>(() => undefined);
   const liftGuard = usePreventRemove(active, ({ repeat }) => {

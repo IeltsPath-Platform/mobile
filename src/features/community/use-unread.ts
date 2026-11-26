@@ -8,7 +8,8 @@ import { shouldPollUnread, UNREAD_POLL_MS } from './unread-polling';
 
 export const unreadQueryKey = ['community', 'unread'] as const;
 
-export function useUnread() {
+/** Every observer of a query runs its own timer, so only the tab badge asks for `poll`; the others read its cache. */
+export function useUnread({ polls = false }: { polls?: boolean } = {}) {
   const { status } = useAuth();
   const pathname = usePathname();
   const [active, setActive] = useState(AppState.currentState !== 'background');
@@ -17,7 +18,7 @@ export function useUnread() {
     queryKey: unreadQueryKey,
     queryFn: communityApi.unread,
     enabled: poll,
-    refetchInterval: poll ? UNREAD_POLL_MS : false,
+    refetchInterval: polls && poll ? UNREAD_POLL_MS : false,
     retry: 1,
   });
   useEffect(() => {

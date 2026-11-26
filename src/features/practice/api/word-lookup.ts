@@ -5,6 +5,7 @@ import { apiRequest } from '@/src/lib/api-client'
 /** Looking a word up in the vocabulary library (library-service), for the "click a word" popover of the practice passage. */
 
 const senseSchema = z.object({
+  id: z.string().nullish(),
   partOfSpeech: z.string().nullish(),
   englishDefinition: z.string().nullish(),
   vietnameseMeaning: z.string().nullish(),
@@ -23,6 +24,8 @@ const itemSchema = z.object({
 export type LookupItem = z.infer<typeof itemSchema>
 
 export interface WordSense {
+  /** Library id of the meaning, needed to save it to the notebook. */
+  id: string | null
   partOfSpeech: string | null
   vietnameseMeaning: string | null
   englishDefinition: string | null
@@ -64,6 +67,7 @@ export function lemmaCandidates(word: string): string[] {
 const toSenses = (item: LookupItem): WordSense[] => item.senses
   .filter((sense) => sense.vietnameseMeaning?.trim() || sense.englishDefinition?.trim())
   .map((sense): WordSense => ({
+    id: sense.id ?? null,
     partOfSpeech: sense.partOfSpeech ?? null,
     vietnameseMeaning: sense.vietnameseMeaning?.trim() || null,
     englishDefinition: sense.englishDefinition?.trim() || null,

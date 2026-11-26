@@ -5,6 +5,7 @@ import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
 import { BackHeader } from '@/src/components/navigation/back-header';
+import { StatusBarStrip } from '@/src/components/ui/band-status-bar';
 import { Button } from '@/src/components/ui/button';
 import { EmptyState } from '@/src/components/ui/empty-state';
 import { FormAlert } from '@/src/components/ui/form-alert';
@@ -21,6 +22,7 @@ import { practiceFormatLabel } from '../model/format-labels';
 import { RATING_LABELS, WEAK_BELOW_PERCENT, adviseTime, formatClockTime, formatMinutes, formatTip, mascotMessage, priorityFormats, rateFormats, skippedFormats, weakFormats, type AccuracyRating, type RatedFormat } from '../model/practice-analysis';
 import type { ReadingResultView } from '../model/result-view';
 import { rememberAttempt } from '../model/resume-store';
+import { safeErrorMessage } from '@/src/lib/error-message';
 import { PRACTICE_SKILL_CONFIG } from '../model/skill-config';
 import { skillColor } from '../model/skill-meta';
 import { SkillBand } from '../components/skill-band';
@@ -39,11 +41,11 @@ export function ResultScreen({ attemptId, skill }: { attemptId: string; skill: '
   const upgrade = usePremiumUpgrade();
 
   if (data.isPending) return <Loading label={`Đang tải kết quả ${config.label}…`} />;
-  if (data.isError) {
+  if (!data.data) {
     return (
       <View className="flex-1 bg-canvas">
         <BackHeader title="Kết quả" fallbackHref={catalog} />
-        <EmptyState title="Chưa tải được kết quả" message={data.error.message} mood="oops" action={<Button label="Thử lại" variant="secondary" onPress={() => void data.refetch()} />} />
+        <EmptyState title="Chưa tải được kết quả" message={safeErrorMessage(data.error, 'Chưa tải được kết quả. Vui lòng thử lại.')} mood="oops" action={<Button label="Thử lại" variant="secondary" onPress={() => void data.refetch()} />} />
       </View>
     );
   }
@@ -62,7 +64,7 @@ export function ResultScreen({ attemptId, skill }: { attemptId: string; skill: '
       router.replace(`/practice/${skill}/${restarted.id}` as never);
     } catch (cause) {
       if (isPremiumRequired(cause)) upgrade.open();
-      setRetryError(cause instanceof Error ? cause.message : 'Không tạo lại được bài làm.');
+      setRetryError(safeErrorMessage(cause, 'Không tạo lại được bài làm. Vui lòng thử lại.'));
     } finally {
       setRetrying(false);
     }
@@ -72,7 +74,7 @@ export function ResultScreen({ attemptId, skill }: { attemptId: string; skill: '
     <View className="flex-1 bg-canvas">
       {upgrade.sheets}
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-        <SkillBand color={skillColor(skill)} title={`Kết quả ${config.label}`} subtitle={scopeLabel} onBack={() => leaveToCatalog(catalog)}>
+        <SkillBand color={skillColor(skill)} title={`Kết quả ${config.label}`} subtitle={scopeLabel} fallbackHref={catalog}>
           <Hero view={view} />
         </SkillBand>
         <View style={{ padding: 16, gap: 16 }}>
@@ -92,6 +94,7 @@ export function ResultScreen({ attemptId, skill }: { attemptId: string; skill: '
         <Text className="text-center text-xs text-muted">Số liệu phân tích được tính từ bài bạn vừa làm; band chỉ là ước tính, không thay thế kết quả thi thật.</Text>
         </View>
       </ScrollView>
+      <StatusBarStrip color={skillColor(skill)} />
     </View>
   );
 }
@@ -130,7 +133,8 @@ function Summary({ view }: { view: ReadingResultView }) {
         <View accessibilityRole="image" accessibilityLabel={`${view.counts.correct} trên ${total} câu đúng`} style={{ width: 110, height: 110, alignItems: 'center', justifyContent: 'center' }}>
           <Svg width={110} height={110} viewBox="0 0 110 110" style={{ position: 'absolute' }}>
             <Circle cx={55} cy={55} r={radius} stroke={colors.line} strokeWidth={12} fill="none" />
-            <Circle cx={55} cy={55} r={radius} stroke={colors.success} strokeWidth={12} fill="none" strokeLinecap="round" strokeDasharray={`${circumference * share} ${circumference}`} transform="rotate(-90 55 55)" />
+            {/* A round cap draws a dot even for an empty arc, so nothing is drawn when no answer is correct. */}
+            {share > 0 ? <Circle cx={55} cy={55} r={radius} stroke={colors.success} strokeWidth={12} fill="none" strokeLinecap="round" strokeDasharray={`${circumference * share} ${circumference}`} transform="rotate(-90 55 55)" /> : null}
           </Svg>
           <Text weight="black" className="text-xl text-ink">{view.counts.correct}/{total}</Text>
           <Text className="text-[11px] text-muted">câu đúng</Text>
@@ -207,7 +211,10 @@ function PriorityCard({ rated, answered, total, onPractise }: { rated: RatedForm
 function FormatCards({ rated, scopeLabel, onPractise }: { rated: RatedFormat[]; scopeLabel: string; onPractise: (code: string) => void }) {
   return (
     <View className="gap-2">
-      <Text weight="extrabold" className="text-base text-ink">Theo từng dạng câu hỏi <Text className="text-xs text-muted">· {scopeLabel}</Text></Text>
+      <View>
+        <Text weight="extrabold" className="text-base text-ink">Theo từng dạng câu hỏi</Text>
+        <Text className="text-xs text-muted">{scopeLabel}</Text>
+      </View>
       {rated.map((row) => (
         <View key={row.formatCode} className="rounded-2xl bg-surface p-3" style={{ borderWidth: 2, borderColor: row.priority ? TONE[row.rating] : colors.line }}>
           <View className="flex-row items-center gap-2">
