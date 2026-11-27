@@ -36,13 +36,13 @@ export function AppSettingsPanel() {
     <View>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Thông báo cộng đồng"
+        accessibilityLabel="Thông báo"
         onPress={() => router.push('/community/notification-preferences' as never)}
         className="min-h-16 flex-row items-center gap-3 px-4 py-3 active:opacity-70">
         <Bell size={22} color={colors.accentDeep} />
         <View className="flex-1">
           <Text weight="bold" className="text-base text-ink">
-            Thông báo cộng đồng
+            Thông báo
           </Text>
           <Text className="mt-0.5 text-sm text-muted">Chọn loại thông báo bạn muốn nhận</Text>
         </View>
