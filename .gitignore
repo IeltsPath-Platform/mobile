@@ -68,3 +68,7 @@ Thumbs.db
 CODEX_TASK_*.md
 # Firebase config (provided to cloud builds through an EAS file secret)
 google-services.json
+
+# Working notes for AI tools
+docs/prompts/
+docs/journals/
