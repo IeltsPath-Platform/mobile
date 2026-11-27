@@ -1,28 +1,33 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { Camera, Check, Clock3, ImagePlus, Trash2, UserRound } from 'lucide-react-native';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
+import { Check, ChevronRight, ImagePlus, Smartphone, Trash2 } from 'lucide-react-native';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, TextInput, View, type TextInputProps } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BackButton } from '@/src/components/navigation/back-header';
+import { ActionSheet, type ActionSheetItem } from '@/src/components/ui/action-sheet';
 import { StatusBarStrip } from '@/src/components/ui/band-status-bar';
 import { Button } from '@/src/components/ui/button';
-import { Card } from '@/src/components/ui/card';
 import { FormAlert } from '@/src/components/ui/form-alert';
 import { Text } from '@/src/components/ui/text';
-import { TextField } from '@/src/components/ui/text-field';
 import { useCurrentUser } from '@/src/features/auth/auth-provider';
+import { Sheet } from '@/src/features/practice/components/sheet';
 import { profileApi, profileQueryKeys } from '@/src/features/profile/api';
+import { BAND_CHOICES, DEFAULT_TIMEZONE, deviceTimezone, parseBand, TIMEZONE_CHOICES, timezoneLabel } from '@/src/features/profile/profile-form';
 import { gamificationApi } from '@/src/features/progress/gamification-api';
-import { colors, fonts } from '@/src/theme';
 import { ApiError } from '@/src/lib/api-client';
 import { safeErrorMessage } from '@/src/lib/error-message';
+import { haptics } from '@/src/lib/haptics';
 import { useDiscardGuard } from '@/src/lib/use-discard-guard';
+import { colors, fonts } from '@/src/theme';
+import { useTheme } from '@/src/theme/app-theme';
 
 const MAX_SOURCE_AVATAR_BYTES = 20 * 1024 * 1024;
+const BIO_MAX = 1000;
+const AVATAR_SIZE = 96;
 
 export default function EditProfileScreen() {
   const queryClient = useQueryClient();
@@ -40,11 +45,14 @@ export default function EditProfileScreen() {
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
   const [band, setBand] = useState('');
-  const [timezone, setTimezone] = useState('Asia/Ho_Chi_Minh');
+  const [timezone, setTimezone] = useState(DEFAULT_TIMEZONE);
   const [visibility, setVisibility] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
   const [formError, setFormError] = useState('');
   const [avatarError, setAvatarError] = useState('');
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarMenu, setAvatarMenu] = useState(false);
+  const [timezonePicker, setTimezonePicker] = useState(false);
+  const [bandPicker, setBandPicker] = useState(false);
   const refreshCommunityAvatar = () => {
     if (!user.data?.id) return Promise.resolve();
     return Promise.all([
@@ -73,7 +81,7 @@ export default function EditProfileScreen() {
       setDisplayName(learner.data.displayName ?? user.data?.fullName ?? '');
       setBio(learner.data.bio ?? '');
       setBand(learner.data.selfReportedBand == null ? '' : String(learner.data.selfReportedBand));
-      if (!timezoneHydrated.current) setTimezone(learner.data.timezone || 'Asia/Ho_Chi_Minh');
+      if (!timezoneHydrated.current) setTimezone(learner.data.timezone || DEFAULT_TIMEZONE);
       setVisibility(learner.data.visibility === 'PRIVATE' ? 'PRIVATE' : 'PUBLIC');
     }
   }, [learner.data, user.data?.fullName]);
@@ -101,38 +109,34 @@ export default function EditProfileScreen() {
     || phoneNumber !== (user.data!.phoneNumber ?? '')
     || displayName !== (learner.data!.displayName ?? user.data!.fullName ?? '')
     || bio !== (learner.data!.bio ?? '')
-    || band !== (learner.data!.selfReportedBand == null ? '' : String(learner.data!.selfReportedBand))
-    || timezone !== (gamificationSettings.data?.timezone || learner.data!.timezone || 'Asia/Ho_Chi_Minh')
+    || parseBand(band) !== (learner.data!.selfReportedBand ?? null)
+    || timezone !== (gamificationSettings.data?.timezone || learner.data!.timezone || DEFAULT_TIMEZONE)
     || visibility !== (learner.data!.visibility === 'PRIVATE' ? 'PRIVATE' : 'PUBLIC')
   );
   const allowLeave = useDiscardGuard(dirty);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const parsedBand = band.trim() ? Number(band.replace(',', '.')) : null;
-      if (parsedBand != null && (!Number.isFinite(parsedBand) || parsedBand < 0 || parsedBand > 9)) {
-        throw new Error('Band tự đánh giá phải nằm trong khoảng 0 đến 9.');
-      }
-      if (!timezone.trim()) throw new Error('Vui lòng nhập múi giờ.');
-
+      const parsedBand = parseBand(band);
       await profileApi.updateAccount({ fullName: fullName.trim(), phoneNumber: phoneNumber.trim() || null });
       const profile = await profileApi.updateLearnerProfile({
-          displayName: (displayName.trim() || fullName.trim()),
-          bio: bio.trim() || null,
-          selfReportedBand: parsedBand,
-          timezone: timezone.trim(),
-          visibility,
-        }).catch((error: unknown) => {
-          throw new Error(`Thông tin tài khoản đã lưu, nhưng hồ sơ học viên chưa lưu được: ${error instanceof Error ? error.message : 'Vui lòng thử lại.'}`);
-        });
+        displayName: (displayName.trim() || fullName.trim()),
+        bio: bio.trim() || null,
+        selfReportedBand: parsedBand,
+        timezone,
+        visibility,
+      }).catch((error: unknown) => {
+        throw new Error(`Thông tin tài khoản đã lưu, nhưng hồ sơ học viên chưa lưu được: ${error instanceof Error ? error.message : 'Vui lòng thử lại.'}`);
+      });
       try {
-        await gamificationApi.updateSettings(timezone.trim());
+        await gamificationApi.updateSettings(timezone);
       } catch (error) {
         throw new Error(`Hồ sơ đã lưu nhưng múi giờ học chưa đồng bộ: ${error instanceof Error ? error.message : 'Vui lòng thử lại.'}`);
       }
       return profile;
     },
     onSuccess: async (profile) => {
+      haptics.success();
       queryClient.setQueryData(profileQueryKeys.learner, profile);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: profileQueryKeys.user }),
@@ -145,6 +149,7 @@ export default function EditProfileScreen() {
     },
     // The server names the field that is wrong ("Số điện thoại không hợp lệ"); its general message does not.
     onError: (error: Error) => {
+      haptics.error();
       const field = error instanceof ApiError ? error.details.fullName ?? error.details.phoneNumber : undefined;
       setFormError(safeErrorMessage(field ? new Error(field) : error));
       // The account part may have been stored before a later step failed.
@@ -155,15 +160,22 @@ export default function EditProfileScreen() {
   const avatar = learner.data?.avatarReference;
   const initial = useMemo(() => (displayName || fullName || '?').trim().charAt(0).toUpperCase(), [displayName, fullName]);
   const loading = user.isPending || learner.isPending;
+  const avatarBusy = avatarUploading || avatarMutation.isPending;
+  const canSave = dirty && Boolean(fullName.trim()) && Boolean(displayName.trim()) && !avatarBusy && !saveMutation.isPending;
+  const save = () => {
+    if (!canSave) return;
+    setFormError('');
+    saveMutation.mutate();
+  };
 
   const pickAvatar = async () => {
-    if (avatarUploading || avatarMutation.isPending) return;
+    if (avatarBusy) return;
     setAvatarUploading(true);
     setAvatarError('');
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        setAvatarError('Hãy cấp quyền truy cập thư viện ảnh để chọn avatar.');
+        setAvatarError('Hãy cấp quyền truy cập thư viện ảnh để chọn ảnh đại diện.');
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -193,6 +205,7 @@ export default function EditProfileScreen() {
       queryClient.setQueryData(profileQueryKeys.learner, profile);
       await queryClient.invalidateQueries({ queryKey: profileQueryKeys.learner });
       await refreshCommunityAvatar();
+      haptics.success();
     } catch (error) {
       setAvatarError(safeErrorMessage(error, 'Không tải được ảnh đại diện.'));
     } finally {
@@ -200,35 +213,39 @@ export default function EditProfileScreen() {
     }
   };
 
-  const confirmDeleteAvatar = () => {
-    const remove = () => avatarMutation.mutate();
-    if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
-      if (window.confirm('Xóa ảnh đại diện hiện tại?')) remove();
-      return;
-    }
-    Alert.alert('Xóa ảnh đại diện', 'Bạn có muốn xóa ảnh hiện tại không?', [
-      { text: 'Để sau', style: 'cancel' },
-      { text: 'Xóa ảnh', style: 'destructive', onPress: remove },
-    ]);
-  };
+  const bandValue = parseBand(band);
+
+  const avatarActions: ActionSheetItem[] = [
+    { label: avatar ? 'Chọn ảnh khác' : 'Chọn ảnh từ thư viện', icon: ImagePlus, onPress: () => { setTimeout(() => void pickAvatar(), 280); } },
+    ...(avatar ? [{ label: 'Xóa ảnh hiện tại', icon: Trash2, destructive: true, onPress: () => avatarMutation.mutate() }] : []),
+  ];
 
   return (
     <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'web' ? undefined : 'padding'}>
       <View className="flex-1 bg-canvas">
+        <View className="flex-row items-center gap-2 px-4 pb-2" style={{ paddingTop: Math.max(insets.top, 12) + 4 }}>
+          <BackButton fallbackHref="/(tabs)/account" />
+          <Text accessibilityRole="header" weight="black" className="flex-1 text-center text-lg">Sửa hồ sơ</Text>
+          <Pressable
+            onPress={save}
+            disabled={!canSave}
+            accessibilityRole="button"
+            accessibilityLabel="Lưu thay đổi"
+            accessibilityState={{ disabled: !canSave, busy: saveMutation.isPending }}
+            className="min-h-11 min-w-16 items-center justify-center rounded-full px-4 active:opacity-70"
+            style={{ backgroundColor: canSave ? colors.accent : 'transparent' }}>
+            {saveMutation.isPending
+              ? <ActivityIndicator size="small" color={colors.onAccent} />
+              : <Text weight="extrabold" className="text-[15px]" style={{ color: canSave ? colors.onAccent : colors.muted }}>Lưu</Text>}
+          </Pressable>
+        </View>
+
         <ScrollView
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-          contentContainerClassName="px-5 pb-6"
-          contentContainerStyle={{ paddingTop: Math.max(insets.top, 12) + 8 }}>
-          <View className="mb-5 flex-row items-center gap-3">
-            <BackButton fallbackHref="/(tabs)/account" />
-            <View className="flex-1">
-              <Text weight="black" className="text-xl">Chỉnh sửa hồ sơ</Text>
-              <Text className="text-xs text-muted">Thông tin và ảnh đại diện</Text>
-            </View>
-          </View>
-
-          {loading ? <View className="mt-14 items-center gap-3"><ActivityIndicator color={colors.accent} /><Text className="text-sm text-muted">Đang tải hồ sơ…</Text></View> : null}
+          contentContainerClassName="px-4 pb-10"
+          showsVerticalScrollIndicator={false}>
+          {loading ? <View className="mt-20 items-center gap-3"><ActivityIndicator color={colors.accent} /><Text className="text-sm text-muted">Đang tải hồ sơ…</Text></View> : null}
           {!loading && (!user.data || !learner.data) ? (
             <View className="mt-5 gap-3">
               <FormAlert message={(user.error ?? learner.error)?.message ?? 'Không tải được hồ sơ.'} />
@@ -237,92 +254,166 @@ export default function EditProfileScreen() {
           ) : null}
 
           {!loading && user.data && learner.data ? <>
-            <View className="overflow-hidden rounded-3xl p-5" style={{ backgroundColor: colors.heroStart }}>
-              <View className="flex-row items-center gap-4">
-                <Pressable onPress={() => void pickAvatar()} accessibilityRole="button" accessibilityLabel="Thay ảnh đại diện" className="relative">
-                  <View className="h-24 w-24 items-center justify-center overflow-hidden rounded-full border-[3px] border-white/80 bg-accent">
-                    {avatar ? <Image source={{ uri: avatar }} accessibilityIgnoresInvertColors contentFit="cover" style={{ width: '100%', height: '100%' }} /> : <Text weight="black" className="text-3xl text-white">{initial}</Text>}
-                  </View>
-                  <View className="absolute bottom-0 right-0 h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-accent">
-                    {avatarMutation.isPending || avatarUploading ? <ActivityIndicator size="small" color="#fff" /> : <Camera size={17} color="#fff" />}
-                  </View>
-                </Pressable>
-                <View className="flex-1">
-                  <Text weight="black" className="text-lg text-white">{displayName || fullName}</Text>
-                  <Text className="mt-1 text-sm text-white/75">Ảnh vuông, rõ mặt sẽ dễ nhận ra hơn.</Text>
-                  <Pressable onPress={() => void pickAvatar()} accessibilityRole="button" accessibilityLabel="Chọn ảnh đại diện" disabled={avatarUploading || avatarMutation.isPending} className="mt-3 min-h-11 flex-row items-center gap-2 self-start rounded-xl bg-white/15 px-3">
-                    <ImagePlus size={17} color="#fff" />
-                    <Text weight="bold" className="text-sm text-white">{avatarUploading ? 'Đang tải ảnh…' : 'Chọn ảnh'}</Text>
-                  </Pressable>
-                </View>
+            <Pressable
+              onPress={() => setAvatarMenu(true)}
+              disabled={avatarBusy}
+              accessibilityRole="button"
+              accessibilityLabel="Đổi ảnh đại diện"
+              className="items-center pb-6 pt-4 active:opacity-80">
+              <View className="items-center justify-center overflow-hidden rounded-full bg-accent" style={{ width: AVATAR_SIZE, height: AVATAR_SIZE }}>
+                {avatar
+                  ? <Image source={{ uri: avatar }} accessibilityIgnoresInvertColors contentFit="cover" style={{ width: '100%', height: '100%' }} />
+                  : <Text weight="black" style={{ fontSize: 38, color: colors.onAccent }}>{initial}</Text>}
+                {avatarBusy ? <View className="absolute inset-0 items-center justify-center bg-black/40"><ActivityIndicator color="#fff" /></View> : null}
               </View>
-              {avatar ? <Pressable onPress={confirmDeleteAvatar} disabled={avatarUploading || avatarMutation.isPending} accessibilityRole="button" accessibilityLabel="Xóa ảnh đại diện hiện tại" className="mt-4 min-h-11 flex-row items-center justify-center gap-2 rounded-xl border border-white/20">
-                {avatarMutation.isPending ? <ActivityIndicator size="small" color="#fff" /> : <Trash2 size={16} color="#fff" />}
-                <Text weight="semibold" className="text-sm text-white">Xóa ảnh hiện tại</Text>
-              </Pressable> : null}
-              <Text className="mt-3 text-xs text-white/70">JPEG, PNG hoặc WebP · tối đa 2 MB</Text>
-              {avatarError ? <View className="mt-3"><FormAlert message={avatarError} /></View> : null}
-            </View>
+              <Text weight="bold" className="mt-3 text-[15px]" style={{ color: colors.accentDeep }}>{avatar ? 'Đổi ảnh' : 'Thêm ảnh'}</Text>
+            </Pressable>
+            {avatarError ? <View className="mb-4"><FormAlert message={avatarError} /></View> : null}
 
-            <Card className="mt-4 gap-4 p-4">
-              <SectionHeading icon={<UserRound size={18} color={colors.accentDeep} />} title="Tài khoản" subtitle="Tên thật và thông tin liên hệ" />
-              <TextField label="Họ và tên" value={fullName} onChangeText={setFullName} autoCapitalize="words" maxLength={150} placeholder="Tên của bạn" />
-              <View className="rounded-2xl border border-line bg-canvas px-4 py-3">
-                <Text weight="semibold" className="text-sm">Email</Text>
-                <Text className="mt-1 text-sm text-muted">{user.data?.email ?? '—'}</Text>
-                <Text className="mt-0.5 text-xs text-muted">Email không thể thay đổi tại đây</Text>
-              </View>
-              <TextField label="Số điện thoại" value={phoneNumber} onChangeText={setPhoneNumber} keyboardType="phone-pad" maxLength={30} placeholder="Thêm số điện thoại" />
+            <Card>
+              <InputRow label="Tên" value={displayName} onChangeText={setDisplayName} maxLength={100} placeholder="Tên hiển thị" />
+              <Divider />
+              <InputRow label="Giới thiệu" value={bio} onChangeText={setBio} maxLength={BIO_MAX} placeholder="Thêm giới thiệu" multiline />
+              <Divider />
+              <LinkRow label="Band" value={bandValue == null ? 'Chưa chọn' : bandValue.toFixed(1)} muted={bandValue == null} onPress={() => setBandPicker(true)} />
+              <Divider />
+              <LinkRow label="Múi giờ" value={timezoneLabel(timezone)} onPress={() => setTimezonePicker(true)} />
             </Card>
 
-            <Card className="mt-4 gap-4 p-4">
-              <SectionHeading icon={<Check size={18} color={colors.accentDeep} />} title="Hồ sơ học viên" subtitle="Thông tin xuất hiện trong cộng đồng" />
-              <TextField label="Tên hiển thị" value={displayName} onChangeText={setDisplayName} maxLength={100} placeholder="Tên mọi người sẽ nhìn thấy" />
-              <View className="gap-1.5">
-                <Text weight="semibold" className="text-sm">Giới thiệu</Text>
-                <TextInput value={bio} onChangeText={setBio} multiline numberOfLines={4} maxLength={1000} placeholder="Chia sẻ một chút về bạn" placeholderTextColor={colors.muted} textAlignVertical="top" accessibilityLabel="Giới thiệu" className="min-h-28 rounded-xl border border-line bg-surface px-3.5 py-3 text-base text-ink" style={{ fontFamily: fonts.regular }} />
-                <Text className="text-xs text-muted">{bio.length}/1.000 ký tự</Text>
+            <Card>
+              <InputRow label="Họ tên" value={fullName} onChangeText={setFullName} autoCapitalize="words" maxLength={150} placeholder="Tên thật" />
+              <Divider />
+              <View className="min-h-14 flex-row items-center px-4">
+                <Text className="w-28 text-[15px] text-muted">Email</Text>
+                <Text className="flex-1 text-[15px]" numberOfLines={1} style={{ color: colors.muted }}>{user.data.email}</Text>
               </View>
-              <TextField label="Band tự đánh giá" value={band} onChangeText={setBand} keyboardType="decimal-pad" maxLength={3} placeholder="Ví dụ: 6.5" hint="Từ 0 đến 9 · có thể để trống" />
-              <View>
-                <Text weight="semibold" className="mb-2 text-sm">Quyền riêng tư</Text>
-                <View className="flex-row gap-2">
-                  {(['PUBLIC', 'PRIVATE'] as const).map((value) => {
-                    const selected = visibility === value;
-                    return <Pressable key={value} accessibilityRole="radio" accessibilityLabel={value === 'PUBLIC' ? 'Công khai' : 'Riêng tư'} accessibilityState={{ checked: selected }} onPress={() => setVisibility(value)} className="min-h-12 flex-1 items-center justify-center rounded-2xl border px-2" style={{ borderColor: selected ? colors.accent : colors.line, backgroundColor: selected ? colors.accentSoft : colors.surface }}>
-                      <Text weight="bold" className="text-sm" style={{ color: selected ? colors.accentDeep : colors.ink }}>{value === 'PUBLIC' ? 'Công khai' : 'Riêng tư'}</Text>
-                    </Pressable>;
-                  })}
-                </View>
-                <Text className="mt-2 text-xs leading-5 text-muted">Công khai cho phép người học khác xem hồ sơ cộng đồng của bạn.</Text>
-              </View>
+              <Divider />
+              <InputRow label="Điện thoại" value={phoneNumber} onChangeText={setPhoneNumber} keyboardType="phone-pad" maxLength={30} placeholder="Thêm số" />
             </Card>
 
-            <Card className="mt-4 gap-3 p-4">
-              <SectionHeading icon={<Clock3 size={18} color={colors.accentDeep} />} title="Thiết lập học tập" subtitle="Múi giờ dùng để tính ngày học" />
-              <TextField label="Múi giờ" value={timezone} onChangeText={setTimezone} autoCapitalize="none" maxLength={50} placeholder="Asia/Ho_Chi_Minh" hint="Dùng tên múi giờ IANA, ví dụ Asia/Ho_Chi_Minh" />
+            <Card>
+              <View className="min-h-14 flex-row items-center gap-3 px-4 py-2">
+                <Text className="flex-1 text-[15px]">Hồ sơ công khai</Text>
+                <Switch
+                  value={visibility === 'PUBLIC'}
+                  onValueChange={(on) => { haptics.select(); setVisibility(on ? 'PUBLIC' : 'PRIVATE'); }}
+                  accessibilityLabel="Hồ sơ công khai"
+                  trackColor={{ false: colors.line, true: colors.accent }}
+                  thumbColor={colors.surface}
+                />
+              </View>
             </Card>
+            <Text className="mt-2 px-1 text-[13px] leading-5 text-muted">
+              {visibility === 'PUBLIC' ? 'Người học khác xem được hồ sơ và bài viết của bạn.' : 'Chỉ bạn xem được hồ sơ của mình.'}
+            </Text>
+
+            {formError ? <View className="mt-4"><FormAlert message={formError} /></View> : null}
           </> : null}
         </ScrollView>
         <StatusBarStrip color={colors.canvas} />
-
-        {!loading && !user.isError && !learner.isError ? <View className="border-t border-line bg-surface px-5 pt-3" style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
-          {formError ? <View className="mb-3"><FormAlert message={formError} /></View> : null}
-          <Button label="Lưu thay đổi" loading={saveMutation.isPending} loadingLabel="Đang lưu hồ sơ" disabled={!fullName.trim() || !displayName.trim() || avatarUploading || avatarMutation.isPending} onPress={() => { setFormError(''); saveMutation.mutate(); }} />
-        </View> : null}
       </View>
+
+      <ActionSheet visible={avatarMenu} items={avatarActions} onClose={() => setAvatarMenu(false)} />
+
+      <Sheet visible={bandPicker} title="Band hiện tại" subtitle="Dùng để gợi ý bài vừa sức." onClose={() => setBandPicker(false)}>
+        <View className="flex-row flex-wrap pb-2" style={{ marginHorizontal: -4 }}>
+          {[null, ...BAND_CHOICES].map((value) => {
+            const selected = bandValue === value;
+            return (
+              <View key={String(value)} style={{ width: '25%', padding: 4 }}>
+                <Pressable
+                  onPress={() => { haptics.select(); setBand(value == null ? '' : String(value)); setBandPicker(false); }}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: selected }}
+                  accessibilityLabel={value == null ? 'Chưa rõ band' : `Band ${value.toFixed(1)}`}
+                  className="min-h-12 items-center justify-center rounded-2xl active:opacity-70"
+                  style={{ borderWidth: 1.5, borderColor: selected ? colors.accent : colors.line, backgroundColor: selected ? colors.accent : 'transparent' }}>
+                  <Text weight="bold" className="text-base" style={{ color: selected ? colors.onAccent : colors.ink }}>{value == null ? 'Chưa rõ' : value.toFixed(1)}</Text>
+                </Pressable>
+              </View>
+            );
+          })}
+        </View>
+      </Sheet>
+
+      <TimezoneSheet
+        visible={timezonePicker}
+        current={timezone}
+        onPick={(zone) => { setTimezone(zone); setTimezonePicker(false); }}
+        onClose={() => setTimezonePicker(false)}
+      />
     </KeyboardAvoidingView>
   );
 }
 
-function SectionHeading({ icon, title, subtitle }: { icon: ReactNode; title: string; subtitle: string }) {
+function Card({ children }: { children: ReactNode }) {
+  return <View className="mt-3 overflow-hidden rounded-2xl bg-surface" style={{ borderWidth: 1.5, borderColor: colors.line }}>{children}</View>;
+}
+
+function Divider() {
+  return <View className="ml-4 h-px" style={{ backgroundColor: colors.line }} />;
+}
+
+/** One line per field: the label on the left, what you type on the right. */
+function InputRow({ label, multiline, ...input }: TextInputProps & { label: string }) {
+  const { fontScale } = useTheme();
   return (
-    <View className="flex-row items-center gap-3">
-      <View className="h-10 w-10 items-center justify-center rounded-2xl bg-accent-soft">{icon}</View>
-      <View className="flex-1">
-        <Text weight="extrabold" className="text-base">{title}</Text>
-        <Text className="text-xs text-muted">{subtitle}</Text>
-      </View>
+    <View className="min-h-14 flex-row px-4" style={{ alignItems: multiline ? 'flex-start' : 'center', paddingVertical: multiline ? 15 : 0 }}>
+      <Text className="w-28 text-[15px] text-muted">{label}</Text>
+      <TextInput
+        {...input}
+        multiline={multiline}
+        accessibilityLabel={label}
+        placeholderTextColor={colors.muted}
+        selectionColor={colors.accentDeep}
+        className="flex-1 text-ink"
+        style={{ fontFamily: fonts.medium ?? fonts.regular, fontSize: Math.round(15 * fontScale), padding: 0, textAlignVertical: multiline ? 'top' : 'center' }}
+      />
     </View>
+  );
+}
+
+function LinkRow({ label, value, muted = false, onPress }: { label: string; value: string; muted?: boolean; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`${label}: ${value}`} className="min-h-14 flex-row items-center px-4 active:opacity-60">
+      <Text className="w-28 text-[15px] text-muted">{label}</Text>
+      <Text className="flex-1 text-[15px]" numberOfLines={1} style={{ color: muted ? colors.muted : colors.ink }}>{value}</Text>
+      <ChevronRight size={18} color={colors.muted} />
+    </Pressable>
+  );
+}
+
+function TimezoneSheet({ visible, current, onPick, onClose }: { visible: boolean; current: string; onPick: (zone: string) => void; onClose: () => void }) {
+  const device = deviceTimezone();
+  const listed = TIMEZONE_CHOICES.some((zone) => zone.id === current);
+  const rows = [
+    ...(device ? [{ id: device, label: 'Theo điện thoại', hint: timezoneLabel(device), icon: true }] : []),
+    ...(!listed ? [{ id: current, label: current, hint: 'Đang dùng', icon: false }] : []),
+    ...TIMEZONE_CHOICES.map((zone) => ({ id: zone.id, label: zone.label, hint: zone.id, icon: false })),
+  ];
+  return (
+    <Sheet visible={visible} title="Chọn múi giờ" onClose={onClose}>
+      <View className="pb-2">
+        {rows.map((row, index) => {
+          // The device row is "selected" only when it is the explicit choice; the same zone further down shows the tick.
+          const selected = row.id === current && (row.icon ? !rows.slice(1).some((other) => other.id === current) : true);
+          return (
+            <Pressable
+              key={`${row.label}-${index}`}
+              onPress={() => { haptics.select(); onPick(row.id); }}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: selected }}
+              className="min-h-14 flex-row items-center gap-3 rounded-2xl px-3 active:bg-canvas">
+              {row.icon ? <Smartphone size={20} color={colors.accentDeep} /> : null}
+              <View className="flex-1">
+                <Text weight={selected ? 'extrabold' : 'semibold'} className="text-base" style={{ color: selected ? colors.accentDeep : colors.ink }}>{row.label}</Text>
+                <Text className="text-xs text-muted">{row.hint}</Text>
+              </View>
+              {selected ? <Check size={20} color={colors.accentDeep} strokeWidth={3} /> : null}
+            </Pressable>
+          );
+        })}
+      </View>
+    </Sheet>
   );
 }
