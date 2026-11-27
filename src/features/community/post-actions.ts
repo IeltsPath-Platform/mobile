@@ -115,7 +115,7 @@ export const REPORT_REASONS = ['Spam', 'Nội dung không phù hợp', 'Thông t
 
 /** Asks before a destructive step; React Native's Alert has no buttons on the web, so the browser's confirm stands in. */
 export function confirmDestructive(title: string, message: string, confirmLabel: string): Promise<boolean> {
-  if (Platform.OS === 'web') return Promise.resolve(window.confirm(`\n\n`));
+  if (Platform.OS === 'web') return Promise.resolve(window.confirm(`${title}\n\n${message}`));
   return new Promise((resolve) => {
     Alert.alert(title, message, [
       { text: 'Hủy', style: 'cancel', onPress: () => resolve(false) },
