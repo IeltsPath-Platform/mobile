@@ -10,6 +10,7 @@ import {
   Settings2,
   Trash2,
   UserRound,
+  UserX,
 } from 'lucide-react-native';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
@@ -390,6 +391,12 @@ export default function AccountScreen() {
               danger
               busy={busy === 'cache'}
               onPress={clearCachePrompt}
+            />
+            <SettingsLinkRow
+              icon={UserX}
+              title="Xóa tài khoản"
+              danger
+              onPress={() => router.push('/profile/delete-account' as never)}
               isLast
             />
           </SettingsSection>
