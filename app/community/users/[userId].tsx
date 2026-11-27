@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Bookmark, ChevronRight } from 'lucide-react-native';
+import { Ban, Bookmark, ChevronRight } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, View } from 'react-native';
 
@@ -13,6 +13,7 @@ import { communityApi, type CommunityPost, type CursorPage, type PublicProfile }
 import { CommunityAvatar } from '@/src/features/community/components/community-image';
 import { usePostMenu } from '@/src/features/community/components/post-menu';
 import { PostRow } from '@/src/features/community/components/post-row';
+import { blockUser } from '@/src/features/community/post-actions';
 import { setAuthorFollowing } from '@/src/features/community/post-cache';
 import { haptics } from '@/src/lib/haptics';
 import { colors } from '@/src/theme';
@@ -110,6 +111,9 @@ export default function PublicProfileScreen() {
           </View>
           {own ? (
             <View className="mb-1 flex-row items-center gap-2">
+              <Pressable onPress={() => router.push('/community/blocked' as never)} accessibilityRole="button" accessibilityLabel="Người đã chặn" className="h-11 w-11 items-center justify-center rounded-full border border-line active:opacity-70">
+                <Ban size={19} color={colors.ink} />
+              </Pressable>
               <Pressable onPress={() => router.push('/community/bookmarked' as never)} accessibilityRole="button" accessibilityLabel="Bài viết đã lưu" className="h-11 w-11 items-center justify-center rounded-full border border-line active:opacity-70">
                 <Bookmark size={19} color={colors.ink} />
               </Pressable>
@@ -118,16 +122,25 @@ export default function PublicProfileScreen() {
               </Pressable>
             </View>
           ) : (
+            <View className="mb-1 flex-row items-center gap-2">
+            <Pressable
+              onPress={() => void blockUser(qc, userId, p.displayName).then((blocked) => { if (blocked) router.replace('/(tabs)/community' as never); })}
+              accessibilityRole="button"
+              accessibilityLabel={`Chặn ${p.displayName}`}
+              className="h-11 w-11 items-center justify-center rounded-full border border-line active:opacity-70">
+              <Ban size={19} color={colors.danger} />
+            </Pressable>
             <Pressable
               disabled={followBusy || (!relation.data && !relationFailed)}
               onPress={() => void (relationFailed ? relation.refetch() : toggleFollow())}
               accessibilityRole="button"
               accessibilityLabel={relationFailed ? 'Chưa tải được trạng thái theo dõi. Chạm để thử lại' : following ? 'Đang theo dõi' : 'Theo dõi'}
               accessibilityState={{ selected: following, busy: followBusy }}
-              className="mb-1 min-h-11 min-w-32 items-center justify-center rounded-full border px-5 active:opacity-80"
+              className="min-h-11 min-w-32 items-center justify-center rounded-full border px-5 active:opacity-80"
               style={{ backgroundColor: following ? 'transparent' : colors.accent, borderColor: following ? colors.line : colors.accent }}>
               <Text weight="bold" className="text-sm" style={{ color: following ? colors.ink : colors.onAccent }}>{relationFailed ? 'Thử lại' : following ? 'Đang theo dõi' : 'Theo dõi'}</Text>
             </Pressable>
+            </View>
           )}
         </View>
 

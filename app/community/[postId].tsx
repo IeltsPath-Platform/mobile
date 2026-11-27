@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Bookmark, Flag, MessageCircle, MoreHorizontal, Pencil, Play, Send, Trash2, X } from 'lucide-react-native';
+import { Ban, Bookmark, Flag, MessageCircle, MoreHorizontal, Pencil, Play, Send, Trash2, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, RefreshControl, TextInput, View, type TextInputInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,7 +19,7 @@ import { CommunityPostContent } from '@/src/features/community/components/commun
 import { CommunityReactionControl } from '@/src/features/community/components/community-reaction-control';
 import { usePostMenu } from '@/src/features/community/components/post-menu';
 import { CATEGORY_LABELS, totalReactions } from '@/src/features/community/format';
-import { REPORT_REASONS, reactToPost, reportContent, toggleBookmark, toggleFollowAuthor } from '@/src/features/community/post-actions';
+import { REPORT_REASONS, blockUser, reactToPost, reportContent, toggleBookmark, toggleFollowAuthor } from '@/src/features/community/post-actions';
 import { updateCommunityPostCache } from '@/src/features/community/post-cache';
 import { ApiError } from '@/src/lib/api-client';
 import { safeErrorMessage } from '@/src/lib/error-message';
@@ -176,7 +176,17 @@ export default function PostDetailScreen() {
         { label: 'Xóa bình luận', icon: Trash2, destructive: true, onPress: () => removeComment(comment) },
       ];
     }
-    return [{ label: 'Báo cáo bình luận', icon: Flag, destructive: true, onPress: () => { setTimeout(() => setReportingComment(comment), 280); } }];
+    const name = comment.author?.displayName ?? 'người dùng này';
+    return [
+      { label: 'Báo cáo bình luận', icon: Flag, destructive: true, onPress: () => { setTimeout(() => setReportingComment(comment), 280); } },
+      {
+        label: `Chặn ${comment.author?.displayName ?? 'người viết'}`,
+        icon: Ban,
+        destructive: true,
+        // Blocking the post's author hides this post too, so leave it; otherwise the comment list reloads without them.
+        onPress: () => { setTimeout(() => void blockUser(qc, comment.authorId, name).then((blocked) => { if (blocked && comment.authorId === post.data?.authorId) router.replace('/(tabs)/community' as never); }), 280); },
+      },
+    ];
   };
 
   if (post.isPending) {

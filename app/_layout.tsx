@@ -181,6 +181,7 @@ function RootNavigator() {
           <Stack.Screen name="achievements" />
           <Stack.Screen name="profile/edit" options={{ headerShown: false }} />
           <Stack.Screen name="profile/change-password" options={{ headerShown: false }} />
+          <Stack.Screen name="profile/delete-account" options={{ headerShown: false }} />
           <Stack.Screen name="profile/verify-email" options={{ headerShown: false }} />
           <Stack.Screen name="profile/sessions" options={{ headerShown: false }} />
           <Stack.Screen name="games" />
@@ -188,6 +189,7 @@ function RootNavigator() {
           <Stack.Screen name="flashcards" options={{ headerShown: false }} />
           <Stack.Screen name="community/[postId]" options={{ headerShown: false }} />
           <Stack.Screen name="community/bookmarked" options={{ headerShown: false }} />
+          <Stack.Screen name="community/blocked" options={{ headerShown: false }} />
           <Stack.Screen name="community/users/[userId]" options={{ headerShown: false }} />
           <Stack.Screen name="community/notifications" options={{ headerShown: false }} />
           <Stack.Screen name="community/notification-preferences" options={{ headerShown: false }} />

@@ -91,6 +91,19 @@ export function snapshotPostCaches(queryClient: QueryClient) {
 }
 
 /** Drop a post from cached lists (all of them unless `only` narrows it) without refetching. */
+/** Drops every cached post written by `authorId`, e.g. right after the viewer blocks them. */
+export function removeAuthorFromCaches(queryClient: QueryClient, authorId: string) {
+  for (const key of ALL_POST_CACHES) {
+    queryClient.setQueriesData<InfiniteData<CursorPage<CachedCommunityEntry>>>({ queryKey: ['community', key] }, (data) => data && ({
+      ...data,
+      pages: data.pages.map((page) => ({
+        ...page,
+        content: page.content.filter((entry) => !('authorId' in entry) || entry.authorId !== authorId),
+      })),
+    }));
+  }
+}
+
 export function removePostFromCaches(queryClient: QueryClient, postId: string, only: PostCacheKey[] = ALL_POST_CACHES) {
   for (const key of only) {
     queryClient.setQueriesData<InfiniteData<CursorPage<CachedCommunityEntry>>>({ queryKey: ['community', key] }, (data) => data && ({

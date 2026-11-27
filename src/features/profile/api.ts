@@ -73,4 +73,7 @@ export const profileApi = {
 
   changePassword: (body: { currentPassword: string; newPassword: string }) =>
     apiRequest<void>('/api/users/me/password', { method: 'POST', body, auth: true }),
+  /** Deletes the account for good: confirmed by the current password, or Google for a Google-only account. */
+  deleteAccount: (credential: { currentPassword: string } | { googleIdToken: string }) =>
+    apiRequest<void>('/api/users/me', { method: 'DELETE', body: credential, auth: true }),
 };
