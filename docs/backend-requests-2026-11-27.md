@@ -8,6 +8,7 @@ Bổ sung cho `backend-requests-2026-11-25.md`, `-2026-11-26.md` và `-2026-11-2
 
 | # | Mức | Việc | Trạng thái |
 |---|---|---|---|
+| 0 | **P0** | `DELETE /api/users/me` trả 500, không xóa được tài khoản | **Mới**, tính năng không chạy |
 | 1 | **P0** | content-service và game-service không kết nối được RabbitMQ, stack local không lên | **Mới**, chặn chạy local |
 | 2 | P1 | Phiên đăng nhập không lưu thiết bị và IP (A1) | Còn mở, có patch |
 | 3 | P1 | Gọi sai method trả 500 thay vì 405 ở 5 service (A2) | Còn mở, có patch |
@@ -21,7 +22,39 @@ Bổ sung cho `backend-requests-2026-11-25.md`, `-2026-11-26.md` và `-2026-11-2
 | 11 | P2 | learning-service còn câu lỗi tiếng Anh (B5) | Còn sót một chỗ |
 | 12 | P2 | Thiếu tham số bắt buộc trả 500 ở learning-service và content-service | Còn mở (tài liệu 26/11 ghi đã xong, kiểm lại vẫn lỗi) |
 
-Đã xong kể từ đợt trước (không cần làm nữa): trùng migration `V148` (nay V152–V155, có callback dời lịch sử Flyway), API xóa tài khoản `DELETE /api/users/me` cùng trang web xóa tài khoản, API chặn người dùng `/api/community/blocks`, hàng đợi kiểm duyệt báo cáo `/api/community/admin/reports`, runtime glibc cho chấm Speaking, giới hạn riêng cho `/auth/refresh` (tier `auth-refresh`). Mobile đã làm màn xóa tài khoản và chặn người dùng (PR mobile #2).
+Đã xong kể từ đợt trước (không cần làm nữa): trùng migration `V148` (nay V152–V155, có callback dời lịch sử Flyway), trang web xóa tài khoản (API xóa tài khoản đã có nhưng còn lỗi, xem mục 0), API chặn người dùng `/api/community/blocks`, hàng đợi kiểm duyệt báo cáo `/api/community/admin/reports`, runtime glibc cho chấm Speaking, giới hạn riêng cho `/auth/refresh` (tier `auth-refresh`). Mobile đã làm màn xóa tài khoản và chặn người dùng (PR mobile #2).
+
+---
+
+## 0. P0: không xóa được tài khoản (`DELETE /api/users/me` trả 500)
+
+**Phát hiện khi test trên máy Android thật** (27/11, `main` `beecdf57`). Dòng "API xóa tài khoản đã xong" ở trên là **sai**: endpoint có nhưng không chạy được.
+
+**Hiện tượng**: nhập đúng mật khẩu, app hiện "Lỗi hệ thống không xác định"; tài khoản vẫn còn và đăng nhập được. Nhập sai mật khẩu thì trả lỗi đúng.
+
+**Log user-service** (correlationId `218d2a89-82b5-456a-8cf1-b471198c5966`):
+
+```
+ERROR: new row for relation "refresh_tokens" violates check constraint "chk_refresh_tokens_revoked_reason"
+DataIntegrityViolationException: ... update refresh_tokens set revoked_at=?,revoked_reason=? where user_id=? and revoked_at is null and expires_at>?
+    at com.ieltspath.user.application.usecase.DeleteMyAccountUseCase.execute(DeleteMyAccountUseCase.java:97)
+```
+
+**Nguyên nhân**: dòng 97 gọi `refreshTokens.revokeAllActiveForUser(userId, now, "ACCOUNT_DELETED")`, nhưng ràng buộc tạo ở `V17__refresh_token_sessions.sql` chỉ cho phép `ROTATED, LOGOUT, PASSWORD_CHANGE, PASSWORD_RESET, GOOGLE_LINK, SESSION_REVOKED, REUSE_DETECTED, ADMIN`. `V23__account_deletion.sql` không cập nhật ràng buộc. Ai đang đăng nhập đều có refresh token còn hạn, nên xóa tài khoản từ app luôn lỗi.
+
+`DeleteMyAccountUseCaseTest` giả lập repository nên vẫn xanh.
+
+**Cách sửa đề xuất**: migration mới (không sửa V17):
+
+```sql
+ALTER TABLE refresh_tokens DROP CONSTRAINT chk_refresh_tokens_revoked_reason;
+ALTER TABLE refresh_tokens ADD CONSTRAINT chk_refresh_tokens_revoked_reason CHECK (revoked_reason IS NULL OR revoked_reason IN
+    ('ROTATED','LOGOUT','PASSWORD_CHANGE','PASSWORD_RESET','GOOGLE_LINK','SESSION_REVOKED','REUSE_DETECTED','ADMIN','ACCOUNT_DELETED'));
+```
+
+Rà thêm các giá trị `revoked_reason` khác được dùng trong code, và thêm một test Testcontainers xóa tài khoản **đang có phiên đăng nhập**.
+
+**Cách kiểm tra**: đăng ký, đăng nhập, gọi `DELETE /api/users/me` với đúng mật khẩu, phải trả 204 và không đăng nhập lại được. Các bước sau đó (sự kiện `user.deleted.v1`, dọn dữ liệu ở service khác) **chưa kiểm được** vì lỗi này chặn trước.
 
 ---
 
