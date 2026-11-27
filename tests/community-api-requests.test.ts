@@ -26,6 +26,14 @@ describe('community API requests match the gateway routes', () => {
     expect(lastCall()).toMatchObject(['/api/community/users/u1/follow', { method: 'DELETE' }]);
   });
 
+  it('blocks with POST, unblocks with DELETE and pages the blocked list', async () => {
+    await communityApi.block('u2');
+    expect(lastCall()).toMatchObject(['/api/community/blocks/u2', { method: 'POST', auth: true }]);
+    await communityApi.unblock('u2');
+    expect(lastCall()).toMatchObject(['/api/community/blocks/u2', { method: 'DELETE', auth: true }]);
+    await communityApi.blocked(2, 20);
+    expect(lastCall()).toMatchObject(['/api/community/blocks?page=2&size=20', { auth: true }]);
+  });
   it('reacts with PUT and removes the reaction with DELETE on the typed path', async () => {
     await communityApi.react('p1', 'LOVE');
     expect(lastCall()).toMatchObject(['/api/community/posts/p1/reactions/LOVE', { method: 'PUT' }]);

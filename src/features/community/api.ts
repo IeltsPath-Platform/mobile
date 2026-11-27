@@ -83,6 +83,10 @@ export const communityApi = {
   deleteComment: (id: string) => apiRequest<void>(`/api/community/comments/${id}`, { method: 'DELETE', auth: true }),
   reactToComment: (id: string, type: ReactionType) => apiRequest<void>(`/api/community/comments/${encodeURIComponent(id)}/reactions/${type}`, { method: 'PUT', auth: true }),
   removeCommentReaction: (id: string, type: ReactionType) => apiRequest<void>(`/api/community/comments/${encodeURIComponent(id)}/reactions/${type}`, { method: 'DELETE', auth: true }),
+  /** Blocking hides both people from each other and removes follows both ways; repeating it is harmless. */
+  block: (id: string) => apiRequest<void>(`/api/community/blocks/${id}`, { method: 'POST', auth: true }),
+  unblock: (id: string) => apiRequest<void>(`/api/community/blocks/${id}`, { method: 'DELETE', auth: true }),
+  blocked: (page = 0, size = 20) => apiRequest<Omit<OffsetPage<PublicProfile>, 'last'>>(`/api/community/blocks?${query({ page: String(page), size: String(size) })}`, { auth: true }),
   follow: (id: string, active: boolean) => apiRequest<void>(`/api/community/users/${id}/follow`, { method: active ? 'DELETE' : 'POST', auth: true }),
   relationship: (id: string) => apiRequest<{ following: boolean; followerCount: number; followingCount: number }>(`/api/community/users/${id}/relationship`, { auth: true }),
   followers: (id: string, cursor?: string) => profilePage(`/api/community/users/${id}/followers?${query({ size: '10', cursor })}`),

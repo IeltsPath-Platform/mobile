@@ -1,13 +1,13 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { Flag, Pencil, Trash2, UserCheck, UserPlus } from 'lucide-react-native';
+import { Ban, Flag, Pencil, Trash2, UserCheck, UserPlus } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { Alert } from 'react-native';
 
 import { ActionSheet, type ActionSheetItem } from '@/src/components/ui/action-sheet';
 
 import type { CommunityPost } from '../api';
-import { REPORT_REASONS, deletePost, reportContent, toggleFollowAuthor } from '../post-actions';
+import { REPORT_REASONS, blockUser, deletePost, reportContent, toggleFollowAuthor } from '../post-actions';
 
 /**
  * Shared "more" menu for posts (feed, saved, profile, detail).
@@ -47,6 +47,14 @@ export function usePostMenu(currentUserId?: string, onDeleted?: () => void) {
         },
         // iOS cannot present a second modal while the first is still dismissing.
         { label: 'Báo cáo bài viết', icon: Flag, destructive: true, onPress: () => { setTimeout(() => setReportPost(post), 280); } },
+        {
+          label: `Chặn ${post.author?.displayName ?? 'tác giả'}`,
+          icon: Ban,
+          destructive: true,
+          // Wait for the sheet to close: the confirmation is a second modal.
+          // The post is hidden once its author is blocked, so a screen showing only this post leaves like after a delete.
+          onPress: () => { setTimeout(() => void blockUser(qc, post.authorId, post.author?.displayName ?? 'người dùng này').then((blocked) => { if (blocked) onDeleted?.(); }), 280); },
+        },
       );
     }
   }

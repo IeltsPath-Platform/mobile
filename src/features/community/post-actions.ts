@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 
 import { ApiError } from '@/src/lib/api-client';
 import { haptics } from '@/src/lib/haptics';
@@ -7,6 +7,7 @@ import { haptics } from '@/src/lib/haptics';
 import { communityApi, type CommunityPost, type ReactionType } from './api';
 import {
   applyPostReaction,
+  removeAuthorFromCaches,
   removePostFromCaches,
   setAuthorFollowing,
   snapshotPostCaches,
@@ -111,3 +112,40 @@ export function deletePost(qc: QueryClient, post: CommunityPost, onDone?: () => 
 }
 
 export const REPORT_REASONS = ['Spam', 'Nội dung không phù hợp', 'Thông tin sai lệch'] as const;
+
+/** Asks before a destructive step; React Native's Alert has no buttons on the web, so the browser's confirm stands in. */
+export function confirmDestructive(title: string, message: string, confirmLabel: string): Promise<boolean> {
+  if (Platform.OS === 'web') return Promise.resolve(window.confirm(`\n\n`));
+  return new Promise((resolve) => {
+    Alert.alert(title, message, [
+      { text: 'Hủy', style: 'cancel', onPress: () => resolve(false) },
+      { text: confirmLabel, style: 'destructive', onPress: () => resolve(true) },
+    ], { cancelable: true, onDismiss: () => resolve(false) });
+  });
+}
+
+/**
+ * Blocks a learner after the viewer confirms. Both stop seeing each other's posts, comments and profile, so their posts
+ * leave the cached lists at once and the lists are read again. Resolves true once blocked.
+ */
+export async function blockUser(qc: QueryClient, userId: string, displayName: string) {
+  const confirmed = await confirmDestructive(
+    `Chặn ${displayName}?`,
+    'Hai bạn sẽ không thấy bài viết, bình luận và hồ sơ của nhau, không thể nhắc tên hay theo dõi nhau. Bạn có thể bỏ chặn trong mục Người đã chặn.',
+    'Chặn',
+  );
+  if (!confirmed) return false;
+  let blocked = false;
+  await guarded(`block:${userId}`, async () => {
+    try {
+      await communityApi.block(userId);
+      removeAuthorFromCaches(qc, userId);
+      void qc.invalidateQueries({ queryKey: ['community'] });
+      haptics.success();
+      blocked = true;
+    } catch (error) {
+      fail('Không thể chặn người dùng này', error);
+    }
+  });
+  return blocked;
+}
