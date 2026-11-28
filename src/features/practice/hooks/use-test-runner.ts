@@ -18,12 +18,14 @@ import { useAttemptAnswers } from './use-attempt-answers';
  * the open section, the clock (counting up in practice, down in the timed exam with auto-submit), the seconds spent per
  * section and the submit that saves what is left and opens the result.
  */
-export function useTestRunner({ attemptId, attempt, sections, saved, skill }: {
+export function useTestRunner({ attemptId, attempt, sections, saved, skill, onFinish }: {
   attemptId: string;
   attempt: ReadingAttempt;
   sections: TestSection[];
   saved: SavedResponse[];
   skill: 'reading' | 'listening';
+  /** Replaces the submit and the result page: a placement hands in only this skill, then returns to its hub. */
+  onFinish?: () => Promise<void>;
 }) {
   const client = useQueryClient();
   const timed = attempt.mode === 'TIMED';
@@ -70,6 +72,11 @@ export function useTestRunner({ attemptId, attempt, sections, saved, skill }: {
       return false;
     }
     try {
+      if (onFinish) {
+        await onFinish();
+        haptics.success();
+        return true;
+      }
       await submitReadingAttempt(attemptId, spent.current);
       haptics.success();
       void forgetAttempt(attemptId);
@@ -89,7 +96,7 @@ export function useTestRunner({ attemptId, attempt, sections, saved, skill }: {
       submittingRef.current = false;
       return false;
     }
-  }, [answers, attemptId, client, skill, timed]);
+  }, [answers, attemptId, client, skill, timed, onFinish]);
 
   const submitRef = useRef(submit);
   useLayoutEffect(() => { submitRef.current = submit; });

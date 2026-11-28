@@ -186,6 +186,7 @@ function RootNavigator() {
           <Stack.Screen name="profile/sessions" options={{ headerShown: false }} />
           <Stack.Screen name="games" />
           <Stack.Screen name="practice" options={{ headerShown: false }} />
+          <Stack.Screen name="placement" options={{ headerShown: false }} />
           <Stack.Screen name="flashcards" options={{ headerShown: false }} />
           <Stack.Screen name="community/[postId]" options={{ headerShown: false }} />
           <Stack.Screen name="community/bookmarked" options={{ headerShown: false }} />

@@ -24,10 +24,12 @@ type SubmitSheetProps = {
   /** The server already closed the attempt (late submit): the test cannot be graded, so the only way on is to leave. */
   closed?: boolean;
   onExit?: () => void;
+  /** Replaces the line under the title (a placement skill is graded with the whole test, not at once). */
+  note?: string;
 };
 
 /** The finish screen before submitting: what is still empty or flagged, and the irreversible submit. */
-export function SubmitSheet({ visible, onClose, onSubmit, total, unanswered, flagged, unsaved, submitting, error, timed, expired = false, closed = false, onExit }: SubmitSheetProps) {
+export function SubmitSheet({ visible, onClose, onSubmit, total, unanswered, flagged, unsaved, submitting, error, timed, expired = false, closed = false, onExit, note }: SubmitSheetProps) {
   if (closed) {
     return (
       <Sheet
@@ -46,7 +48,7 @@ export function SubmitSheet({ visible, onClose, onSubmit, total, unanswered, fla
       onClose={onClose}
       dismissable={!submitting && !expired}
       title={expired ? 'Hết giờ làm bài' : 'Nộp bài?'}
-      subtitle={expired ? 'Bài đang được nộp tự động. Nếu chưa nộp được, hãy kiểm tra mạng rồi nộp lại.' : timed ? 'Sau khi nộp bạn không sửa được đáp án.' : 'Bài sẽ được chấm ngay và bạn xem được giải thích từng câu.'}
+      subtitle={note && !expired ? note : expired ? 'Bài đang được nộp tự động. Nếu chưa nộp được, hãy kiểm tra mạng rồi nộp lại.' : timed ? 'Sau khi nộp bạn không sửa được đáp án.' : 'Bài sẽ được chấm ngay và bạn xem được giải thích từng câu.'}
       footer={<>
         <Button label="Nộp bài" loading={submitting} loadingLabel="Đang nộp…" onPress={onSubmit} />
         {expired ? null : <Button label="Làm tiếp" variant="secondary" disabled={submitting} onPress={onClose} />}

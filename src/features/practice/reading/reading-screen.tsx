@@ -15,6 +15,7 @@ import { QuestionGroups } from '../components/question-groups';
 import { ReaderSettingsSheet, useReaderPrefs } from '../components/reader-prefs';
 import { SnapPanel, type SnapPanelHandle } from '../components/snap-panel';
 import { SubmitSheet } from '../components/submit-sheet';
+import type { PlacementRun } from '../components/placement-run';
 import { KeyboardShell, SectionTabs, TestFooter, closeTest, leaveToCatalog, unsavedAnswersMessage, useLeaveTestGuard } from '../components/test-shell';
 import { useAnnotations } from '../hooks/use-annotations';
 import { useScrollToItem } from '../hooks/use-scroll-to-item';
@@ -25,7 +26,7 @@ import { blockOrderOf } from '../model/mark-blocks';
 import { groupItems, type SavedResponse, type TestSection } from '../model/sections';
 import { PassageView } from './passage-view';
 
-const CATALOG = '/practice/catalog/reading';
+const DEFAULT_CATALOG = '/practice/catalog/reading';
 const TINT = colors.skill.reading;
 const COACH_KEY_SEEN = { current: false };
 
@@ -33,8 +34,9 @@ const COACH_KEY_SEEN = { current: false };
  * Reading test on a phone: the passage fills the screen, the questions live in a panel dragged between peek / half /
  * full. Long-press words to highlight or note them; in practice mode a tap looks a word up.
  */
-export function ReadingScreen({ attemptId, attempt, sections, saved }: { attemptId: string; attempt: ReadingAttempt; sections: TestSection[]; saved: SavedResponse[] }) {
-  const runner = useTestRunner({ attemptId, attempt, sections, saved, skill: 'reading' });
+export function ReadingScreen({ attemptId, attempt, sections, saved, placement }: { attemptId: string; attempt: ReadingAttempt; sections: TestSection[]; saved: SavedResponse[]; /** Set when this is one skill of a placement test. */ placement?: PlacementRun }) {
+  const CATALOG = placement?.exitHref ?? DEFAULT_CATALOG;
+  const runner = useTestRunner({ attemptId, attempt, sections, saved, skill: 'reading', onFinish: placement?.onFinish });
   const insets = useSafeAreaInsets();
   const { paper } = useReaderPrefs();
   const study = useStudySession('ASSESSMENT', attemptId);
@@ -100,7 +102,7 @@ export function ReadingScreen({ attemptId, attempt, sections, saved }: { attempt
     <View className="flex-1" style={{ backgroundColor: paper.background }} onTouchStart={study.markActivity}>
       <ExamHeader
         title={`Reading · ${label(runner.activeIndex)}`}
-        subtitle={runner.timed ? 'Thi thật' : 'Luyện tập'}
+        subtitle={placement ? 'Kiểm tra trình độ' : runner.timed ? 'Thi thật' : 'Luyện tập'}
         readClock={runner.readClock}
         countdown={runner.timed}
         tint={TINT}
@@ -188,6 +190,7 @@ export function ReadingScreen({ attemptId, attempt, sections, saved }: { attempt
         expired={runner.expired}
         closed={runner.closed}
         onExit={() => leaveToCatalog(CATALOG)}
+        note={placement ? 'Sau khi nộp, bạn không sửa được phần này. Kết quả có khi làm xong cả 4 kỹ năng.' : undefined}
       />
       <MarkingSheets marking={marking} annotations={annotations} sectionId={section.id} sectionLabel={label(runner.activeIndex)} />
       <SelectionCallout marking={marking} lookupEnabled={lookupEnabled} />

@@ -71,7 +71,11 @@ export function useHomeData(signedIn: boolean) {
     }
   }, [signedIn, client]));
 
-  const refresh = () => Promise.all([profile.refetch(), ...(resume ? [resumeAttempt.refetch()] : []), ...latest.map((query) => query.refetch())]);
+  const refresh = () => Promise.all([
+    profile.refetch(), ...(resume ? [resumeAttempt.refetch()] : []), ...latest.map((query) => query.refetch()),
+    // The placement card on this screen reads its own query.
+    client.invalidateQueries({ queryKey: ['placement', 'options'] }),
+  ]);
   const refreshing = profile.isRefetching || resumeAttempt.isRefetching || latest.some((query) => query.isRefetching);
 
   return {

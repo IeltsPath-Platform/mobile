@@ -13,6 +13,8 @@ import { colors } from '@/src/theme';
 
 import { routeOf, type HistoryRow } from '../model/history-view';
 import { suggestQuick, type QuickSuggestion } from '../model/quick-suggestions';
+import { PlacementEntryCard } from '@/src/features/placement/placement-entry';
+
 import { SKILL_META, skillColor, skillInk } from '../model/skill-meta';
 import type { SkillType } from '../model/types';
 import { HOME_SKILLS, useHomeData } from './use-home-data';
@@ -96,6 +98,8 @@ export const PracticeHome = forwardRef<ScrollViewInstance, Props>(function Pract
             return <SkillTile key={skill} skill={skill} signedIn={signedIn} loading={signedIn && query.isPending} error={query.isError} latest={query.data?.[0] ?? null} onPress={() => open(`/practice/catalog/${skill}`)} />;
           })}
         </View>
+
+        {signedIn ? <PlacementEntryCard /> : null}
 
         <SectionTitle title="Luyện nhanh" note={personal ? 'Theo kết quả của bạn' : 'Vừa giờ nghỉ'} />
       </View>

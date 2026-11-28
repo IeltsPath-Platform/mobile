@@ -277,6 +277,8 @@ export default function EditProfileScreen() {
               <Divider />
               <LinkRow label="Band" value={bandValue == null ? 'Chưa chọn' : bandValue.toFixed(1)} muted={bandValue == null} onPress={() => setBandPicker(true)} />
               <Divider />
+              <LinkRow label="Kiểm tra" value="Làm bài kiểm tra trình độ" onPress={() => router.push('/placement' as never)} />
+              <Divider />
               <LinkRow label="Múi giờ" value={timezoneLabel(timezone)} onPress={() => setTimezonePicker(true)} />
             </Card>
 

@@ -13,6 +13,7 @@ import { QuestionGridSheet, QuestionStrip } from '../components/question-nav';
 import { QuestionGroups } from '../components/question-groups';
 import { ReaderSettingsSheet, useReaderPrefs } from '../components/reader-prefs';
 import { SubmitSheet } from '../components/submit-sheet';
+import type { PlacementRun } from '../components/placement-run';
 import { KeyboardShell, SectionTabs, TestFooter, closeTest, leaveToCatalog, unsavedAnswersMessage, useLeaveTestGuard } from '../components/test-shell';
 import { useAnnotations } from '../hooks/use-annotations';
 import { useScrollToItem } from '../hooks/use-scroll-to-item';
@@ -25,15 +26,16 @@ import { groupItems, type SavedResponse, type TestSection } from '../model/secti
 import { ExamPlayer, PracticePlayer } from './audio-players';
 import { SectionHeader } from './section-header';
 
-const CATALOG = '/practice/catalog/listening';
+const DEFAULT_CATALOG = '/practice/catalog/listening';
 const TINT = colors.skill.listening;
 
 /**
  * Listening test: the recording docked under the header (full controls in practice, play-once in the exam), the
  * questions of the open section below, and the question strip with submit at the bottom.
  */
-export function ListeningScreen({ attemptId, attempt, sections, saved }: { attemptId: string; attempt: ReadingAttempt; sections: TestSection[]; saved: SavedResponse[] }) {
-  const runner = useTestRunner({ attemptId, attempt, sections, saved, skill: 'listening' });
+export function ListeningScreen({ attemptId, attempt, sections, saved, placement }: { attemptId: string; attempt: ReadingAttempt; sections: TestSection[]; saved: SavedResponse[]; /** Set when this is one skill of a placement test. */ placement?: PlacementRun }) {
+  const CATALOG = placement?.exitHref ?? DEFAULT_CATALOG;
+  const runner = useTestRunner({ attemptId, attempt, sections, saved, skill: 'listening', onFinish: placement?.onFinish });
   const { paper } = useReaderPrefs();
   const study = useStudySession('ASSESSMENT', attemptId);
   const annotations = useAnnotations(attemptId);
@@ -105,7 +107,7 @@ export function ListeningScreen({ attemptId, attempt, sections, saved }: { attem
     <View className="flex-1" style={{ backgroundColor: paper.background }} onTouchStart={study.markActivity}>
       <ExamHeader
         title={`Listening · ${label(runner.activeIndex)}`}
-        subtitle={runner.timed ? 'Thi thật · nghe một lần' : 'Luyện tập'}
+        subtitle={placement ? 'Kiểm tra trình độ' : runner.timed ? 'Thi thật · nghe một lần' : 'Luyện tập'}
         readClock={runner.readClock}
         countdown={runner.timed}
         tint={TINT}
@@ -171,6 +173,7 @@ export function ListeningScreen({ attemptId, attempt, sections, saved }: { attem
         expired={runner.expired}
         closed={runner.closed}
         onExit={() => leaveToCatalog(CATALOG)}
+        note={placement ? 'Sau khi nộp, bạn không sửa được phần này. Kết quả có khi làm xong cả 4 kỹ năng.' : undefined}
       />
       <MarkingSheets marking={marking} annotations={annotations} sectionId={section.id} sectionLabel={label(runner.activeIndex)} />
       <SelectionCallout marking={marking} lookupEnabled={lookupEnabled} />
