@@ -88,8 +88,21 @@ export function useAttemptAnswers(attemptId: string, saved: SavedResponse[]) {
     return () => { subscription.remove(); void flushAll(); };
   }, [flushAll]);
 
+  /**
+   * Stops trying to save these items: the server has locked them (their section was handed in) and keeps the answer it
+   * already holds, so a later edit can never be stored and must not block the rest of the test.
+   */
+  const forget = useCallback((itemIds: Iterable<string>) => {
+    const ids = [...itemIds];
+    for (const id of ids) {
+      clearTimeout(timers.current[id]);
+      savedValues.current[id] = (latest.current[id] ?? '').trim();
+    }
+    if (mounted.current) setSaveStates((current) => Object.fromEntries(Object.entries(current).filter(([id]) => !ids.includes(id))));
+  }, []);
+
   const failed = Object.values(saveStates).filter((state) => state === 'error').length;
   const saving = Object.values(saveStates).some((state) => state === 'saving');
 
-  return { answers, saveStates, setAnswer, saveAnswer, flushAll, failed, saving };
+  return { answers, saveStates, setAnswer, saveAnswer, flushAll, forget, failed, saving };
 }

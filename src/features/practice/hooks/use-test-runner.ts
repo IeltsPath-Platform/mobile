@@ -7,7 +7,7 @@ import { ApiError } from '@/src/lib/api-client';
 import { haptics } from '@/src/lib/haptics';
 import { serverNow } from '@/src/lib/server-clock';
 
-import { startAttemptSection, submitReadingAttempt, type ReadingAttempt } from '../api/attempts';
+import { getAttemptStructure, startAttemptSection, submitReadingAttempt, type ReadingAttempt } from '../api/attempts';
 import type { NavQuestion } from '../components/question-nav';
 import { forgetAttempt } from '../model/resume-store';
 import { clockSeconds, numberItems, type SavedResponse, type TestSection } from '../model/sections';
@@ -64,7 +64,16 @@ export function useTestRunner({ attemptId, attempt, sections, saved, skill, onFi
     submittingRef.current = true;
     setSubmitting(true);
     setSubmitError('');
-    const savedAll = await answers.flushAll();
+    let savedAll = await answers.flushAll();
+    // A placement hands its sections in one by one; after a hand-in cut short, the sections already handed in are
+    // locked and refuse edits. Their answers are kept as the server has them, so only the open sections must save.
+    if (!savedAll && onFinish) {
+      const locked = await lockedItemIds(attemptId).catch(() => null);
+      if (locked?.size) {
+        answers.forget(locked);
+        savedAll = await answers.flushAll();
+      }
+    }
     if (!savedAll && !timed) {
       setSubmitError('Một số câu chưa lưu được. Kiểm tra mạng rồi thử nộp lại.');
       setSubmitting(false);
@@ -165,4 +174,10 @@ export function useTestRunner({ attemptId, attempt, sections, saved, skill, onFi
     currentId, setCurrentId, goTo, flagged, toggleFlag,
     readClock, expired, closed, submit, submitting, submitError,
   };
+}
+
+/** Items of the sections the server has already closed: their answers can no longer change. */
+async function lockedItemIds(attemptId: string) {
+  const structure = await getAttemptStructure(attemptId);
+  return new Set(structure.sections.filter((section) => section.completedAt).flatMap((section) => section.items.map((item) => item.id)));
 }
