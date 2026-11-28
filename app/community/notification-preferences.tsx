@@ -145,7 +145,7 @@ export default function NotificationPreferencesScreen() {
                 <Text weight="semibold" className="text-sm text-ink">Email học tập</Text>
                 <Text className="mt-1 text-xs leading-4 text-muted">Nhận email khi bài được chấm hoặc có kết quả. Email bảo mật và thanh toán luôn được gửi.</Text>
               </View>
-              {mailBusy ? <ActivityIndicator color={colors.accent} className="mx-2" /> : <Switch value={mail.data.learning} disabled={busy !== undefined} accessibilityLabel="Email học tập" trackColor={{ false: colors.line, true: colors.accent }} thumbColor={colors.canvas} onValueChange={(learning) => void updateMail(learning)} />}
+              {mailBusy ? <ActivityIndicator color={colors.accent} className="mx-2" /> : <Switch value={mail.data.learning} disabled={busy !== undefined} accessibilityLabel="Email học tập" trackColor={{ false: colors.line, true: colors.accent }} thumbColor="#ffffff" onValueChange={(learning) => void updateMail(learning)} />}
             </View>
           </View> : null}
           {sections.map((section) => <View key={section.key}>
@@ -165,7 +165,7 @@ export default function NotificationPreferencesScreen() {
                     accessibilityLabel={copy.title}
                     accessibilityHint={copy.detail}
                     trackColor={{ false: colors.line, true: colors.accent }}
-                    thumbColor={colors.canvas}
+                    thumbColor="#ffffff"
                     onValueChange={(enabled) => void update(item.eventType, enabled)}
                   />}
                 </View>;

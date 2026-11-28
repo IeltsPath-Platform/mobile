@@ -21,7 +21,8 @@ import { AuthProvider, useAuth } from "@/src/features/auth/auth-provider";
 import { useOnboarding } from "@/src/features/onboarding/use-onboarding";
 import { AUTH_ENABLED } from "@/src/lib/env";
 import { queryClient } from "@/src/lib/query-client";
-import { AppThemeProvider, rootScreenLayout, useTheme } from "@/src/theme/app-theme";
+import { ThemeSheetHost } from "@/src/features/settings/components/theme-sheet";
+import { AppThemeProvider, rootScreenLayout } from "@/src/theme/app-theme";
 import { colors } from "@/src/theme";
 import { getNotificationRoute } from "@/src/features/community/push-notifications";
 import { unreadQueryKey } from "@/src/features/community/use-unread";
@@ -97,6 +98,7 @@ export default function RootLayout() {
         <AuthProvider>
           <RootNavigator />
         </AuthProvider>
+        <ThemeSheetHost />
       </AppThemeProvider>
     </QueryClientProvider>
   );
@@ -104,7 +106,6 @@ export default function RootLayout() {
 
 function RootNavigator() {
   const router = useRouter();
-  const { isDark } = useTheme();
   const { status } = useAuth();
   const { ready, onboarded } = useOnboarding();
   const isAuthenticated = status === "authenticated";
@@ -162,7 +163,6 @@ function RootNavigator() {
 
   return (
     <>
-      <StatusBar style={enterApp && !isDark ? "dark" : "light"} />
       <Stack
         screenLayout={rootScreenLayout}
         screenOptions={{

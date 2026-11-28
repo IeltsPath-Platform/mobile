@@ -107,7 +107,7 @@ export function SettingsToggleItem({
         value={value}
         onValueChange={onChange}
         trackColor={{ false: colors.line, true: colors.accent }}
-        thumbColor={colors.surface}
+        thumbColor="#ffffff"
         ios_backgroundColor={colors.line}
       />
     </View>

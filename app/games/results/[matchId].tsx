@@ -85,9 +85,10 @@ export default function GameResultScreen() {
   const solved = rocketStats ? rocketStats.correctCount : (wordlyStats?.player.wordsSolved ?? 0);
   const attempted = rocketStats ? rocketStats.totalRounds : (wordlyStats?.player.wordsProcessed ?? 0);
   const accuracy = attempted ? solved / attempted : 0;
-  const stars = accuracy >= 0.8 ? 3 : accuracy >= 0.5 ? 2 : 1;
+  // A game left before anything was solved earns no star and no praise.
+  const stars = solved === 0 ? 0 : accuracy >= 0.8 ? 3 : accuracy >= 0.5 ? 2 : 1;
 
-  const heading = won ? 'Bạn về nhất!' : stars === 3 ? 'Xuất sắc!' : stars === 2 ? 'Làm tốt lắm!' : 'Hoàn thành ván!';
+  const heading = won ? 'Bạn về nhất!' : stars === 3 ? 'Xuất sắc!' : stars === 2 ? 'Làm tốt lắm!' : stars === 1 ? 'Hoàn thành ván!' : 'Ván đã kết thúc';
   const cards: { label: string; value: string; tone: 'accent' | 'success' | 'xp'; icon: LucideIcon }[] = rocketStats
     ? [
         { label: 'Câu đúng', value: `${rocketStats.correctCount}/${rocketStats.totalRounds}`, tone: 'success', icon: Check },

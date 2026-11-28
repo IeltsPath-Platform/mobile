@@ -12,7 +12,13 @@ import { placementApi } from './api';
 export function PlacementEntryCard() {
   const options = useQuery({ queryKey: ['placement', 'options'], queryFn: ({ signal }) => placementApi.options(signal), staleTime: 60_000, retry: 1 });
   if (!options.data) return null;
-  const { hasPlacement, currentBand } = options.data;
+  const { hasPlacement, currentBand, openAssignment } = options.data;
+  const title = openAssignment
+    ? 'Làm tiếp bài kiểm tra'
+    : hasPlacement && currentBand != null ? `Trình độ: band ${currentBand.toFixed(1)}` : 'Kiểm tra trình độ miễn phí';
+  const detail = openAssignment
+    ? 'Câu trả lời đã làm vẫn được giữ'
+    : hasPlacement ? 'Làm lại để cập nhật band của bạn' : 'Khoảng 40 phút, đủ 4 kỹ năng';
   return (
     <Pressable
       onPress={() => router.push('/placement' as never)}
@@ -24,11 +30,9 @@ export function PlacementEntryCard() {
       </View>
       <View className="flex-1">
         <Text weight="extrabold" className="text-base">
-          {hasPlacement && currentBand != null ? `Trình độ: band ${currentBand.toFixed(1)}` : 'Kiểm tra trình độ miễn phí'}
+          {title}
         </Text>
-        <Text className="text-[13px] leading-5 text-muted">
-          {hasPlacement ? 'Làm lại để cập nhật band của bạn' : 'Khoảng 40 phút, đủ 4 kỹ năng'}
-        </Text>
+        <Text className="text-[13px] leading-5 text-muted">{detail}</Text>
       </View>
       <ChevronRight size={20} color={colors.muted} />
     </Pressable>

@@ -91,7 +91,8 @@ export default function DeckStudyScreen() {
     <View className="flex-1 bg-canvas">
       <BackHeader
         title={deck.name}
-        subtitle={`${deck.dueCount} thẻ đến hạn · ${deck.cardCount} thẻ tất cả`}
+        // The session counts down on its own; a due count here would stay at its opening value.
+        subtitle={`${deck.cardCount} thẻ trong bộ`}
         fallbackHref="/(tabs)/flashcards"
       />
       <StudySession

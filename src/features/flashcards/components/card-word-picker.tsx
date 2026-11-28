@@ -66,6 +66,11 @@ export function CardWordPicker({
           Chưa tìm được từ. Bạn vẫn có thể nhập thẻ thủ công bên dưới.
         </Text>
       ) : null}
+      {search.data?.length === 0 && !search.isFetching && debounced.length >= 2 && debounced === query.trim() ? (
+        <Text className="mt-2 text-sm text-muted" accessibilityLiveRegion="polite">
+          Kho từ chưa có “{debounced}”. Bạn nhập thẻ thủ công bên dưới nhé.
+        </Text>
+      ) : null}
       {query.trim().length >= 2
         ? search.data?.slice(0, 4).map((item) => (
             <View key={item.id}>

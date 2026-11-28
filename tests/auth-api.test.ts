@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/lib/env', () => ({ API_BASE_URL: 'https://api.test', API_CONFIGURATION_ERROR: null, REQUEST_TIMEOUT_MS: 100 }));
 vi.mock('../src/lib/token-storage', () => ({ tokenStorage: { load: async () => null, save: async () => {}, clear: async () => {} } }));
-import { authApi } from '../src/features/auth/api';
+import { authApi, tokenFrom } from '../src/features/auth/api';
 
 const json = (status: number, data: unknown, headers?: Record<string, string>) =>
   new Response(JSON.stringify(data), { status, headers });
@@ -27,6 +27,15 @@ describe('auth endpoints', () => {
     vi.stubGlobal('fetch', fetchMock);
     await run();
     expect(call(fetchMock)).toEqual({ url: `https://api.test${path}`, method: 'POST', body });
+  });
+
+  it('takes the token out of a pasted email link', async () => {
+    const fetchMock = vi.fn(async () => json(200, { message: 'ok' }));
+    vi.stubGlobal('fetch', fetchMock);
+    await authApi.verifyEmail(' http://localhost:5173/verify-email?token=3441aa1d-987b ');
+    expect(call(fetchMock).body).toEqual({ token: '3441aa1d-987b' });
+    expect(tokenFrom('  plain-token ')).toBe('plain-token');
+    expect(tokenFrom('https://x.vn/reset?lang=vi&token=abc#top')).toBe('abc');
   });
 
   it('exposes Retry-After and the error code of a rate-limited login', async () => {

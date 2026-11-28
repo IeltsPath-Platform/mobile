@@ -42,6 +42,9 @@ export function ColorfulTabBar({ state, emitter, navigateToTab }: BottomTabBarPr
   }, [tabBarVisible, visibility]);
 
   return (
+    <>
+    {/* The system navigation buttons are drawn over the app: without a backdrop the scrolling text runs through them. */}
+    <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: insets.bottom, backgroundColor: colors.canvas }} />
     <Animated.View
       pointerEvents={tabBarVisible ? 'box-none' : 'none'}
       style={{
@@ -130,5 +133,6 @@ export function ColorfulTabBar({ state, emitter, navigateToTab }: BottomTabBarPr
           })}
       </View>
     </Animated.View>
+    </>
   );
 }

@@ -301,7 +301,7 @@ export default function EditProfileScreen() {
                   onValueChange={(on) => { haptics.select(); setVisibility(on ? 'PUBLIC' : 'PRIVATE'); }}
                   accessibilityLabel="Hồ sơ công khai"
                   trackColor={{ false: colors.line, true: colors.accent }}
-                  thumbColor={colors.surface}
+                  thumbColor="#ffffff"
                 />
               </View>
             </Card>

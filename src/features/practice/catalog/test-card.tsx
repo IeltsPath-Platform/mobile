@@ -49,9 +49,11 @@ export const TestCard = memo(function TestCard({ card, skill, config, partNo, do
       <View className="flex-row items-center gap-3 rounded-3xl bg-surface p-3" style={{ borderWidth: 1.5, borderBottomWidth: 3.5, borderColor: colors.line, borderBottomColor: colors.edge }}>
         {/* Fixed square so a tall cover image can never stretch the card. */}
         <View style={{ width: THUMB, height: THUMB, borderRadius: 18, overflow: 'hidden', backgroundColor: `${tint}22`, alignItems: 'center', justifyContent: 'center' }}>
+          {/* The icon stays underneath, so a cover that cannot load does not leave an empty square. */}
+          <Icon size={30} color={ink} />
           {card.coverUrl
             ? <Image source={card.coverUrl} contentFit="cover" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} transition={150} accessibilityIgnoresInvertColors />
-            : <Icon size={30} color={ink} />}
+            : null}
           {done ? (
             <View style={{ position: 'absolute', right: 6, top: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.success, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#ffffff' }}>
               <Check size={12} color="#ffffff" strokeWidth={3.5} />

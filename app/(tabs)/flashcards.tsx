@@ -209,7 +209,7 @@ export default function FlashcardsScreen() {
                         {due.data
                           ? due.data.total > 0
                             ? `${due.data.total} thẻ đến hạn`
-                            : 'Đã ôn hết thẻ!'
+                            : 'Chưa có thẻ đến hạn'
                           : 'Thẻ đến hạn'}
                       </Text>
                     </View>

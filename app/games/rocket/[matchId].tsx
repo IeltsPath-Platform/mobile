@@ -67,6 +67,12 @@ export default function RocketMatchScreen() {
         contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 16, paddingBottom: Math.max(insets.bottom, 16) + 8, gap: 12 }}
         showsVerticalScrollIndicator={false}
       >
+        {/* The icon in the header alone does not explain a countdown stopped at zero. */}
+        {!game.connected ? (
+          <Text weight="bold" accessibilityLiveRegion="polite" className="text-center text-sm text-muted">
+            Mất kết nối. Đang nối lại…
+          </Text>
+        ) : null}
         <View className="flex-row items-center gap-3">
           <View className="flex-1">
             <Text weight="bold" className="mb-1 text-xs text-muted">
