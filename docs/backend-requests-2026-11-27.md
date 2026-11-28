@@ -9,6 +9,10 @@ Bổ sung cho `backend-requests-2026-11-25.md`, `-2026-11-26.md` và `-2026-11-2
 | # | Mức | Việc | Trạng thái |
 |---|---|---|---|
 | 0 | **P0** | `DELETE /api/users/me` trả 500, không xóa được tài khoản | **Mới**, tính năng không chạy |
+| 0b | ~~P0~~ | Nộp bài kiểm tra trình độ có Speaking trả 500 (`ase.snapshot` không tồn tại) | **Đã sửa** (PR #243), đã kiểm trên máy thật 28/11 |
+| 13 | P1 | Band tổng của bài kiểm tra trình độ không tính lại khi Writing chấm xong sau | **Mới** (28/11) |
+| 14 | P1 | Speaking đã chấm nhưng không có trong `skills` của kết quả | **Mới** (28/11) |
+| 15 | P2 | game-service có lúc khởi động khi chưa lấy được cấu hình, nối Redis vào `localhost` | **Mới** (28/11) |
 | 1 | **P0** | content-service và game-service không kết nối được RabbitMQ, stack local không lên | **Mới**, chặn chạy local |
 | 2 | P1 | Phiên đăng nhập không lưu thiết bị và IP (A1) | Còn mở, có patch |
 | 3 | P1 | Gọi sai method trả 500 thay vì 405 ở 5 service (A2) | Còn mở, có patch |
@@ -55,6 +59,28 @@ ALTER TABLE refresh_tokens ADD CONSTRAINT chk_refresh_tokens_revoked_reason CHEC
 Rà thêm các giá trị `revoked_reason` khác được dùng trong code, và thêm một test Testcontainers xóa tài khoản **đang có phiên đăng nhập**.
 
 **Cách kiểm tra**: đăng ký, đăng nhập, gọi `DELETE /api/users/me` với đúng mật khẩu, phải trả 204 và không đăng nhập lại được. Các bước sau đó (sự kiện `user.deleted.v1`, dọn dữ liệu ở service khác) **chưa kiểm được** vì lỗi này chặn trước.
+
+---
+
+## 0b. P0: nộp bài kiểm tra trình độ (placement) có Speaking trả 500
+
+**Phát hiện khi làm luồng kiểm tra trình độ cho mobile và test trên máy Android thật** (27/11, `main` `beecdf57`).
+
+**Hiện tượng**: làm xong cả 4 kỹ năng (mọi section `completedAt` đã có), gọi `POST /api/assessments/attempts/{id}/submit` trả 500 "Hệ thống gặp lỗi nội bộ, vui lòng thử lại sau". Attempt kẹt ở `IN_PROGRESS`, không có kết quả. Upload ghi âm (`POST /api/assessments/speaking-recordings`) và gửi bài (`POST /api/assessments/submissions`) đều thành công.
+
+**Log PostgreSQL** (cùng lúc với request submit, gateway correlationId `6f8f87c3-c052-4064-8472-d03a25e75b00`):
+
+```
+ERROR:  column ase.snapshot does not exist at character 63
+```
+
+**Nguyên nhân**: `JdbcPlacementSpeakingGradeStore.recordings(...)` (thêm ở commit `0ebb0eeb feat(assessment): grade placement speaking recordings`) đọc `ase.snapshot` ở hai chỗ (dòng 40 và 49), nhưng cột của bảng `attempt_sections` tên là **`section_snapshot`** (jsonb). Các cột còn lại trong câu SQL (`ai.question_snapshot`, `ls.prompt_snapshot`) đúng tên và đúng kiểu.
+
+Vì câu này chạy khi submit mọi bài placement, **bản web cũng không nộp được** bài kiểm tra trình độ có phần Speaking. Test hiện có không bắt được vì không chạy câu SQL này trên schema thật (hoặc dữ liệu test không có Speaking).
+
+**Cách sửa đề xuất**: đổi `ase.snapshot` thành `ase.section_snapshot` ở cả hai dòng; thêm một test Testcontainers submit một attempt placement có ghi âm Speaking.
+
+**Cách kiểm tra**: tài khoản test `qb90412@mail.vn` trên stack local đang có attempt `9b251d57-dd82-46fc-b114-aaa5fc90cb8a` đã xong 4 kỹ năng; sau khi sửa, gọi lại submit phải trả 200 và `GET .../placement-result` có kết quả sau khi chấm.
 
 ---
 
@@ -166,9 +192,24 @@ Mục "Thiếu tham số trả 500 (26/11 #3)" trong `backend-requests-2026-11-2
 
 ---
 
+## 13–15. Phát hiện khi test luồng kiểm tra trình độ trên mobile (28/11)
+
+Kiểm trên stack local, `main` `bf217e05`, tài khoản test `qb90412@mail.vn`, attempt `9b251d57-dd82-46fc-b114-aaa5fc90cb8a` (nộp đủ 4 kỹ năng).
+
+**13. P1: band tổng không tính lại sau khi Writing chấm xong.** `GET .../placement-result` trả `overallBand: 1`, `skills` chỉ có Listening (0.0) và Reading (1.5), `partial: true`. Cùng lúc đó `sections[].essays[0].band` của Writing là **5.5**: bài viết được chấm xong sau khi band tổng đã tính và không được cộng lại. Người học thấy band tổng thấp hơn thực tế. Mobile tạm hiện band Writing lấy từ bài viết, nhưng band tổng và khóa học gợi ý vẫn theo số cũ. Đề xuất: khi bài viết hoặc bài nói của attempt placement được chấm xong, tính lại `overallBand`, `skills` và phát lại band sang Learning.
+
+**14. P1: Speaking đã chấm nhưng không có trong kết quả.** Log learning-service có `SpeakingGrader: Speaking LLM calls done` cho 2 bản ghi của attempt trên, nhưng `skills` không có `SPEAKING` và `speakingFeedback` là `null`. Có thể cùng nguyên nhân với mục 13.
+
+**15. P2: game-service có lúc khởi động khi chưa lấy được cấu hình.** Sau khi Docker khởi động lại, game-service `unhealthy` với `Unable to connect to localhost/<unresolved>:6379` dù biến `REDIS_HOST=redis` có trong container: service lên trước khi config-server sẵn sàng nên dùng giá trị mặc định. `docker compose restart game-service` là hết. Đề xuất: `depends_on: config-server: condition: service_healthy` cho game-service (nếu chưa có) và bật `spring.cloud.config.fail-fast` kèm retry.
+
+**Cấu hình local (không phải lỗi code):** `.env` đặt `ASSESSMENT_LLM_MODEL=gemini-3.8-flash`, Google trả `400 INVALID_ARGUMENT` nên bài Writing của placement không có nhận xét chi tiết. Người phụ trách `.env` nên đổi sang model đang chạy được.
+
+---
+
 ## Thứ tự đề xuất
 
-1. Mục 1 trước tiên: không sửa thì không ai chạy được `main` ở local, và có thể ảnh hưởng production ở lần deploy tới.
-2. Áp patch A1–A3 (mục 2–4), vì đã viết và test sẵn.
-3. Mục 5 trước khi nộp bản lên Google Play.
-4. Các mục còn lại theo mức ưu tiên.
+1. Mục 0 (xóa tài khoản trả 500) và mục 1 (RabbitMQ): cả hai vẫn còn trên `main` ngày 28/11. Mục 0 chặn Google Play, mục 1 chặn chạy `main` ở local.
+2. Mục 13–14: band kiểm tra trình độ sai là thứ người học nhìn thấy đầu tiên.
+3. Áp patch A1–A3 (mục 2–4), vì đã viết và test sẵn.
+4. Mục 5 trước khi nộp bản lên Google Play.
+5. Các mục còn lại theo mức ưu tiên.
